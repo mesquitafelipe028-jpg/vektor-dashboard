@@ -360,7 +360,7 @@ export default function CashFlow() {
               <p className="text-xs text-muted-foreground">Linha sólida: com recorrências · Linha tracejada: sem recorrências</p>
             </CardHeader>
             <CardContent>
-              <div className="h-72">
+              <div className="h-52 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={projectionData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
