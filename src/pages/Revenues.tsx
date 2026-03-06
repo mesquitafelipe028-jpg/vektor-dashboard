@@ -283,7 +283,7 @@ export default function Revenues() {
               {hasFilters ? "Nenhuma receita encontrada com os filtros aplicados." : "Nenhuma receita cadastrada."}
             </p>
           ) : (
-            <Table>
+            <div className="overflow-x-auto"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Descrição</TableHead>
