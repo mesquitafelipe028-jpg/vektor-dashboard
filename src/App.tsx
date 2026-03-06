@@ -24,6 +24,7 @@ const Goals = lazy(() => import("./pages/Goals"));
 const FinancialAnalysis = lazy(() => import("./pages/FinancialAnalysis"));
 const ClientDetails = lazy(() => import("./pages/ClientDetails"));
 const More = lazy(() => import("./pages/More"));
+const InvestmentCalculator = lazy(() => import("./pages/InvestmentCalculator"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
