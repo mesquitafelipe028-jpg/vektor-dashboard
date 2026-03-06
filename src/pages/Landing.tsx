@@ -38,7 +38,7 @@ export default function Landing() {
           <span className="inline-block mb-4 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
             Simples. Rápido. Para você.
           </span>
-          <h1 className="font-heading text-4xl md:text-6xl font-bold leading-tight mb-6 max-w-3xl mx-auto">
+          <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl font-bold leading-tight mb-6 max-w-3xl mx-auto">
             Controle financeiro feito para{" "}
             <span className="text-primary">quem trabalha por conta própria</span>
           </h1>
