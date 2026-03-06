@@ -24,7 +24,7 @@ const Clients = lazy(() => import("./pages/Clients"));
 const Goals = lazy(() => import("./pages/Goals"));
 const FinancialAnalysis = lazy(() => import("./pages/FinancialAnalysis"));
 const ClientDetails = lazy(() => import("./pages/ClientDetails"));
-const PainelFiscal = lazy(() => import("./pages/PainelFiscal"));
+
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
