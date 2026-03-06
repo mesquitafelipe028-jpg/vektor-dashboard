@@ -29,12 +29,11 @@ const quickActions = [
 const moreMenuItems = [
   { label: "Clientes", icon: Users, path: "/clientes" },
   { label: "Fluxo de Caixa", icon: ArrowLeftRight, path: "/fluxo-de-caixa" },
-  { label: "Impostos", icon: Receipt, path: "/impostos" },
+  { label: "Área Fiscal", icon: Receipt, path: "/impostos" },
   { label: "Relatórios", icon: BarChart3, path: "/relatorios" },
   { label: "Relatório Mensal", icon: FileText, path: "/relatorio-mensal" },
   { label: "Metas", icon: Target, path: "/metas" },
   { label: "Análise Financeira", icon: Activity, path: "/analise-financeira" },
-  { label: "Painel Fiscal", icon: FileText, path: "/painel-fiscal" },
   { label: "Configurações", icon: Settings, path: "/configuracoes" },
 ];
 

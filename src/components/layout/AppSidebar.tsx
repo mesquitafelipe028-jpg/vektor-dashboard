@@ -33,13 +33,12 @@ const mainItems = [
   { title: "Receitas", url: "/receitas", icon: TrendingUp },
   { title: "Despesas", url: "/despesas", icon: TrendingDown },
   { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
-  { title: "Impostos", url: "/impostos", icon: Receipt },
+  { title: "Área Fiscal", url: "/impostos", icon: Receipt },
   { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
   { title: "Relatório Mensal", url: "/relatorio-mensal", icon: FileText },
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Metas", url: "/metas", icon: Target },
   { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
-  { title: "Painel Fiscal", url: "/painel-fiscal", icon: FileText },
 ];
 
 const configItems = [
