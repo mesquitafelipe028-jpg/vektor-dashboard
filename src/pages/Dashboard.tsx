@@ -239,8 +239,8 @@ export default function Dashboard() {
       {/* Header + CTAs */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Visão geral das suas finanças</p>
+          <h1 className="font-heading text-2xl font-bold">Olá, bem-vindo ao Vektor</h1>
+          <p className="text-sm text-muted-foreground">Seu centro de controle financeiro.</p>
         </div>
         <div className="hidden md:flex gap-2">
           <Button size="sm" onClick={() => navigate("/receitas")}>

@@ -6,7 +6,6 @@ import {
   Receipt,
   BarChart3,
   Settings,
-  Zap,
   LogOut,
   Users,
   Target,
@@ -14,6 +13,7 @@ import {
   Calculator,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { LogoVektor } from "@/components/branding/LogoVektor";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -62,13 +62,8 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <div className="flex items-center gap-2 px-4 py-5">
-          <Zap className="h-6 w-6 text-sidebar-primary shrink-0" />
-          {!collapsed && (
-            <span className="font-heading text-lg font-bold text-sidebar-primary-foreground">
-              FluxoPro
-            </span>
-          )}
+        <div className="px-4 py-5">
+          <LogoVektor size={collapsed ? "sm" : "md"} showText={!collapsed} textClassName="text-sidebar-primary-foreground" />
         </div>
 
         <SidebarGroup>

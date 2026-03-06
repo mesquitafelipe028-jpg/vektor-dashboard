@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { LogoVektor } from "@/components/branding/LogoVektor";
 
 export default function AppLayout() {
   const isMobile = useIsMobile();
@@ -16,7 +17,7 @@ export default function AppLayout() {
           {/* Header: show sidebar trigger only on desktop */}
           <header className="h-14 flex items-center border-b border-border px-3 sm:px-4 sticky top-[env(safe-area-inset-top)] z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             {!isMobile && <SidebarTrigger className="mr-3 sm:mr-4" />}
-            <span className="text-sm text-muted-foreground font-medium">FluxoPro</span>
+            <LogoVektor size="sm" textClassName="text-muted-foreground" />
           </header>
           <main className="flex-1 overflow-x-hidden p-4 sm:p-6 pb-24 md:pb-6">
             <Outlet />
