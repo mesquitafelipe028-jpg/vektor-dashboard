@@ -103,13 +103,25 @@ export default function Dashboard() {
 
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
+  const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
+  const dismissAlert = useCallback((id: string) => {
+    setHiddenAlerts((prev) => new Set(prev).add(id));
+  }, []);
+
   const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const currentYear = now.getFullYear().toString();
+  const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const receitasMes = receitas.filter((r) => r.data.startsWith(currentMonth));
   const despesasMes = despesas.filter((d) => d.data.startsWith(currentMonth));
   const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
   const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
   const saldoMes = faturamentoMes - despesasMesTotal;
+
+  const LIMITE_MEI = 81000;
+  const faturamentoAnual = receitas
+    .filter((r) => r.data.startsWith(currentYear))
+    .reduce((s, r) => s + r.valor, 0);
+  const percentLimit = Math.min((faturamentoAnual / LIMITE_MEI) * 100, 100);
 
   // Previous month for report summary
   const prevMonth = useMemo(() => {
