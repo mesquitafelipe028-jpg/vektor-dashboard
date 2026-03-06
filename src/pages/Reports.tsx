@@ -160,11 +160,57 @@ export default function Reports() {
   const [selY, selM] = selectedMonth.split("-").map(Number);
   const monthLabel = getMonthLabel(selY, selM - 1);
 
+  const handleExportPDF = useCallback(async () => {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const imgWidth = 190;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageHeight = pdf.internal.pageSize.getHeight() - 20;
+
+      let y = 10;
+      let remainingHeight = imgHeight;
+
+      pdf.addImage(imgData, "PNG", 10, y, imgWidth, imgHeight);
+
+      // If content overflows, add pages
+      while (remainingHeight > pageHeight) {
+        remainingHeight -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 10, -(imgHeight - remainingHeight), imgWidth, imgHeight);
+      }
+
+      pdf.save(`relatorio-${selectedMonth}.pdf`);
+      toast({ title: "PDF exportado com sucesso!" });
+    } catch {
+      toast({ title: "Erro ao exportar PDF", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  }, [selectedMonth, toast]);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Relatórios</h1>
-        <p className="text-muted-foreground text-sm">Análise financeira completa</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Relatórios</h1>
+          <p className="text-muted-foreground text-sm">Análise financeira completa</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting}>
+          {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+          Exportar PDF
+        </Button>
       </div>
 
       <Tabs defaultValue="visao-geral" className="space-y-6">
