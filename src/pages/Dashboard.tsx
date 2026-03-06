@@ -22,16 +22,12 @@ import { useFinancialInsights } from "@/hooks/useFinancialInsights";
 // Lazy-load heavy recharts components
 const DashboardCharts = lazy(() => import("@/components/dashboard/DashboardCharts"));
 
-const PIE_COLORS = [
-  "hsl(160, 60%, 38%)",
-  "hsl(38, 90%, 55%)",
-  "hsl(200, 70%, 50%)",
-  "hsl(280, 60%, 55%)",
-  "hsl(0, 72%, 51%)",
-  "hsl(145, 60%, 42%)",
-  "hsl(220, 60%, 50%)",
-  "hsl(340, 60%, 50%)",
-];
+const ChartsFallback = () => (
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <Skeleton className="h-72 w-full rounded-lg" />
+    <Skeleton className="h-72 w-full rounded-lg" />
+  </div>
+);
 
 export default function Dashboard() {
   const { user } = useAuth();
