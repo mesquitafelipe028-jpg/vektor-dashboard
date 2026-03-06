@@ -186,12 +186,12 @@ export default function Revenues() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Receitas</h1>
           <p className="text-sm text-muted-foreground">Gerencie suas entradas financeiras</p>
         </div>
-        <Button onClick={() => { setForm(emptyForm); setEditingId(null); setOpen(true); }}>
+        <Button onClick={() => { setForm(emptyForm); setEditingId(null); setOpen(true); }} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Nova Receita
         </Button>
       </div>
