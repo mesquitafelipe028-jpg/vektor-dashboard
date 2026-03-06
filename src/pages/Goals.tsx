@@ -21,7 +21,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import {
   Target, Plus, Pencil, Trash2, TrendingUp, Trophy, Rocket,
-  PiggyBank, History, ArrowUpRight,
+  PiggyBank, History, ArrowUpRight, ArrowDownLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -66,6 +66,7 @@ export default function Goals() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Meta | null>(null);
   const [depositMeta, setDepositMeta] = useState<Meta | null>(null);
+  const [withdrawMeta, setWithdrawMeta] = useState<Meta | null>(null);
   const [detailMeta, setDetailMeta] = useState<Meta | null>(null);
 
   // Meta form
@@ -75,10 +76,10 @@ export default function Goals() {
   const [prazo, setPrazo] = useState("");
   const [categoria, setCategoria] = useState("Outros");
 
-  // Deposit form
-  const [depositValor, setDepositValor] = useState("");
-  const [depositDesc, setDepositDesc] = useState("");
-  const [depositData, setDepositData] = useState(new Date().toISOString().slice(0, 10));
+  // Deposit/Withdraw form
+  const [txValor, setTxValor] = useState("");
+  const [txDesc, setTxDesc] = useState("");
+  const [txData, setTxData] = useState(new Date().toISOString().slice(0, 10));
 
   const { data: metas = [], isLoading } = useQuery({
     queryKey: ["metas_financeiras"],
@@ -133,23 +134,27 @@ export default function Goals() {
     },
   });
 
+  const resetTxForm = () => {
+    setTxValor("");
+    setTxDesc("");
+    setTxData(new Date().toISOString().slice(0, 10));
+  };
+
   const addDeposit = useMutation({
     mutationFn: async () => {
       if (!depositMeta) return;
-      const valor = parseFloat(depositValor);
+      const valor = parseFloat(txValor);
       if (!valor || valor <= 0) throw new Error("Valor inválido");
 
-      // Insert deposit
       const { error: depError } = await (supabase as any).from("depositos_meta").insert({
         meta_id: depositMeta.id,
         user_id: user!.id,
         valor,
-        descricao: depositDesc.trim() || null,
-        data: depositData,
+        descricao: txDesc.trim() || null,
+        data: txData,
       });
       if (depError) throw depError;
 
-      // Update meta valor_atual
       const { error: metaError } = await (supabase as any)
         .from("metas_financeiras")
         .update({ valor_atual: depositMeta.valor_atual + valor })
@@ -161,11 +166,42 @@ export default function Goals() {
       queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
       toast.success("Depósito registrado!");
       setDepositMeta(null);
-      setDepositValor("");
-      setDepositDesc("");
-      setDepositData(new Date().toISOString().slice(0, 10));
+      resetTxForm();
     },
     onError: () => toast.error("Erro ao registrar depósito."),
+  });
+
+  const addWithdraw = useMutation({
+    mutationFn: async () => {
+      if (!withdrawMeta) return;
+      const valor = parseFloat(txValor);
+      if (!valor || valor <= 0) throw new Error("Valor inválido");
+      if (valor > withdrawMeta.valor_atual) throw new Error("Saldo insuficiente");
+
+      // Insert negative deposit
+      const { error: depError } = await (supabase as any).from("depositos_meta").insert({
+        meta_id: withdrawMeta.id,
+        user_id: user!.id,
+        valor: -valor,
+        descricao: txDesc.trim() || "Saque",
+        data: txData,
+      });
+      if (depError) throw depError;
+
+      const { error: metaError } = await (supabase as any)
+        .from("metas_financeiras")
+        .update({ valor_atual: withdrawMeta.valor_atual - valor })
+        .eq("id", withdrawMeta.id);
+      if (metaError) throw metaError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
+      queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
+      toast.success("Saque registrado!");
+      setWithdrawMeta(null);
+      resetTxForm();
+    },
+    onError: (e) => toast.error(e.message === "Saldo insuficiente" ? "Saldo insuficiente na meta." : "Erro ao registrar saque."),
   });
 
   const openNew = () => {
@@ -340,11 +376,14 @@ export default function Goals() {
                   <Separator />
 
                   <div className="flex gap-2">
-                    <Button size="sm" className="flex-1" onClick={() => setDepositMeta(meta)} disabled={pct >= 100}>
+                    <Button size="sm" className="flex-1" onClick={() => { resetTxForm(); setDepositMeta(meta); }} disabled={pct >= 100}>
                       <PiggyBank className="h-4 w-4" /> Depositar
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => setDetailMeta(meta)}>
-                      <History className="h-4 w-4" /> Histórico ({metaDepositos.length})
+                    <Button size="sm" variant="secondary" className="flex-1" onClick={() => { resetTxForm(); setWithdrawMeta(meta); }} disabled={meta.valor_atual <= 0}>
+                      <ArrowDownLeft className="h-4 w-4" /> Sacar
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setDetailMeta(meta)}>
+                      <History className="h-4 w-4" /> ({metaDepositos.length})
                     </Button>
                   </div>
                 </CardContent>
@@ -361,30 +400,62 @@ export default function Goals() {
             <DialogTitle>Depositar na Meta</DialogTitle>
             <DialogDescription>
               {depositMeta && (
-                <>
-                  {depositMeta.titulo} — Falta {formatCurrency(Math.max(depositMeta.valor_alvo - depositMeta.valor_atual, 0))}
-                </>
+                <>{depositMeta.titulo} — Falta {formatCurrency(Math.max(depositMeta.valor_alvo - depositMeta.valor_atual, 0))}</>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Valor (R$) *</Label>
-              <Input type="number" min="0.01" step="0.01" value={depositValor} onChange={(e) => setDepositValor(e.target.value)} placeholder="500.00" />
+              <Input type="number" min="0.01" step="0.01" value={txValor} onChange={(e) => setTxValor(e.target.value)} placeholder="500.00" />
             </div>
             <div>
               <Label>Descrição (opcional)</Label>
-              <Input value={depositDesc} onChange={(e) => setDepositDesc(e.target.value)} placeholder="Ex: Freelance do mês" maxLength={200} />
+              <Input value={txDesc} onChange={(e) => setTxDesc(e.target.value)} placeholder="Ex: Freelance do mês" maxLength={200} />
             </div>
             <div>
               <Label>Data</Label>
-              <Input type="date" value={depositData} onChange={(e) => setDepositData(e.target.value)} />
+              <Input type="date" value={txData} onChange={(e) => setTxData(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDepositMeta(null)}>Cancelar</Button>
-            <Button onClick={() => addDeposit.mutate()} disabled={addDeposit.isPending || !depositValor}>
+            <Button onClick={() => addDeposit.mutate()} disabled={addDeposit.isPending || !txValor}>
               <ArrowUpRight className="h-4 w-4" /> Confirmar Depósito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Dialog */}
+      <Dialog open={!!withdrawMeta} onOpenChange={() => setWithdrawMeta(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sacar da Meta</DialogTitle>
+            <DialogDescription>
+              {withdrawMeta && (
+                <>{withdrawMeta.titulo} — Saldo: {formatCurrency(withdrawMeta.valor_atual)}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Valor (R$) *</Label>
+              <Input type="number" min="0.01" step="0.01" max={withdrawMeta?.valor_atual} value={txValor} onChange={(e) => setTxValor(e.target.value)} placeholder="200.00" />
+            </div>
+            <div>
+              <Label>Motivo (opcional)</Label>
+              <Input value={txDesc} onChange={(e) => setTxDesc(e.target.value)} placeholder="Ex: Emergência" maxLength={200} />
+            </div>
+            <div>
+              <Label>Data</Label>
+              <Input type="date" value={txData} onChange={(e) => setTxData(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawMeta(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => addWithdraw.mutate()} disabled={addWithdraw.isPending || !txValor}>
+              <ArrowDownLeft className="h-4 w-4" /> Confirmar Saque
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -398,7 +469,7 @@ export default function Goals() {
               <span className="text-xl">{detailMeta && (categoryIcons[detailMeta.categoria] || "🎯")}</span>
               {detailMeta?.titulo}
             </DialogTitle>
-            <DialogDescription>Histórico de depósitos e evolução</DialogDescription>
+            <DialogDescription>Histórico de movimentações</DialogDescription>
           </DialogHeader>
 
           {detailMeta && (
@@ -455,24 +526,36 @@ export default function Goals() {
                 </Card>
               )}
 
-              {/* Deposit History */}
+              {/* Transaction History */}
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                  <History className="h-4 w-4" /> Depósitos ({detailDepositos.length})
+                  <History className="h-4 w-4" /> Movimentações ({detailDepositos.length})
                 </h3>
                 {detailDepositos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">Nenhum depósito registrado ainda.</p>
+                  <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma movimentação registrada ainda.</p>
                 ) : (
                   <div className="max-h-60 overflow-y-auto space-y-2">
-                    {[...detailDepositos].reverse().map((dep) => (
-                      <div key={dep.id} className="flex items-center justify-between rounded-lg border p-3">
-                        <div>
-                          <p className="text-sm font-medium">{dep.descricao || "Depósito"}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(dep.data)}</p>
+                    {[...detailDepositos].reverse().map((dep) => {
+                      const isWithdraw = dep.valor < 0;
+                      return (
+                        <div key={dep.id} className="flex items-center justify-between rounded-lg border p-3">
+                          <div className="flex items-center gap-2">
+                            {isWithdraw ? (
+                              <ArrowDownLeft className="h-4 w-4 text-destructive" />
+                            ) : (
+                              <ArrowUpRight className="h-4 w-4 text-primary" />
+                            )}
+                            <div>
+                              <p className="text-sm font-medium">{dep.descricao || (isWithdraw ? "Saque" : "Depósito")}</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(dep.data)}</p>
+                            </div>
+                          </div>
+                          <span className={`text-sm font-semibold ${isWithdraw ? "text-destructive" : "text-primary"}`}>
+                            {isWithdraw ? "" : "+"}{formatCurrency(dep.valor)}
+                          </span>
                         </div>
-                        <span className="text-sm font-semibold text-primary">+{formatCurrency(dep.valor)}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
