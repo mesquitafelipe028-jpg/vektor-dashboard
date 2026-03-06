@@ -59,6 +59,21 @@ export default function Dashboard() {
   const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
   const lucroLiquido = faturamentoMes - despesasMesTotal;
 
+  const insights = useFinancialInsights(receitas, despesas);
+
+  const insightColors: Record<string, string> = {
+    success: "border-l-green-500 bg-green-500/5",
+    warning: "border-l-yellow-500 bg-yellow-500/5",
+    danger: "border-l-red-500 bg-red-500/5",
+    info: "border-l-blue-500 bg-blue-500/5",
+  };
+  const insightIconColors: Record<string, string> = {
+    success: "text-green-600",
+    warning: "text-yellow-600",
+    danger: "text-red-600",
+    info: "text-blue-600",
+  };
+
   const stats = [
     { label: "Faturamento do Mês", value: faturamentoMes, icon: TrendingUp, color: "text-primary" },
     { label: "Despesas do Mês", value: despesasMesTotal, icon: TrendingDown, color: "text-destructive" },
