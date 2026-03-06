@@ -11,6 +11,7 @@ const menuItems = [
   { label: "Relatórios", icon: BarChart3, path: "/relatorios", color: "bg-chart-3/10 text-chart-3" },
   { label: "Metas", icon: Target, path: "/metas", color: "bg-chart-1/10 text-chart-1" },
   { label: "Análise", icon: Activity, path: "/analise-financeira", color: "bg-accent text-accent-foreground" },
+  { label: "Calculadora", icon: Calculator, path: "/calculadora-investimentos", color: "bg-chart-2/10 text-chart-2" },
   { label: "Configurações", icon: Settings, path: "/configuracoes", color: "bg-muted text-muted-foreground" },
 ];
 
