@@ -318,7 +318,25 @@ export default function Expenses() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Categoria</Label>
+              <Label>Descrição *</Label>
+              <Input
+                value={form.descricao}
+                onChange={(e) => {
+                  const desc = e.target.value;
+                  const updates: Partial<DespesaForm> = { descricao: desc };
+                  if (!editingId || !form.categoria) {
+                    const suggested = suggestCategory(desc);
+                    if (suggested) updates.categoria = suggested;
+                  }
+                  setForm((prev) => ({ ...prev, ...updates }));
+                }}
+                placeholder="Ex: Uber, Netflix, iFood..."
+                maxLength={200}
+              />
+              {errors.descricao && <p className="text-sm text-destructive">{errors.descricao}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria {form.categoria && suggestCategory(form.descricao) === form.categoria && <Badge variant="secondary" className="ml-2 text-xs">Sugerida automaticamente</Badge>}</Label>
               <Select value={form.categoria} onValueChange={(v) => setForm({ ...form, categoria: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
                 <SelectContent>
@@ -327,16 +345,6 @@ export default function Expenses() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Descrição *</Label>
-              <Input
-                value={form.descricao}
-                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-                placeholder="Descrição da despesa"
-                maxLength={200}
-              />
-              {errors.descricao && <p className="text-sm text-destructive">{errors.descricao}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
