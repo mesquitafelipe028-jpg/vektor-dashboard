@@ -244,7 +244,7 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Visão geral das suas finanças</p>
         </div>
-        <div className="flex gap-2">
+        <div className="hidden md:flex gap-2">
           <Button size="sm" onClick={() => navigate("/receitas")}>
             <Plus className="h-4 w-4" /> Registrar Receita
           </Button>
