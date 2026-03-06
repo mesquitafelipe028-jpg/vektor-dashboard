@@ -376,11 +376,14 @@ export default function Goals() {
                   <Separator />
 
                   <div className="flex gap-2">
-                    <Button size="sm" className="flex-1" onClick={() => setDepositMeta(meta)} disabled={pct >= 100}>
+                    <Button size="sm" className="flex-1" onClick={() => { resetTxForm(); setDepositMeta(meta); }} disabled={pct >= 100}>
                       <PiggyBank className="h-4 w-4" /> Depositar
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => setDetailMeta(meta)}>
-                      <History className="h-4 w-4" /> Histórico ({metaDepositos.length})
+                    <Button size="sm" variant="secondary" className="flex-1" onClick={() => { resetTxForm(); setWithdrawMeta(meta); }} disabled={meta.valor_atual <= 0}>
+                      <ArrowDownLeft className="h-4 w-4" /> Sacar
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setDetailMeta(meta)}>
+                      <History className="h-4 w-4" /> ({metaDepositos.length})
                     </Button>
                   </div>
                 </CardContent>
