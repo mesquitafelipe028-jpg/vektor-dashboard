@@ -213,6 +213,7 @@ export default function Reports() {
         </Button>
       </div>
 
+      <div ref={reportRef}>
       <Tabs defaultValue="visao-geral" className="space-y-6">
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="visao-geral" className="flex-1 sm:flex-initial">Visão Geral</TabsTrigger>
