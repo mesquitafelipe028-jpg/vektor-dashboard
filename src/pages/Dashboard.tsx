@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Wallet, Receipt } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
+import { useFinancialInsights } from "@/hooks/useFinancialInsights";
 import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
