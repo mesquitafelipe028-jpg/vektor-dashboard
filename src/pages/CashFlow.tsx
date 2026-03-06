@@ -483,7 +483,7 @@ export default function CashFlow() {
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-1.5">
                               <span className="capitalize">{item.descricao}</span>
-                              {item.isProjected && <Repeat className="h-3 w-3 text-chart-3 shrink-0" title="Projeção recorrente" />}
+                              {item.isProjected && <span title="Projeção recorrente"><Repeat className="h-3 w-3 text-chart-3 shrink-0" /></span>}
                             </div>
                           </TableCell>
                           <TableCell>
