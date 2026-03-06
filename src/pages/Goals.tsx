@@ -469,7 +469,7 @@ export default function Goals() {
               <span className="text-xl">{detailMeta && (categoryIcons[detailMeta.categoria] || "🎯")}</span>
               {detailMeta?.titulo}
             </DialogTitle>
-            <DialogDescription>Histórico de depósitos e evolução</DialogDescription>
+            <DialogDescription>Histórico de movimentações</DialogDescription>
           </DialogHeader>
 
           {detailMeta && (
