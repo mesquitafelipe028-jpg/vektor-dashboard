@@ -11,11 +11,12 @@ import {
   Target,
   Activity,
   Calculator,
+  LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { LogoVektor } from "@/components/branding/LogoVektor";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useCallback } from "react";
+import { memo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
@@ -36,7 +37,6 @@ const mainItems = [
   { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
   { title: "Área Fiscal", url: "/impostos", icon: Receipt },
   { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
-  
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Metas", url: "/metas", icon: Target },
   { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
@@ -46,6 +46,25 @@ const mainItems = [
 const configItems = [
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
+
+interface SidebarNavItemProps {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  isActive: boolean;
+}
+
+const SidebarNavItem = memo(({ title, url, icon: Icon, isActive }: SidebarNavItemProps) => (
+  <SidebarMenuItem>
+    <SidebarMenuButton asChild isActive={isActive}>
+      <NavLink to={url} end activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
+        <Icon className="mr-2 h-4 w-4" />
+        <span className="group-data-[collapsible=icon]:hidden">{title}</span>
+      </NavLink>
+    </SidebarMenuButton>
+  </SidebarMenuItem>
+));
+SidebarNavItem.displayName = "SidebarNavItem";
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -72,14 +91,13 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <SidebarNavItem
+                  key={item.title}
+                  title={item.title}
+                  url={item.url}
+                  icon={item.icon}
+                  isActive={isActive(item.url)}
+                />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -90,19 +108,18 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {configItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end activeClassName="bg-sidebar-accent text-sidebar-primary font-medium">
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <SidebarNavItem
+                  key={item.title}
+                  title={item.title}
+                  url={item.url}
+                  icon={item.icon}
+                  isActive={isActive(item.url)}
+                />
               ))}
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
-                  {!collapsed && <span>Sair</span>}
+                  <span className="group-data-[collapsible=icon]:hidden">Sair</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
