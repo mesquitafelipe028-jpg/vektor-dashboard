@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/mockData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -17,7 +18,9 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet, BarChart3,
   ArrowUpRight, ArrowDownRight, Minus, Activity, PiggyBank, Percent, Scale,
+  Download, Loader2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const PIE_COLORS = [
   "hsl(160, 60%, 38%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)",
