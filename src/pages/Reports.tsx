@@ -46,6 +46,9 @@ const VarIndicator = ({ value }: { value: number }) => {
 
 export default function Reports() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
   const now = new Date();
 
   const defaultMonth = now.getMonth() === 0
