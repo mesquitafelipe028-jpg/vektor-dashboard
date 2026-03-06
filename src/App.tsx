@@ -24,7 +24,7 @@ const Clients = lazy(() => import("./pages/Clients"));
 const Goals = lazy(() => import("./pages/Goals"));
 const FinancialAnalysis = lazy(() => import("./pages/FinancialAnalysis"));
 const ClientDetails = lazy(() => import("./pages/ClientDetails"));
-const PainelFiscal = lazy(() => import("./pages/PainelFiscal"));
+
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -69,7 +69,6 @@ const App = () => (
                   <Route path="/clientes/:id" element={<ClientDetails />} />
                   <Route path="/metas" element={<Goals />} />
                   <Route path="/analise-financeira" element={<FinancialAnalysis />} />
-                  <Route path="/painel-fiscal" element={<PainelFiscal />} />
                 </Route>
               </Route>
               <Route path="*" element={<NotFound />} />
