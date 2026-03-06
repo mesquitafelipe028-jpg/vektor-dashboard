@@ -411,7 +411,7 @@ export default function CashFlow() {
                         <div className="flex items-center gap-1.5">
                           <p className="text-sm font-medium truncate capitalize">{m.descricao}</p>
                           {m.isProjected && (
-                            <Repeat className="h-3 w-3 text-chart-3 shrink-0" title="Projeção recorrente" />
+                            <span title="Projeção recorrente"><Repeat className="h-3 w-3 text-chart-3 shrink-0" /></span>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">{formatDate(m.data)}</p>
