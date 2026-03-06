@@ -40,6 +40,7 @@ const moreMenuItems = [
 
 export function MobileBottomNav() {
   const [fabOpen, setFabOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
