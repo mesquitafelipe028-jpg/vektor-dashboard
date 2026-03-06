@@ -32,6 +32,7 @@ const mainItems = [
   { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
   { title: "Impostos", url: "/impostos", icon: Receipt },
   { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
+  { title: "Clientes", url: "/clientes", icon: Users },
 ];
 
 const configItems = [
