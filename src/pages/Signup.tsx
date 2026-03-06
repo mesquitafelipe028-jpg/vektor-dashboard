@@ -74,7 +74,7 @@ export default function Signup() {
             <Link to="/login" className="text-primary font-medium hover:underline">Entrar</Link>
           </p>
           <p className="text-center text-sm mt-2">
-            <Link to="/" className="text-muted-foreground hover:underline">← Voltar para o início</Link>
+            <Link to="/login" className="text-muted-foreground hover:underline">← Voltar para o início</Link>
           </p>
         </CardContent>
       </Card>
