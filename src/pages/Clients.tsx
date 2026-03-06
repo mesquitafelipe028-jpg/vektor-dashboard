@@ -109,7 +109,7 @@ export default function Clients() {
 
   const upsert = useMutation({
     mutationFn: async (values: ClienteForm) => {
-      const payload: Record<string, any> = {
+      const payload = {
         nome: values.nome.trim(),
         email: values.email.trim() || null,
         telefone: values.telefone.trim() || null,
