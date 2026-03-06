@@ -76,10 +76,10 @@ export default function Goals() {
   const [prazo, setPrazo] = useState("");
   const [categoria, setCategoria] = useState("Outros");
 
-  // Deposit form
-  const [depositValor, setDepositValor] = useState("");
-  const [depositDesc, setDepositDesc] = useState("");
-  const [depositData, setDepositData] = useState(new Date().toISOString().slice(0, 10));
+  // Deposit/Withdraw form
+  const [txValor, setTxValor] = useState("");
+  const [txDesc, setTxDesc] = useState("");
+  const [txData, setTxData] = useState(new Date().toISOString().slice(0, 10));
 
   const { data: metas = [], isLoading } = useQuery({
     queryKey: ["metas_financeiras"],
