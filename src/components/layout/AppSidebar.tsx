@@ -39,6 +39,7 @@ const mainItems = [
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Metas", url: "/metas", icon: Target },
   { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
+  { title: "Painel Fiscal", url: "/painel-fiscal", icon: FileText },
 ];
 
 const configItems = [

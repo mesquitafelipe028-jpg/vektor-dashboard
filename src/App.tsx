@@ -20,6 +20,7 @@ import Clients from "./pages/Clients";
 import Goals from "./pages/Goals";
 import FinancialAnalysis from "./pages/FinancialAnalysis";
 import ClientDetails from "./pages/ClientDetails";
+import PainelFiscal from "./pages/PainelFiscal";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -50,6 +51,7 @@ const App = () => (
                 <Route path="/clientes/:id" element={<ClientDetails />} />
                 <Route path="/metas" element={<Goals />} />
                 <Route path="/analise-financeira" element={<FinancialAnalysis />} />
+                <Route path="/painel-fiscal" element={<PainelFiscal />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
