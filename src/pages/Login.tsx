@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Zap } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { BrandHeader } from "@/components/branding/BrandHeader";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -36,12 +36,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex items-center gap-2">
-              <Zap className="h-7 w-7 text-primary" />
-              <span className="font-heading text-2xl font-bold">FluxoPro</span>
-            </div>
-          </div>
+          <BrandHeader className="mb-2" />
           <CardTitle className="font-heading text-xl">Entrar na sua conta</CardTitle>
           <CardDescription>Digite seu e-mail e senha para acessar</CardDescription>
         </CardHeader>

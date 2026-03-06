@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useCallback } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
+import { SplashScreen } from "./components/branding/SplashScreen";
 
 // Lazy-loaded pages
 const Login = lazy(() => import("./pages/Login"));
@@ -31,8 +32,8 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 min — avoid unnecessary refetches
-      gcTime: 10 * 60 * 1000,   // 10 min cache
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       refetchOnWindowFocus: false,
     },
   },
@@ -44,43 +45,49 @@ const PageFallback = () => (
   </div>
 );
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Suspense fallback={<PageFallback />}>
-            <Routes>
-              <Route path="/" element={<Login />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/cadastro" element={<Signup />} />
-              <Route element={<ProtectedRoute />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/receitas" element={<Revenues />} />
-                  <Route path="/despesas" element={<Expenses />} />
-                  <Route path="/fluxo-de-caixa" element={<CashFlow />} />
-                  <Route path="/impostos" element={<Taxes />} />
-                  <Route path="/relatorios" element={<Reports />} />
-                  
-                  <Route path="/configuracoes" element={<Settings />} />
-                  <Route path="/clientes" element={<Clients />} />
-                  <Route path="/clientes/:id" element={<ClientDetails />} />
-                  <Route path="/metas" element={<Goals />} />
-                  <Route path="/analise-financeira" element={<FinancialAnalysis />} />
-                  <Route path="/calculadora-investimentos" element={<InvestmentCalculator />} />
-                  <Route path="/mais" element={<More />} />
+const App = () => {
+  const [splashDone, setSplashDone] = useState(false);
+  const handleSplashFinish = useCallback(() => setSplashDone(true), []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        {!splashDone && <SplashScreen onFinish={handleSplashFinish} />}
+        <BrowserRouter>
+          <AuthProvider>
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route path="/" element={<Login />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/cadastro" element={<Signup />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/receitas" element={<Revenues />} />
+                    <Route path="/despesas" element={<Expenses />} />
+                    <Route path="/fluxo-de-caixa" element={<CashFlow />} />
+                    <Route path="/impostos" element={<Taxes />} />
+                    <Route path="/relatorios" element={<Reports />} />
+                    
+                    <Route path="/configuracoes" element={<Settings />} />
+                    <Route path="/clientes" element={<Clients />} />
+                    <Route path="/clientes/:id" element={<ClientDetails />} />
+                    <Route path="/metas" element={<Goals />} />
+                    <Route path="/analise-financeira" element={<FinancialAnalysis />} />
+                    <Route path="/calculadora-investimentos" element={<InvestmentCalculator />} />
+                    <Route path="/mais" element={<More />} />
+                  </Route>
                 </Route>
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

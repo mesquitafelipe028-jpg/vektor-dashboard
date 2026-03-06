@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="80" fill="#1a7a5a"/>
-  <path d="M256 100L160 260h192L256 100z" fill="none" stroke="#fff" stroke-width="14" stroke-linejoin="round"/>
-  <path d="M180 290v120M256 290v120M332 290v120" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
-  <text x="256" y="450" text-anchor="middle" fill="#fff" font-family="sans-serif" font-size="36" font-weight="bold">FluxoPro</text>
+  <rect width="512" height="512" rx="80" fill="#1E3A8A"/>
+  <path d="M128 148L256 372L384 148" stroke="#fff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="384" cy="148" r="28" fill="#10B981"/>
 </svg>
