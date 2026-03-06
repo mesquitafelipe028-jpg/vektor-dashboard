@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { TrendingDown, TrendingUp, AlertTriangle, ShieldAlert, ThumbsUp } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertTriangle, ShieldAlert, ThumbsUp, BarChart3 } from "lucide-react";
 
 type InsightType = "warning" | "danger" | "info" | "success";
 
@@ -7,6 +7,7 @@ export interface FinancialInsight {
   type: InsightType;
   title: string;
   description: string;
+  suggestion: string;
   icon: typeof TrendingDown;
 }
 
@@ -20,7 +21,7 @@ function sumByMonth(items: { data: string; valor: number }[], key: string) {
 
 export function useFinancialInsights(
   receitas: { data: string; valor: number }[],
-  despesas: { data: string; valor: number }[]
+  despesas: { data: string; valor: number; categoria?: string | null }[]
 ): FinancialInsight[] {
   return useMemo(() => {
     const insights: FinancialInsight[] = [];
@@ -42,6 +43,7 @@ export function useFinancialInsights(
         type: "warning",
         title: "Aumento de despesas",
         description: `Suas despesas subiram ${pct}% em relação ao mês anterior.`,
+        suggestion: "Revise seus gastos e identifique onde pode economizar.",
         icon: TrendingUp,
       });
     }
@@ -53,13 +55,44 @@ export function useFinancialInsights(
         type: "danger",
         title: "Queda de faturamento",
         description: `Seu faturamento caiu ${pct}% em relação ao mês anterior.`,
+        suggestion: "Avalie novas fontes de receita ou renegocie com clientes.",
         icon: TrendingDown,
       });
     }
 
-    // 3. Lucro abaixo da média (últimos 6 meses)
+    // 3. Categoria que mais cresceu (>30%)
+    const catTotalsCur: Record<string, number> = {};
+    const catTotalsPrev: Record<string, number> = {};
+    for (const d of despesas) {
+      const cat = d.categoria || "Outros";
+      if (d.data.startsWith(curKey)) catTotalsCur[cat] = (catTotalsCur[cat] || 0) + d.valor;
+      if (d.data.startsWith(prevKey)) catTotalsPrev[cat] = (catTotalsPrev[cat] || 0) + d.valor;
+    }
+    let topCat = "";
+    let topPct = 0;
+    for (const cat of Object.keys(catTotalsCur)) {
+      const prev = catTotalsPrev[cat] || 0;
+      if (prev > 0) {
+        const pct = (catTotalsCur[cat] - prev) / prev;
+        if (pct > 0.3 && pct > topPct) {
+          topPct = pct;
+          topCat = cat;
+        }
+      }
+    }
+    if (topCat) {
+      insights.push({
+        type: "warning",
+        title: `Crescimento em ${topCat}`,
+        description: `Seus gastos com ${topCat} cresceram ${Math.round(topPct * 100)}% em relação ao mês anterior.`,
+        suggestion: `Considere alternativas mais econômicas para ${topCat}.`,
+        icon: BarChart3,
+      });
+    }
+
+    // 4. Lucro abaixo da média (últimos 3 meses)
     const lucros: number[] = [];
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 3; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const k = getMonthKey(d);
       lucros.push(sumByMonth(receitas, k) - sumByMonth(despesas, k));
@@ -70,27 +103,30 @@ export function useFinancialInsights(
       insights.push({
         type: "warning",
         title: "Lucro abaixo da média",
-        description: `Seu lucro este mês está abaixo de 70% da média dos últimos 6 meses.`,
+        description: `Seu lucro este mês está abaixo de 70% da média dos últimos 3 meses.`,
+        suggestion: "Compare seus custos fixos e variáveis para encontrar oportunidades.",
         icon: AlertTriangle,
       });
     }
 
-    // 4. Previsão de déficit
+    // 5. Previsão de déficit
     if (despCur > recCur && recCur > 0) {
       insights.push({
         type: "danger",
         title: "Previsão de déficit",
         description: `Suas despesas superam o faturamento neste mês. Atenção ao fluxo de caixa.`,
+        suggestion: "Priorize cobranças pendentes e adie despesas não essenciais.",
         icon: ShieldAlert,
       });
     }
 
-    // 5. Mês positivo
+    // 6. Mês positivo
     if (avgLucro > 0 && lucroCur > avgLucro) {
       insights.push({
         type: "success",
         title: "Mês positivo!",
-        description: `Seu lucro está acima da média dos últimos 6 meses. Continue assim!`,
+        description: `Seu lucro está acima da média dos últimos 3 meses. Continue assim!`,
+        suggestion: "Aproveite para criar uma reserva de emergência.",
         icon: ThumbsUp,
       });
     }

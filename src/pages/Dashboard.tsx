@@ -136,6 +136,7 @@ export default function Dashboard() {
                     <div>
                       <p className="text-sm font-semibold">{insight.title}</p>
                       <p className="text-xs text-muted-foreground">{insight.description}</p>
+                      <p className="text-xs text-muted-foreground italic mt-1">💡 {insight.suggestion}</p>
                     </div>
                   </CardContent>
                 </Card>
