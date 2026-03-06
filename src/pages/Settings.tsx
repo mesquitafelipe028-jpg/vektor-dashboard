@@ -74,6 +74,8 @@ export default function Settings() {
   const [cnpjInput, setCnpjInput] = useState("");
   const [searching, setSearching] = useState(false);
   const [cnpjFound, setCnpjFound] = useState<boolean | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
