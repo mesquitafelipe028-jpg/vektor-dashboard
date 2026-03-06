@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Wallet, Receipt } from "lucide-react";
-import { formatCurrency, formatDate, impostoPendente } from "@/lib/mockData";
+import { formatCurrency, formatDate } from "@/lib/mockData";
 import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -27,6 +27,22 @@ export default function Dashboard() {
     queryKey: ["despesas"],
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: impostoPendente } = useQuery({
+    queryKey: ["impostos_mei_pendente"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("impostos_mei")
+        .select("*")
+        .eq("status", "pendente")
+        .order("vencimento", { ascending: true })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },

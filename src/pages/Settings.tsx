@@ -1,15 +1,73 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 export default function Settings() {
-  const [name, setName] = useState("João Silva");
-  const [email, setEmail] = useState("joao@email.com");
-  const [cnpj, setCnpj] = useState("12.345.678/0001-00");
-  const [phone, setPhone] = useState("(11) 99999-0000");
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [nome, setNome] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user!.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    if (profile) setNome(profile.nome);
+  }, [profile]);
+
+  const updateProfile = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ nome })
+        .eq("id", user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Perfil atualizado");
+    },
+    onError: () => toast.error("Erro ao atualizar perfil"),
+  });
+
+  const changePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast.error("As senhas não coincidem");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      toast.error("Erro ao alterar senha");
+    } else {
+      toast.success("Senha alterada com sucesso");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -24,22 +82,16 @@ export default function Settings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome completo</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input id="name" value={nome} onChange={(e) => setNome(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Telefone</Label>
-              <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cnpj">CNPJ</Label>
-              <Input id="cnpj" value={cnpj} onChange={(e) => setCnpj(e.target.value)} />
+              <Input id="email" type="email" value={user?.email ?? ""} disabled className="opacity-70" />
             </div>
           </div>
-          <Button>Salvar alterações</Button>
+          <Button onClick={() => updateProfile.mutate()} disabled={updateProfile.isPending}>
+            Salvar alterações
+          </Button>
         </CardContent>
       </Card>
 
@@ -48,19 +100,19 @@ export default function Settings() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="current-password">Senha atual</Label>
-            <Input id="current-password" type="password" placeholder="••••••••" />
+            <Input id="current-password" type="password" placeholder="••••••••" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="new-password">Nova senha</Label>
-              <Input id="new-password" type="password" placeholder="••••••••" />
+              <Input id="new-password" type="password" placeholder="••••••••" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirmar senha</Label>
-              <Input id="confirm-password" type="password" placeholder="••••••••" />
+              <Input id="confirm-password" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
           </div>
-          <Button variant="outline">Alterar senha</Button>
+          <Button variant="outline" onClick={changePassword}>Alterar senha</Button>
         </CardContent>
       </Card>
 

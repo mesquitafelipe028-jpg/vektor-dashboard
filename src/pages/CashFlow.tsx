@@ -1,9 +1,56 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockMonthlyData, formatCurrency, saldo } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/mockData";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ArrowLeftRight } from "lucide-react";
+import { useMemo } from "react";
 
 export default function CashFlow() {
+  const { user } = useAuth();
+
+  const { data: receitas = [] } = useQuery({
+    queryKey: ["receitas"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("receitas").select("*");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: despesas = [] } = useQuery({
+    queryKey: ["despesas"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("despesas").select("*");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const totalReceitas = receitas.reduce((s, r) => s + r.valor, 0);
+  const totalDespesas = despesas.reduce((s, d) => s + d.valor, 0);
+  const saldo = totalReceitas - totalDespesas;
+
+  const monthlyData = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+      const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+      const desp = despesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+      return {
+        month: label.charAt(0).toUpperCase() + label.slice(1),
+        receitas: rec,
+        despesas: desp,
+        saldo: rec - desp,
+      };
+    });
+  }, [receitas, despesas]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -28,10 +75,10 @@ export default function CashFlow() {
         <CardContent>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockMonthlyData}>
+              <AreaChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" className="text-xs" />
-                <YAxis className="text-xs" tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                <YAxis className="text-xs" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: number) => formatCurrency(v)} />
                 <Area type="monotone" dataKey="receitas" name="Receitas" stroke="hsl(160, 60%, 38%)" fill="hsl(160, 60%, 38%)" fillOpacity={0.15} strokeWidth={2} />
                 <Area type="monotone" dataKey="despesas" name="Despesas" stroke="hsl(0, 72%, 51%)" fill="hsl(0, 72%, 51%)" fillOpacity={0.1} strokeWidth={2} />
@@ -45,7 +92,7 @@ export default function CashFlow() {
         <CardHeader><CardTitle className="font-heading text-lg">Resumo por Mês</CardTitle></CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mockMonthlyData.map((m) => (
+            {monthlyData.map((m) => (
               <div key={m.month} className="rounded-lg border border-border p-4">
                 <p className="font-heading font-semibold text-lg mb-3">{m.month}</p>
                 <div className="space-y-1 text-sm">
