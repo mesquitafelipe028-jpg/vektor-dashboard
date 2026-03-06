@@ -336,7 +336,7 @@ export default function Dashboard() {
           <Card>
             <CardHeader><CardTitle className="font-heading text-lg">Despesas por Categoria</CardTitle></CardHeader>
             <CardContent>
-              <div className="h-72">
+              <div className="h-52 sm:h-72">
                 {categoryData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
                     Nenhuma despesa registrada este mês.
