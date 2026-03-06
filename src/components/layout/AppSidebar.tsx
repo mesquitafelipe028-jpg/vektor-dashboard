@@ -10,7 +10,6 @@ import {
   LogOut,
   Users,
   Target,
-  FileText,
   Activity,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
