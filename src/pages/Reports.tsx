@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/mockData";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -17,7 +18,9 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet, BarChart3,
   ArrowUpRight, ArrowDownRight, Minus, Activity, PiggyBank, Percent, Scale,
+  Download, Loader2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const PIE_COLORS = [
   "hsl(160, 60%, 38%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)",
@@ -43,6 +46,9 @@ const VarIndicator = ({ value }: { value: number }) => {
 
 export default function Reports() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
   const now = new Date();
 
   const defaultMonth = now.getMonth() === 0
@@ -154,13 +160,60 @@ export default function Reports() {
   const [selY, selM] = selectedMonth.split("-").map(Number);
   const monthLabel = getMonthLabel(selY, selM - 1);
 
+  const handleExportPDF = useCallback(async () => {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const imgWidth = 190;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageHeight = pdf.internal.pageSize.getHeight() - 20;
+
+      let y = 10;
+      let remainingHeight = imgHeight;
+
+      pdf.addImage(imgData, "PNG", 10, y, imgWidth, imgHeight);
+
+      // If content overflows, add pages
+      while (remainingHeight > pageHeight) {
+        remainingHeight -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 10, -(imgHeight - remainingHeight), imgWidth, imgHeight);
+      }
+
+      pdf.save(`relatorio-${selectedMonth}.pdf`);
+      toast({ title: "PDF exportado com sucesso!" });
+    } catch {
+      toast({ title: "Erro ao exportar PDF", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  }, [selectedMonth, toast]);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Relatórios</h1>
-        <p className="text-muted-foreground text-sm">Análise financeira completa</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Relatórios</h1>
+          <p className="text-muted-foreground text-sm">Análise financeira completa</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting}>
+          {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+          Exportar PDF
+        </Button>
       </div>
 
+      <div ref={reportRef}>
       <Tabs defaultValue="visao-geral" className="space-y-6">
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="visao-geral" className="flex-1 sm:flex-initial">Visão Geral</TabsTrigger>
@@ -359,6 +412,7 @@ export default function Reports() {
           </div>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }
