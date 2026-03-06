@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, lazy, Suspense } from "react";
 import { useQuery, useIsFetching } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,21 +18,16 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
-import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
 
-const PIE_COLORS = [
-  "hsl(160, 60%, 38%)",
-  "hsl(38, 90%, 55%)",
-  "hsl(200, 70%, 50%)",
-  "hsl(280, 60%, 55%)",
-  "hsl(0, 72%, 51%)",
-  "hsl(145, 60%, 42%)",
-  "hsl(220, 60%, 50%)",
-  "hsl(340, 60%, 50%)",
-];
+// Lazy-load heavy recharts components
+const DashboardCharts = lazy(() => import("@/components/dashboard/DashboardCharts"));
+
+const ChartsFallback = () => (
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <Skeleton className="h-72 w-full rounded-lg" />
+    <Skeleton className="h-72 w-full rounded-lg" />
+  </div>
+);
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -447,65 +442,10 @@ export default function Dashboard() {
 
       <Separator />
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-          <Card>
-            <CardHeader><CardTitle className="font-heading text-lg">Receitas vs Despesas</CardTitle></CardHeader>
-            <CardContent>
-              <div className="h-52 sm:h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData} barGap={4}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis className="text-xs" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                    <Legend />
-                    <Bar dataKey="receitas" name="Receitas" fill="hsl(160, 60%, 38%)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="despesas" name="Despesas" fill="hsl(0, 72%, 51%)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-          <Card>
-            <CardHeader><CardTitle className="font-heading text-lg">Despesas por Categoria</CardTitle></CardHeader>
-            <CardContent>
-              <div className="h-52 sm:h-72">
-                {categoryData.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-                    Nenhuma despesa registrada este mês.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={45}
-                        outerRadius={75}
-                        paddingAngle={3}
-                        dataKey="value"
-                        nameKey="name"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {categoryData.map((_, idx) => (
-                          <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+      {/* Charts — lazy-loaded */}
+      <Suspense fallback={<ChartsFallback />}>
+        <DashboardCharts monthlyData={monthlyData} categoryData={categoryData} />
+      </Suspense>
 
       {/* Meta Financeira Card */}
       {metaAtual && (
