@@ -227,7 +227,7 @@ export default function Dashboard() {
                 <Wallet className="h-5 w-5 text-chart-3" />
                 <span className="text-sm text-muted-foreground">Saldo do Mês</span>
               </div>
-              <p className={`font-heading text-4xl font-bold ${saldoMes >= 0 ? "text-primary" : "text-destructive"}`}>
+              <p className={`font-heading text-2xl sm:text-4xl font-bold ${saldoMes >= 0 ? "text-primary" : "text-destructive"}`}>
                 {formatCurrency(saldoMes)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
