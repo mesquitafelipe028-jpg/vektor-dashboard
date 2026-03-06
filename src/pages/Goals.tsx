@@ -400,30 +400,62 @@ export default function Goals() {
             <DialogTitle>Depositar na Meta</DialogTitle>
             <DialogDescription>
               {depositMeta && (
-                <>
-                  {depositMeta.titulo} — Falta {formatCurrency(Math.max(depositMeta.valor_alvo - depositMeta.valor_atual, 0))}
-                </>
+                <>{depositMeta.titulo} — Falta {formatCurrency(Math.max(depositMeta.valor_alvo - depositMeta.valor_atual, 0))}</>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Valor (R$) *</Label>
-              <Input type="number" min="0.01" step="0.01" value={depositValor} onChange={(e) => setDepositValor(e.target.value)} placeholder="500.00" />
+              <Input type="number" min="0.01" step="0.01" value={txValor} onChange={(e) => setTxValor(e.target.value)} placeholder="500.00" />
             </div>
             <div>
               <Label>Descrição (opcional)</Label>
-              <Input value={depositDesc} onChange={(e) => setDepositDesc(e.target.value)} placeholder="Ex: Freelance do mês" maxLength={200} />
+              <Input value={txDesc} onChange={(e) => setTxDesc(e.target.value)} placeholder="Ex: Freelance do mês" maxLength={200} />
             </div>
             <div>
               <Label>Data</Label>
-              <Input type="date" value={depositData} onChange={(e) => setDepositData(e.target.value)} />
+              <Input type="date" value={txData} onChange={(e) => setTxData(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDepositMeta(null)}>Cancelar</Button>
-            <Button onClick={() => addDeposit.mutate()} disabled={addDeposit.isPending || !depositValor}>
+            <Button onClick={() => addDeposit.mutate()} disabled={addDeposit.isPending || !txValor}>
               <ArrowUpRight className="h-4 w-4" /> Confirmar Depósito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Dialog */}
+      <Dialog open={!!withdrawMeta} onOpenChange={() => setWithdrawMeta(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sacar da Meta</DialogTitle>
+            <DialogDescription>
+              {withdrawMeta && (
+                <>{withdrawMeta.titulo} — Saldo: {formatCurrency(withdrawMeta.valor_atual)}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Valor (R$) *</Label>
+              <Input type="number" min="0.01" step="0.01" max={withdrawMeta?.valor_atual} value={txValor} onChange={(e) => setTxValor(e.target.value)} placeholder="200.00" />
+            </div>
+            <div>
+              <Label>Motivo (opcional)</Label>
+              <Input value={txDesc} onChange={(e) => setTxDesc(e.target.value)} placeholder="Ex: Emergência" maxLength={200} />
+            </div>
+            <div>
+              <Label>Data</Label>
+              <Input type="date" value={txData} onChange={(e) => setTxData(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWithdrawMeta(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => addWithdraw.mutate()} disabled={addWithdraw.isPending || !txValor}>
+              <ArrowDownLeft className="h-4 w-4" /> Confirmar Saque
             </Button>
           </DialogFooter>
         </DialogContent>
