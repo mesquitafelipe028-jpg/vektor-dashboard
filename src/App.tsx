@@ -18,6 +18,7 @@ import MonthlyReport from "./pages/MonthlyReport";
 import Settings from "./pages/Settings";
 import Clients from "./pages/Clients";
 import Goals from "./pages/Goals";
+import FinancialAnalysis from "./pages/FinancialAnalysis";
 import ClientDetails from "./pages/ClientDetails";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
@@ -48,6 +49,7 @@ const App = () => (
                 <Route path="/clientes" element={<Clients />} />
                 <Route path="/clientes/:id" element={<ClientDetails />} />
                 <Route path="/metas" element={<Goals />} />
+                <Route path="/analise-financeira" element={<FinancialAnalysis />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
