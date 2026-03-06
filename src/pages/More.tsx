@@ -9,7 +9,6 @@ const menuItems = [
   { label: "Fluxo de Caixa", icon: ArrowLeftRight, path: "/fluxo-de-caixa", color: "bg-chart-2/10 text-chart-2" },
   { label: "Área Fiscal", icon: Receipt, path: "/impostos", color: "bg-chart-4/10 text-chart-4" },
   { label: "Relatórios", icon: BarChart3, path: "/relatorios", color: "bg-chart-3/10 text-chart-3" },
-  { label: "Rel. Mensal", icon: FileText, path: "/relatorio-mensal", color: "bg-chart-5/10 text-chart-5" },
   { label: "Metas", icon: Target, path: "/metas", color: "bg-chart-1/10 text-chart-1" },
   { label: "Análise", icon: Activity, path: "/analise-financeira", color: "bg-accent text-accent-foreground" },
   { label: "Configurações", icon: Settings, path: "/configuracoes", color: "bg-muted text-muted-foreground" },
