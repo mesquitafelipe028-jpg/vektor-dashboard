@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle,
 } from "@/components/ui/drawer";
+import { QuickAddModal } from "./QuickAddModal";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
