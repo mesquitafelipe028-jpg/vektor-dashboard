@@ -1,15 +1,22 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, TrendingUp, TrendingDown, Users, Plus, X, Receipt, UserPlus } from "lucide-react";
+import {
+  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus,
+  MoreHorizontal, Users, ArrowLeftRight, BarChart3, FileText, Target, Activity, Settings, LogOut,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Drawer, DrawerContent, DrawerHeader, DrawerTitle,
+} from "@/components/ui/drawer";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Receitas", icon: TrendingUp, path: "/receitas" },
   { label: "Adicionar", icon: Plus, path: "", isFab: true },
   { label: "Despesas", icon: TrendingDown, path: "/despesas" },
-  { label: "Clientes", icon: Users, path: "/clientes" },
+  { label: "Mais", icon: MoreHorizontal, path: "", isMore: true },
 ];
 
 const quickActions = [
@@ -18,12 +25,33 @@ const quickActions = [
   { label: "Adicionar Cliente", icon: UserPlus, path: "/clientes", color: "text-chart-3" },
 ];
 
+const moreMenuItems = [
+  { label: "Clientes", icon: Users, path: "/clientes" },
+  { label: "Fluxo de Caixa", icon: ArrowLeftRight, path: "/fluxo-de-caixa" },
+  { label: "Impostos", icon: Receipt, path: "/impostos" },
+  { label: "Relatórios", icon: BarChart3, path: "/relatorios" },
+  { label: "Relatório Mensal", icon: FileText, path: "/relatorio-mensal" },
+  { label: "Metas", icon: Target, path: "/metas" },
+  { label: "Análise Financeira", icon: Activity, path: "/analise-financeira" },
+  { label: "Painel Fiscal", icon: FileText, path: "/painel-fiscal" },
+  { label: "Configurações", icon: Settings, path: "/configuracoes" },
+];
+
 export function MobileBottomNav() {
   const [fabOpen, setFabOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
+  const isMoreActive = moreMenuItems.some((item) => isActive(item.path));
+
+  const handleLogout = async () => {
+    setMoreOpen(false);
+    await signOut();
+    navigate("/login");
+  };
 
   return (
     <>
@@ -62,6 +90,46 @@ export function MobileBottomNav() {
         )}
       </AnimatePresence>
 
+      {/* More drawer */}
+      <Drawer open={moreOpen} onOpenChange={setMoreOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Menu</DrawerTitle>
+          </DrawerHeader>
+          <div className="px-4 pb-6 flex flex-col gap-1">
+            {moreMenuItems.map((item) => {
+              const active = isActive(item.path);
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    navigate(item.path);
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground hover:bg-muted"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+            <div className="my-2 h-px bg-border" />
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Sair</span>
+            </button>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
       {/* Bottom navigation bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-[997] bg-card border-t border-border md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="flex items-center justify-around h-16">
@@ -76,6 +144,22 @@ export function MobileBottomNav() {
                   <motion.div animate={{ rotate: fabOpen ? 45 : 0 }} transition={{ duration: 0.2 }}>
                     {fabOpen ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
                   </motion.div>
+                </button>
+              );
+            }
+
+            if (item.isMore) {
+              return (
+                <button
+                  key="more"
+                  onClick={() => setMoreOpen(true)}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-0.5 flex-1 py-2 transition-colors",
+                    isMoreActive ? "text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                  <span className="text-[10px] font-medium">Mais</span>
                 </button>
               );
             }
