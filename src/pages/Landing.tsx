@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Zap, BarChart3, Shield, TrendingUp, ArrowRight, Check } from "lucide-react";
 
@@ -34,7 +33,7 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="container mx-auto px-4 py-24 text-center">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+        <div className="animate-fade-in">
           <span className="inline-block mb-4 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
             Simples. Rápido. Para você.
           </span>
@@ -53,7 +52,7 @@ export default function Landing() {
               <Link to="/login">Já tenho conta</Link>
             </Button>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* Features */}
@@ -61,12 +60,15 @@ export default function Landing() {
         <h2 className="font-heading text-3xl font-bold text-center mb-12">Tudo que você precisa</h2>
         <div className="grid md:grid-cols-3 gap-8">
           {features.map((f, i) => (
-            <motion.div key={f.title} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.15 }}
-              className="rounded-xl border border-border bg-card p-8 hover:shadow-lg transition-shadow">
+            <div
+              key={f.title}
+              className="rounded-xl border border-border bg-card p-8 hover:shadow-lg transition-shadow animate-fade-in"
+              style={{ animationDelay: `${i * 150}ms`, animationFillMode: "both" }}
+            >
               <f.icon className="h-10 w-10 text-primary mb-4" />
               <h3 className="font-heading text-xl font-semibold mb-2">{f.title}</h3>
               <p className="text-muted-foreground">{f.desc}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
