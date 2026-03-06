@@ -412,6 +412,7 @@ export default function Reports() {
           </div>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }
