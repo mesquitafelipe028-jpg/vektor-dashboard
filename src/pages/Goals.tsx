@@ -66,6 +66,7 @@ export default function Goals() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Meta | null>(null);
   const [depositMeta, setDepositMeta] = useState<Meta | null>(null);
+  const [withdrawMeta, setWithdrawMeta] = useState<Meta | null>(null);
   const [detailMeta, setDetailMeta] = useState<Meta | null>(null);
 
   // Meta form
