@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle,
 } from "@/components/ui/drawer";
+import { QuickAddModal } from "./QuickAddModal";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -39,6 +40,7 @@ const moreMenuItems = [
 
 export function MobileBottomNav() {
   const [fabOpen, setFabOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -57,6 +59,9 @@ export function MobileBottomNav() {
 
   return (
     <>
+      {/* Quick Add Modal */}
+      <QuickAddModal open={quickAddOpen} onOpenChange={setQuickAddOpen} />
+
       {/* FAB overlay + actions */}
       <AnimatePresence>
         {fabOpen && (
@@ -74,6 +79,17 @@ export function MobileBottomNav() {
               exit={{ opacity: 0, y: 40 }}
               className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[999] flex flex-col gap-3 items-center"
             >
+              {/* Quick transaction button */}
+              <button
+                onClick={() => {
+                  setFabOpen(false);
+                  setTimeout(() => setQuickAddOpen(true), 200);
+                }}
+                className="flex items-center gap-3 bg-card border border-border rounded-full px-5 py-3 shadow-lg min-w-[200px]"
+              >
+                <Plus className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium text-foreground">Registro Rápido</span>
+              </button>
               {quickActions.map((action) => (
                 <button
                   key={action.label}
