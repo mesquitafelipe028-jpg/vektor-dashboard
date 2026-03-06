@@ -7,11 +7,12 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   TrendingUp, TrendingDown, Wallet, Receipt,
   Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert, Target,
-  FileText, ArrowUpRight, ArrowDownRight,
+  FileText, ArrowUpRight, ArrowDownRight, Building2,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
@@ -81,6 +82,20 @@ export default function Dashboard() {
         .order("prazo", { ascending: true });
       if (error) throw error;
       return data as { id: string; titulo: string; valor_alvo: number; valor_atual: number; prazo: string; categoria: string }[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: empresa } = useQuery({
+    queryKey: ["empresa", user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("empresas")
+        .select("*")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
     },
     enabled: !!user,
   });
@@ -173,6 +188,35 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Company Card */}
+      {empresa && (
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-heading font-semibold text-sm truncate">{empresa.razao_social || empresa.nome_fantasia || "Empresa"}</p>
+                {empresa.nome_fantasia && empresa.razao_social && (
+                  <p className="text-xs text-muted-foreground truncate">{empresa.nome_fantasia}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {empresa.situacao_cadastral && (
+                  <Badge variant={empresa.situacao_cadastral.toLowerCase().includes("ativa") ? "default" : "destructive"} className="text-xs">
+                    {empresa.situacao_cadastral}
+                  </Badge>
+                )}
+                {empresa.cnae_principal && (
+                  <span className="text-xs text-muted-foreground hidden sm:block max-w-48 truncate">{empresa.cnae_principal}</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Saldo + Saúde Financeira */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
