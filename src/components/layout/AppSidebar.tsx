@@ -10,7 +10,6 @@ import {
   LogOut,
   Users,
   Target,
-  FileText,
   Activity,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -35,7 +34,7 @@ const mainItems = [
   { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
   { title: "Área Fiscal", url: "/impostos", icon: Receipt },
   { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
-  { title: "Relatório Mensal", url: "/relatorio-mensal", icon: FileText },
+  
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Metas", url: "/metas", icon: Target },
   { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },

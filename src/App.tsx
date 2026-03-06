@@ -17,7 +17,7 @@ const Expenses = lazy(() => import("./pages/Expenses"));
 const CashFlow = lazy(() => import("./pages/CashFlow"));
 const Taxes = lazy(() => import("./pages/Taxes"));
 const Reports = lazy(() => import("./pages/Reports"));
-const MonthlyReport = lazy(() => import("./pages/MonthlyReport"));
+
 const Settings = lazy(() => import("./pages/Settings"));
 const Clients = lazy(() => import("./pages/Clients"));
 const Goals = lazy(() => import("./pages/Goals"));
@@ -63,7 +63,7 @@ const App = () => (
                   <Route path="/fluxo-de-caixa" element={<CashFlow />} />
                   <Route path="/impostos" element={<Taxes />} />
                   <Route path="/relatorios" element={<Reports />} />
-                  <Route path="/relatorio-mensal" element={<MonthlyReport />} />
+                  
                   <Route path="/configuracoes" element={<Settings />} />
                   <Route path="/clientes" element={<Clients />} />
                   <Route path="/clientes/:id" element={<ClientDetails />} />
