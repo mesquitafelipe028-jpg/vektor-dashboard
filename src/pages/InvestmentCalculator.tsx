@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Calculator, TrendingUp, Wallet, PiggyBank } from "lucide-react";
+import { Calculator, TrendingUp, Wallet, PiggyBank, Target, Lightbulb } from "lucide-react";
+import { motion } from "framer-motion";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
+import { CreateGoalModal } from "@/components/investment/CreateGoalModal";
 
 const PRESET_RATES = [
   { label: "6% ao ano", value: 6 },
@@ -40,7 +42,6 @@ function calcCompoundInterest(
     }
   }
 
-  // push last point if period not divisible by 12
   if (months % 12 !== 0) {
     chartData.push({
       ano: Math.round((months / 12) * 10) / 10,
@@ -66,6 +67,7 @@ export default function InvestmentCalculator() {
   const [rate, setRate] = useState("");
   const [years, setYears] = useState("");
   const [calculated, setCalculated] = useState(false);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
 
   const result = useMemo(() => {
     if (!calculated) return null;
@@ -77,16 +79,20 @@ export default function InvestmentCalculator() {
     return calcCompoundInterest(i, m, r, y);
   }, [calculated, initial, monthly, rate, years]);
 
-  const handleCalculate = () => {
-    setCalculated(true);
-  };
+  const insightText = useMemo(() => {
+    if (!result) return "";
+    const m = parseFloat(monthly) || 0;
+    const y = parseFloat(years) || 0;
+    const r = parseFloat(rate) || 0;
+    return `Investindo ${fmt(m)} por mês durante ${y} ${y === 1 ? "ano" : "anos"} com taxa de ${r}% ao ano, seu patrimônio pode chegar a aproximadamente ${fmt(result.finalValue)}.`;
+  }, [result, monthly, years, rate]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Calculator className="h-6 w-6 text-primary" />
         <h1 className="text-2xl font-bold text-foreground">
-          Calculadora de Investimentos
+          Planejador de Investimentos
         </h1>
       </div>
 
@@ -146,57 +152,64 @@ export default function InvestmentCalculator() {
             ))}
           </div>
 
-          <Button className="w-full sm:w-auto" onClick={handleCalculate}>
-            <Calculator className="h-4 w-4 mr-2" /> Calcular
+          <Button className="w-full sm:w-auto" onClick={() => setCalculated(true)}>
+            <Calculator className="h-4 w-4 mr-2" /> Simular investimento
           </Button>
         </CardContent>
       </Card>
 
       {/* Results */}
       {result && (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 shrink-0">
-                  <Wallet className="h-6 w-6 text-primary" />
+        <motion.div
+          className="space-y-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          {/* Result Card */}
+          <Card className="border-primary/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Resultado da simulação</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 shrink-0">
+                    <Wallet className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Investido</p>
+                    <p className="text-lg font-bold text-foreground">{fmt(result.totalInvested)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Investido</p>
-                  <p className="text-lg font-bold text-foreground">{fmt(result.totalInvested)}</p>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-chart-2/10 shrink-0">
-                  <PiggyBank className="h-6 w-6 text-chart-2" />
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center h-14 w-14 rounded-full bg-chart-2/15 shrink-0">
+                    <PiggyBank className="h-7 w-7 text-chart-2" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Final Estimado</p>
+                    <p className="text-2xl font-bold text-chart-2">{fmt(result.finalValue)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Valor Final</p>
-                  <p className="text-lg font-bold text-foreground">{fmt(result.finalValue)}</p>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex items-center justify-center h-12 w-12 rounded-full bg-chart-1/10 shrink-0">
-                  <TrendingUp className="h-6 w-6 text-chart-1" />
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center h-12 w-12 rounded-full bg-chart-1/10 shrink-0">
+                    <TrendingUp className="h-6 w-6 text-chart-1" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Rendimento Obtido</p>
+                    <p className="text-lg font-bold text-foreground">{fmt(result.profit)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Lucro Obtido</p>
-                  <p className="text-lg font-bold text-foreground">{fmt(result.profit)}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Chart */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Evolução do Patrimônio</CardTitle>
+              <CardTitle className="text-base">Evolução do seu investimento</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-56 sm:h-72">
@@ -248,8 +261,40 @@ export default function InvestmentCalculator() {
               </div>
             </CardContent>
           </Card>
-        </>
+
+          {/* Insight */}
+          <Card className="bg-muted/50 border-dashed">
+            <CardContent className="p-5 flex items-start gap-3">
+              <Lightbulb className="h-5 w-5 text-chart-2 shrink-0 mt-0.5" />
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {insightText}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Create Goal Button */}
+          <div className="flex justify-center">
+            <Button
+              size="lg"
+              className="gap-2"
+              onClick={() => setGoalModalOpen(true)}
+            >
+              <Target className="h-5 w-5" />
+              Criar meta de investimento
+            </Button>
+          </div>
+        </motion.div>
       )}
+
+      {/* Goal Modal */}
+      <CreateGoalModal
+        open={goalModalOpen}
+        onOpenChange={setGoalModalOpen}
+        suggestedName="Meta de investimento"
+        suggestedTarget={result?.finalValue || 0}
+        suggestedYears={parseFloat(years) || 1}
+        suggestedMonthly={parseFloat(monthly) || 0}
+      />
     </div>
   );
 }
