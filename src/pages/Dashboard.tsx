@@ -315,7 +315,7 @@ export default function Dashboard() {
           <Card>
             <CardHeader><CardTitle className="font-heading text-lg">Receitas vs Despesas</CardTitle></CardHeader>
             <CardContent>
-              <div className="h-72">
+              <div className="h-52 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthlyData} barGap={4}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
