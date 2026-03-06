@@ -134,23 +134,27 @@ export default function Goals() {
     },
   });
 
+  const resetTxForm = () => {
+    setTxValor("");
+    setTxDesc("");
+    setTxData(new Date().toISOString().slice(0, 10));
+  };
+
   const addDeposit = useMutation({
     mutationFn: async () => {
       if (!depositMeta) return;
-      const valor = parseFloat(depositValor);
+      const valor = parseFloat(txValor);
       if (!valor || valor <= 0) throw new Error("Valor inválido");
 
-      // Insert deposit
       const { error: depError } = await (supabase as any).from("depositos_meta").insert({
         meta_id: depositMeta.id,
         user_id: user!.id,
         valor,
-        descricao: depositDesc.trim() || null,
-        data: depositData,
+        descricao: txDesc.trim() || null,
+        data: txData,
       });
       if (depError) throw depError;
 
-      // Update meta valor_atual
       const { error: metaError } = await (supabase as any)
         .from("metas_financeiras")
         .update({ valor_atual: depositMeta.valor_atual + valor })
@@ -162,11 +166,42 @@ export default function Goals() {
       queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
       toast.success("Depósito registrado!");
       setDepositMeta(null);
-      setDepositValor("");
-      setDepositDesc("");
-      setDepositData(new Date().toISOString().slice(0, 10));
+      resetTxForm();
     },
     onError: () => toast.error("Erro ao registrar depósito."),
+  });
+
+  const addWithdraw = useMutation({
+    mutationFn: async () => {
+      if (!withdrawMeta) return;
+      const valor = parseFloat(txValor);
+      if (!valor || valor <= 0) throw new Error("Valor inválido");
+      if (valor > withdrawMeta.valor_atual) throw new Error("Saldo insuficiente");
+
+      // Insert negative deposit
+      const { error: depError } = await (supabase as any).from("depositos_meta").insert({
+        meta_id: withdrawMeta.id,
+        user_id: user!.id,
+        valor: -valor,
+        descricao: txDesc.trim() || "Saque",
+        data: txData,
+      });
+      if (depError) throw depError;
+
+      const { error: metaError } = await (supabase as any)
+        .from("metas_financeiras")
+        .update({ valor_atual: withdrawMeta.valor_atual - valor })
+        .eq("id", withdrawMeta.id);
+      if (metaError) throw metaError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
+      queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
+      toast.success("Saque registrado!");
+      setWithdrawMeta(null);
+      resetTxForm();
+    },
+    onError: (e) => toast.error(e.message === "Saldo insuficiente" ? "Saldo insuficiente na meta." : "Erro ao registrar saque."),
   });
 
   const openNew = () => {
