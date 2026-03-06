@@ -70,3 +70,27 @@ export const mockMonthlyData: MonthlyData[] = [
 export const totalReceitas = mockTransactions.filter(t => t.type === "receita").reduce((s, t) => s + t.amount, 0);
 export const totalDespesas = mockTransactions.filter(t => t.type === "despesa").reduce((s, t) => s + t.amount, 0);
 export const saldo = totalReceitas - totalDespesas;
+
+// Monthly helpers
+export const getMonthTransactions = (type: "receita" | "despesa", month = "2026-03") =>
+  mockTransactions.filter(t => t.type === type && t.date.startsWith(month));
+
+export const faturamentoMes = getMonthTransactions("receita").reduce((s, t) => s + t.amount, 0);
+export const despesasMes = getMonthTransactions("despesa").reduce((s, t) => s + t.amount, 0);
+export const lucroLiquido = faturamentoMes - despesasMes;
+
+// Pending DAS
+export interface ImpostoMEI {
+  competencia: string;
+  valor: number;
+  vencimento: string;
+  status: "pago" | "pendente" | "atrasado";
+}
+
+export const impostosMEI: ImpostoMEI[] = [
+  { competencia: "Janeiro/2026", valor: 71.60, vencimento: "2026-02-20", status: "pago" },
+  { competencia: "Fevereiro/2026", valor: 71.60, vencimento: "2026-03-20", status: "pago" },
+  { competencia: "Março/2026", valor: 71.60, vencimento: "2026-04-20", status: "pendente" },
+];
+
+export const impostoPendente = impostosMEI.find(i => i.status === "pendente");
