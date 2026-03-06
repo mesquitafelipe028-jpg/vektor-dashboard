@@ -86,6 +86,20 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  const { data: empresa } = useQuery({
+    queryKey: ["empresa", user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("empresas")
+        .select("*")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
   const now = new Date();
