@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useIsFetching } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
