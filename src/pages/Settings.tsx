@@ -222,6 +222,26 @@ export default function Settings() {
     }
   };
 
+  const clearData = useMutation({
+    mutationFn: async () => {
+      const tables = ["receitas", "despesas", "clientes", "categorias", "impostos_mei", "empresas", "metas_financeiras"] as const;
+      for (const table of tables) {
+        const { error } = await (supabase as any).from(table).delete().eq("user_id", user!.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setEmpresa(emptyEmpresa);
+      setCnpjInput("");
+      setCnpjFound(null);
+      setResetDialogOpen(false);
+      setConfirmText("");
+      toast.success("Todos os dados foram apagados. Você está começando do zero!");
+    },
+    onError: () => toast.error("Erro ao limpar dados. Tente novamente."),
+  });
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
