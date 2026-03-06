@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { LogoVektor } from "@/components/branding/LogoVektor";
 
 export default function AppLayout() {
   const isMobile = useIsMobile();
