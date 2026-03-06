@@ -11,6 +11,7 @@ import {
   Users,
   Target,
   Activity,
+  Calculator,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -38,6 +39,7 @@ const mainItems = [
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Metas", url: "/metas", icon: Target },
   { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
+  { title: "Calculadora", url: "/calculadora-investimentos", icon: Calculator },
 ];
 
 const configItems = [
