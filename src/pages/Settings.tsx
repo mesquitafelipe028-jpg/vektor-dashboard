@@ -9,7 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Building2, Search, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Building2, Search, Loader2, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { motion } from "framer-motion";
 
 // CNPJ formatting & validation
@@ -69,6 +74,8 @@ export default function Settings() {
   const [cnpjInput, setCnpjInput] = useState("");
   const [searching, setSearching] = useState(false);
   const [cnpjFound, setCnpjFound] = useState<boolean | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -214,6 +221,26 @@ export default function Settings() {
       setConfirmPassword("");
     }
   };
+
+  const clearData = useMutation({
+    mutationFn: async () => {
+      const tables = ["receitas", "despesas", "clientes", "categorias", "impostos_mei", "empresas", "metas_financeiras"] as const;
+      for (const table of tables) {
+        const { error } = await (supabase as any).from(table).delete().eq("user_id", user!.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setEmpresa(emptyEmpresa);
+      setCnpjInput("");
+      setCnpjFound(null);
+      setResetDialogOpen(false);
+      setConfirmText("");
+      toast.success("Todos os dados foram apagados. Você está começando do zero!");
+    },
+    onError: () => toast.error("Erro ao limpar dados. Tente novamente."),
+  });
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -391,9 +418,54 @@ export default function Settings() {
 
       <Card>
         <CardHeader><CardTitle className="font-heading text-lg text-destructive">Zona de Perigo</CardTitle></CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">Excluir sua conta é irreversível. Todos os seus dados serão apagados.</p>
-          <Button variant="destructive">Excluir minha conta</Button>
+        <CardContent className="space-y-6">
+          {/* Começar do Zero */}
+          <div>
+            <p className="text-sm font-medium mb-1">Começar do Zero</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Apaga todas as receitas, despesas, clientes, categorias, impostos, metas e dados da empresa. Seu perfil e conta serão mantidos.
+            </p>
+            <AlertDialog open={resetDialogOpen} onOpenChange={(open) => { setResetDialogOpen(open); if (!open) setConfirmText(""); }}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                  Começar do Zero
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação apagará permanentemente todos os seus dados financeiros. Digite <strong>CONFIRMAR</strong> abaixo para continuar.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Input
+                  placeholder='Digite "CONFIRMAR"'
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={confirmText !== "CONFIRMAR" || clearData.isPending}
+                    onClick={(e) => { e.preventDefault(); clearData.mutate(); }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {clearData.isPending ? "Apagando..." : "Apagar tudo"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+
+          <Separator />
+
+          {/* Excluir conta */}
+          <div>
+            <p className="text-sm font-medium mb-1">Excluir conta</p>
+            <p className="text-sm text-muted-foreground mb-3">Excluir sua conta é irreversível. Todos os seus dados serão apagados.</p>
+            <Button variant="destructive">Excluir minha conta</Button>
+          </div>
         </CardContent>
       </Card>
     </div>
