@@ -17,7 +17,7 @@ const Expenses = lazy(() => import("./pages/Expenses"));
 const CashFlow = lazy(() => import("./pages/CashFlow"));
 const Taxes = lazy(() => import("./pages/Taxes"));
 const Reports = lazy(() => import("./pages/Reports"));
-const MonthlyReport = lazy(() => import("./pages/MonthlyReport"));
+
 const Settings = lazy(() => import("./pages/Settings"));
 const Clients = lazy(() => import("./pages/Clients"));
 const Goals = lazy(() => import("./pages/Goals"));
