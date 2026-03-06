@@ -20,6 +20,7 @@ import Clients from "./pages/Clients";
 import Goals from "./pages/Goals";
 import FinancialAnalysis from "./pages/FinancialAnalysis";
 import ClientDetails from "./pages/ClientDetails";
+import PainelFiscal from "./pages/PainelFiscal";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 
