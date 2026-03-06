@@ -184,6 +184,46 @@ export default function Dashboard() {
   const latestReceitas = receitas.slice(0, 5);
   const latestDespesas = despesas.slice(0, 5);
 
+  // Smart Financial Alerts
+  const financialAlerts = useMemo(() => {
+    type AlertItem = { id: string; icon: typeof AlertTriangle; message: string; type: "success" | "warning" | "danger" };
+    const alerts: AlertItem[] = [];
+
+    // Alerta 1 — Limite MEI
+    if (percentLimit >= 90) {
+      alerts.push({ id: "mei-90", icon: ShieldAlert, type: "danger", message: `Atenção: você está próximo de ultrapassar o limite do MEI (${percentLimit.toFixed(1)}% utilizado).` });
+    } else if (percentLimit >= 70) {
+      alerts.push({ id: "mei-70", icon: AlertTriangle, type: "warning", message: `Você já utilizou ${percentLimit.toFixed(1)}% do limite anual do MEI.` });
+    }
+
+    // Alerta 2 — DAS próximo do vencimento
+    const dayOfMonth = now.getDate();
+    if (dayOfMonth >= 15 && dayOfMonth < 20) {
+      const diasRestantes = 20 - dayOfMonth;
+      alerts.push({ id: "das-vencimento", icon: Clock, type: "warning", message: `Seu imposto MEI (DAS) vence em ${diasRestantes} dia${diasRestantes > 1 ? "s" : ""}.` });
+    } else if (dayOfMonth === 20) {
+      alerts.push({ id: "das-hoje", icon: Clock, type: "danger", message: "Seu imposto MEI (DAS) vence hoje!" });
+    }
+
+    // Alerta 3 & 4 — Variação de faturamento
+    if (prevMonth.rec > 0 && faturamentoMes > 0) {
+      const variation = ((faturamentoMes - prevMonth.rec) / prevMonth.rec) * 100;
+      if (variation > 20) {
+        alerts.push({ id: "fat-cresceu", icon: Flame, type: "success", message: `Parabéns! Seu faturamento cresceu ${variation.toFixed(0)}% este mês. 🚀` });
+      } else if (variation < 0) {
+        alerts.push({ id: "fat-caiu", icon: TrendingDown, type: "warning", message: `Seu faturamento caiu ${Math.abs(variation).toFixed(0)}% comparado ao mês passado.` });
+      }
+    }
+
+    return alerts.filter((a) => !hiddenAlerts.has(a.id));
+  }, [percentLimit, now, prevMonth, faturamentoMes, hiddenAlerts]);
+
+  const alertStyles = {
+    success: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-700 dark:text-emerald-400", iconColor: "text-emerald-600" },
+    warning: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-700 dark:text-amber-400", iconColor: "text-amber-600" },
+    danger: { bg: "bg-destructive/10", border: "border-destructive/30", text: "text-destructive", iconColor: "text-destructive" },
+  };
+
   return (
     <div className="space-y-6">
       {/* Header + CTAs */}
