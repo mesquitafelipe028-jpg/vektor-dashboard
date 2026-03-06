@@ -244,7 +244,7 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Visão geral das suas finanças</p>
         </div>
-        <div className="flex gap-2">
+        <div className="hidden md:flex gap-2">
           <Button size="sm" onClick={() => navigate("/receitas")}>
             <Plus className="h-4 w-4" /> Registrar Receita
           </Button>
@@ -534,15 +534,18 @@ export default function Dashboard() {
           <Card>
             <CardHeader><CardTitle className="font-heading text-lg">Últimas Receitas</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {latestReceitas.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma receita cadastrada.</p>}
                 {latestReceitas.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between border-b border-border py-2 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium">{r.descricao}</p>
+                  <div key={r.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{r.descricao}</p>
                       <p className="text-xs text-muted-foreground">{r.forma_pagamento ?? "—"} • {formatDate(r.data)}</p>
                     </div>
-                    <span className="text-sm font-semibold text-primary">+{formatCurrency(r.valor)}</span>
+                    <span className="text-sm font-bold text-primary shrink-0">+{formatCurrency(r.valor)}</span>
                   </div>
                 ))}
               </div>
@@ -553,15 +556,18 @@ export default function Dashboard() {
           <Card>
             <CardHeader><CardTitle className="font-heading text-lg">Últimas Despesas</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {latestDespesas.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma despesa cadastrada.</p>}
                 {latestDespesas.map((d) => (
-                  <div key={d.id} className="flex items-center justify-between border-b border-border py-2 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium">{d.descricao}</p>
+                  <div key={d.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                      <TrendingDown className="h-4 w-4 text-destructive" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{d.descricao}</p>
                       <p className="text-xs text-muted-foreground">{d.categoria ?? "—"} • {formatDate(d.data)}</p>
                     </div>
-                    <span className="text-sm font-semibold text-destructive">-{formatCurrency(d.valor)}</span>
+                    <span className="text-sm font-bold text-destructive shrink-0">-{formatCurrency(d.valor)}</span>
                   </div>
                 ))}
               </div>
