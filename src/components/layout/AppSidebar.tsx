@@ -38,6 +38,7 @@ const mainItems = [
   { title: "Relatório Mensal", url: "/relatorio-mensal", icon: FileText },
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Metas", url: "/metas", icon: Target },
+  { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
 ];
 
 const configItems = [
