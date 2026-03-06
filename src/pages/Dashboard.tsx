@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
   TrendingUp, TrendingDown, Wallet, Receipt,
-  Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert,
+  Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert, Target,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
@@ -69,6 +69,22 @@ export default function Dashboard() {
     },
     enabled: !!user,
   });
+
+  // Metas financeiras
+  const { data: metas = [] } = useQuery({
+    queryKey: ["metas_financeiras"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("metas_financeiras")
+        .select("*")
+        .order("prazo", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; titulo: string; valor_alvo: number; valor_atual: number; prazo: string; categoria: string }[];
+    },
+    enabled: !!user,
+  });
+
+  const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -295,6 +311,29 @@ export default function Dashboard() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Meta Financeira Card */}
+      {metaAtual && (
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+          <Card className="border-accent/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/metas")}>
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-accent" />
+                  <span className="font-heading font-semibold">Meta Atual: {metaAtual.titulo}</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{metaAtual.categoria}</span>
+              </div>
+              <Progress value={metaAtual.valor_alvo > 0 ? Math.min((metaAtual.valor_atual / metaAtual.valor_alvo) * 100, 100) : 0} className="h-3 mb-2" />
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Acumulado: <span className="font-semibold text-primary">{formatCurrency(metaAtual.valor_atual)}</span></span>
+                <span className="text-muted-foreground">Meta: <span className="font-semibold">{formatCurrency(metaAtual.valor_alvo)}</span></span>
+                <span className="text-muted-foreground">Falta: <span className="font-semibold text-destructive">{formatCurrency(Math.max(metaAtual.valor_alvo - metaAtual.valor_atual, 0))}</span></span>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Recent Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

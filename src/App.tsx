@@ -16,6 +16,7 @@ import Taxes from "./pages/Taxes";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Clients from "./pages/Clients";
+import Goals from "./pages/Goals";
 import ClientDetails from "./pages/ClientDetails";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
@@ -44,6 +45,7 @@ const App = () => (
                 <Route path="/configuracoes" element={<Settings />} />
                 <Route path="/clientes" element={<Clients />} />
                 <Route path="/clientes/:id" element={<ClientDetails />} />
+                <Route path="/metas" element={<Goals />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
