@@ -70,6 +70,22 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  // Metas financeiras
+  const { data: metas = [] } = useQuery({
+    queryKey: ["metas_financeiras"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("metas_financeiras")
+        .select("*")
+        .order("prazo", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; titulo: string; valor_alvo: number; valor_atual: number; prazo: string; categoria: string }[];
+    },
+    enabled: !!user,
+  });
+
+  const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
+
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const receitasMes = receitas.filter((r) => r.data.startsWith(currentMonth));
