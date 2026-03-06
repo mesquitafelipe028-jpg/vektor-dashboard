@@ -15,6 +15,7 @@ import CashFlow from "./pages/CashFlow";
 import Taxes from "./pages/Taxes";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import Clients from "./pages/Clients";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 
