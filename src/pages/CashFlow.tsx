@@ -283,7 +283,7 @@ export default function CashFlow() {
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">Saldo Atual</p>
               </div>
-              <p className={`text-4xl font-bold font-heading ${saldoAtual >= 0 ? "text-primary" : "text-destructive"}`}>
+              <p className={`text-2xl sm:text-4xl font-bold font-heading ${saldoAtual >= 0 ? "text-primary" : "text-destructive"}`}>
                 {formatCurrency(saldoAtual)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
