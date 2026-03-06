@@ -8,7 +8,7 @@ export default function AppLayout() {
       <div className="min-h-screen flex w-full overflow-x-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 sm:h-14 flex items-center border-b border-border px-3 sm:px-4 sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <header className="h-14 sm:h-14 flex items-center border-b border-border px-3 sm:px-4 sticky top-[env(safe-area-inset-top)] z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger className="mr-3 sm:mr-4" />
             <span className="text-sm text-muted-foreground font-medium">FluxoPro</span>
           </header>
