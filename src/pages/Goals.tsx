@@ -21,7 +21,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import {
   Target, Plus, Pencil, Trash2, TrendingUp, Trophy, Rocket,
-  PiggyBank, History, ArrowUpRight,
+  PiggyBank, History, ArrowUpRight, ArrowDownLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
