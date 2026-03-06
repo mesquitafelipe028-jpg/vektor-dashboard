@@ -15,6 +15,7 @@ import CashFlow from "./pages/CashFlow";
 import Taxes from "./pages/Taxes";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import Clients from "./pages/Clients";
 import AppLayout from "./components/layout/AppLayout";
 import NotFound from "./pages/NotFound";
 
@@ -40,6 +41,7 @@ const App = () => (
                 <Route path="/impostos" element={<Taxes />} />
                 <Route path="/relatorios" element={<Reports />} />
                 <Route path="/configuracoes" element={<Settings />} />
+                <Route path="/clientes" element={<Clients />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />

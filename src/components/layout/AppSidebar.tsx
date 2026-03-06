@@ -8,6 +8,7 @@ import {
   Settings,
   Zap,
   LogOut,
+  Users,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -31,6 +32,7 @@ const mainItems = [
   { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
   { title: "Impostos", url: "/impostos", icon: Receipt },
   { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
+  { title: "Clientes", url: "/clientes", icon: Users },
 ];
 
 const configItems = [
