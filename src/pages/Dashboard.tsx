@@ -189,6 +189,35 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Company Card */}
+      {empresa && (
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-heading font-semibold text-sm truncate">{empresa.razao_social || empresa.nome_fantasia || "Empresa"}</p>
+                {empresa.nome_fantasia && empresa.razao_social && (
+                  <p className="text-xs text-muted-foreground truncate">{empresa.nome_fantasia}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {empresa.situacao_cadastral && (
+                  <Badge variant={empresa.situacao_cadastral.toLowerCase().includes("ativa") ? "default" : "destructive"} className="text-xs">
+                    {empresa.situacao_cadastral}
+                  </Badge>
+                )}
+                {empresa.cnae_principal && (
+                  <span className="text-xs text-muted-foreground hidden sm:block max-w-48 truncate">{empresa.cnae_principal}</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Saldo + Saúde Financeira */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
