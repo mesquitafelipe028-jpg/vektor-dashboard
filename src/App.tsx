@@ -14,6 +14,7 @@ import Expenses from "./pages/Expenses";
 import CashFlow from "./pages/CashFlow";
 import Taxes from "./pages/Taxes";
 import Reports from "./pages/Reports";
+import MonthlyReport from "./pages/MonthlyReport";
 import Settings from "./pages/Settings";
 import Clients from "./pages/Clients";
 import Goals from "./pages/Goals";
