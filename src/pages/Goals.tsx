@@ -526,24 +526,36 @@ export default function Goals() {
                 </Card>
               )}
 
-              {/* Deposit History */}
+              {/* Transaction History */}
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                  <History className="h-4 w-4" /> Depósitos ({detailDepositos.length})
+                  <History className="h-4 w-4" /> Movimentações ({detailDepositos.length})
                 </h3>
                 {detailDepositos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">Nenhum depósito registrado ainda.</p>
+                  <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma movimentação registrada ainda.</p>
                 ) : (
                   <div className="max-h-60 overflow-y-auto space-y-2">
-                    {[...detailDepositos].reverse().map((dep) => (
-                      <div key={dep.id} className="flex items-center justify-between rounded-lg border p-3">
-                        <div>
-                          <p className="text-sm font-medium">{dep.descricao || "Depósito"}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(dep.data)}</p>
+                    {[...detailDepositos].reverse().map((dep) => {
+                      const isWithdraw = dep.valor < 0;
+                      return (
+                        <div key={dep.id} className="flex items-center justify-between rounded-lg border p-3">
+                          <div className="flex items-center gap-2">
+                            {isWithdraw ? (
+                              <ArrowDownLeft className="h-4 w-4 text-destructive" />
+                            ) : (
+                              <ArrowUpRight className="h-4 w-4 text-primary" />
+                            )}
+                            <div>
+                              <p className="text-sm font-medium">{dep.descricao || (isWithdraw ? "Saque" : "Depósito")}</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(dep.data)}</p>
+                            </div>
+                          </div>
+                          <span className={`text-sm font-semibold ${isWithdraw ? "text-destructive" : "text-primary"}`}>
+                            {isWithdraw ? "" : "+"}{formatCurrency(dep.valor)}
+                          </span>
                         </div>
-                        <span className="text-sm font-semibold text-primary">+{formatCurrency(dep.valor)}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
