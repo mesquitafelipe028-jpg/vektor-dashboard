@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Wallet, Receipt } from "lucide-react";
-import { formatCurrency, formatDate, impostoPendente } from "@/lib/mockData";
+import { formatCurrency, formatDate } from "@/lib/mockData";
 import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
