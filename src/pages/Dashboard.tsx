@@ -33,6 +33,22 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  const { data: impostoPendente } = useQuery({
+    queryKey: ["impostos_mei_pendente"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("impostos_mei")
+        .select("*")
+        .eq("status", "pendente")
+        .order("vencimento", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   // Current month calculations
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
