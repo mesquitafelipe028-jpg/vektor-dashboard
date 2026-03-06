@@ -47,10 +47,12 @@ export function MobileBottomNav() {
   const isActive = (path: string) => location.pathname === path;
   const isMoreActive = moreMenuItems.some((item) => isActive(item.path));
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setMoreOpen(false);
-    await signOut();
-    navigate("/login");
+    setTimeout(async () => {
+      await signOut();
+      navigate("/login");
+    }, 200);
   };
 
   return (
@@ -77,7 +79,7 @@ export function MobileBottomNav() {
                   key={action.label}
                   onClick={() => {
                     setFabOpen(false);
-                    navigate(action.path);
+                    setTimeout(() => navigate(action.path), 200);
                   }}
                   className="flex items-center gap-3 bg-card border border-border rounded-full px-5 py-3 shadow-lg min-w-[200px]"
                 >
@@ -104,7 +106,7 @@ export function MobileBottomNav() {
                   key={item.path}
                   onClick={() => {
                     setMoreOpen(false);
-                    navigate(item.path);
+                    setTimeout(() => navigate(item.path), 200);
                   }}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
