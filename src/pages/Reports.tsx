@@ -90,7 +90,7 @@ export default function Reports() {
         <Card>
           <CardHeader><CardTitle className="font-heading text-lg">Despesas por Categoria</CardTitle></CardHeader>
           <CardContent>
-            <div className="h-72">
+            <div className="h-52 sm:h-72">
               {pieData.length === 0 ? (
                 <p className="text-sm text-muted-foreground flex items-center justify-center h-full">Nenhuma despesa cadastrada.</p>
               ) : (
