@@ -118,6 +118,33 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Financial Insights */}
+      {insights.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="font-heading text-lg font-semibold">Insights Financeiros</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {insights.map((insight, i) => (
+              <motion.div
+                key={insight.title}
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + i * 0.08 }}
+              >
+                <Card className={`border-l-4 ${insightColors[insight.type]}`}>
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <insight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[insight.type]}`} />
+                    <div>
+                      <p className="text-sm font-semibold">{insight.title}</p>
+                      <p className="text-xs text-muted-foreground">{insight.description}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
