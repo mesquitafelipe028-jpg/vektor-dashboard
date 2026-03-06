@@ -79,7 +79,7 @@ export function MobileBottomNav() {
                   key={action.label}
                   onClick={() => {
                     setFabOpen(false);
-                    navigate(action.path);
+                    setTimeout(() => navigate(action.path), 200);
                   }}
                   className="flex items-center gap-3 bg-card border border-border rounded-full px-5 py-3 shadow-lg min-w-[200px]"
                 >
