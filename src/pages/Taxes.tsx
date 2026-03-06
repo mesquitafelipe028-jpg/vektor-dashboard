@@ -434,7 +434,7 @@ export default function Taxes() {
           <CardTitle className="font-heading text-lg">Faturamento Acumulado vs Limite MEI</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-72">
+          <div className="h-52 sm:h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyChartData} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />

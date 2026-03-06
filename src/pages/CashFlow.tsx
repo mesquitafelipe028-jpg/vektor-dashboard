@@ -503,7 +503,7 @@ export default function CashFlow() {
                       </>
                     ))}
                   </TableBody>
-                </Table>
+                </Table></div>
                 {hasMore && !showAll && (
                   <div className="flex justify-center pt-4">
                     <Button variant="ghost" size="sm" onClick={() => setShowAll(true)} className="gap-1">

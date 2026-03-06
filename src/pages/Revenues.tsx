@@ -339,7 +339,7 @@ export default function Revenues() {
                   </motion.tr>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           )}
         </CardContent>
       </Card>

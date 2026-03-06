@@ -304,7 +304,7 @@ export default function Expenses() {
                   </motion.tr>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           )}
         </CardContent>
       </Card>

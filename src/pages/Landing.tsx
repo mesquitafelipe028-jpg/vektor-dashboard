@@ -45,7 +45,7 @@ export default function Landing() {
           <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-8">
             Receitas, despesas, impostos e fluxo de caixa em um só lugar. Sem complicação.
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4">
             <Button size="lg" asChild>
               <Link to="/cadastro">Começar grátis <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
