@@ -242,6 +242,42 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Financial Alerts */}
+      {financialAlerts.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide">Alertas Financeiros</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {financialAlerts.map((alert, i) => {
+              const style = alertStyles[alert.type];
+              return (
+                <motion.div
+                  key={alert.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <div className={`flex items-start gap-3 rounded-lg border ${style.border} ${style.bg} p-3`}>
+                    <alert.icon className={`h-4 w-4 mt-0.5 shrink-0 ${style.iconColor}`} />
+                    <p className={`text-sm flex-1 ${style.text}`}>{alert.message}</p>
+                    <button
+                      onClick={() => dismissAlert(alert.id)}
+                      className="shrink-0 rounded-md p-0.5 hover:bg-background/50 transition-colors"
+                      aria-label="Ocultar alerta"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Company Card */}
       {empresa && (
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}>
