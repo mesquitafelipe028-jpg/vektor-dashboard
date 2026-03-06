@@ -189,20 +189,30 @@ export default function Dashboard() {
     type AlertItem = { id: string; icon: typeof AlertTriangle; message: string; type: "success" | "warning" | "danger" };
     const alerts: AlertItem[] = [];
 
-    // Alerta 1 — Limite MEI
+    // Alerta 1 — Limite MEI (thresholds: 70%, 90%)
     if (percentLimit >= 90) {
       alerts.push({ id: "mei-90", icon: ShieldAlert, type: "danger", message: `Atenção: você está próximo de ultrapassar o limite do MEI (${percentLimit.toFixed(1)}% utilizado).` });
     } else if (percentLimit >= 70) {
       alerts.push({ id: "mei-70", icon: AlertTriangle, type: "warning", message: `Você já utilizou ${percentLimit.toFixed(1)}% do limite anual do MEI.` });
     }
 
-    // Alerta 2 — DAS próximo do vencimento
-    const dayOfMonth = now.getDate();
-    if (dayOfMonth >= 15 && dayOfMonth < 20) {
-      const diasRestantes = 20 - dayOfMonth;
-      alerts.push({ id: "das-vencimento", icon: Clock, type: "warning", message: `Seu imposto MEI (DAS) vence em ${diasRestantes} dia${diasRestantes > 1 ? "s" : ""}.` });
-    } else if (dayOfMonth === 20) {
-      alerts.push({ id: "das-hoje", icon: Clock, type: "danger", message: "Seu imposto MEI (DAS) vence hoje!" });
+    // Alerta 2 — DAS pendente ou próximo do vencimento
+    if (impostoPendente) {
+      const vencDate = new Date(impostoPendente.vencimento + "T12:00:00");
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      vencDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((vencDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays < 0) {
+        alerts.push({ id: "das-vencido", icon: ShieldAlert, type: "danger", message: `Seu DAS de ${impostoPendente.competencia} está vencido! Regularize o pagamento.` });
+      } else if (diffDays === 0) {
+        alerts.push({ id: "das-hoje", icon: Clock, type: "danger", message: "Seu imposto MEI (DAS) vence hoje!" });
+      } else if (diffDays <= 7) {
+        alerts.push({ id: "das-vencimento", icon: Clock, type: "warning", message: `Seu DAS de ${impostoPendente.competencia} vence em ${diffDays} dia${diffDays > 1 ? "s" : ""} (${vencDate.toLocaleDateString("pt-BR")}).` });
+      } else {
+        alerts.push({ id: "das-pendente", icon: Receipt, type: "warning", message: `DAS de ${impostoPendente.competencia} pendente — vencimento em ${vencDate.toLocaleDateString("pt-BR")}.` });
+      }
     }
 
     // Alerta 3 & 4 — Variação de faturamento
@@ -213,10 +223,12 @@ export default function Dashboard() {
       } else if (variation < 0) {
         alerts.push({ id: "fat-caiu", icon: TrendingDown, type: "warning", message: `Seu faturamento caiu ${Math.abs(variation).toFixed(0)}% comparado ao mês passado.` });
       }
+    } else if (faturamentoMes > 0 && prevMonth.rec === 0) {
+      alerts.push({ id: "fat-novo", icon: CheckCircle2, type: "success", message: `Ótimo início de mês! Faturamento atual: ${formatCurrency(faturamentoMes)}.` });
     }
 
     return alerts.filter((a) => !hiddenAlerts.has(a.id));
-  }, [percentLimit, now, prevMonth, faturamentoMes, hiddenAlerts]);
+  }, [percentLimit, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts]);
 
   const alertStyles = {
     success: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-700 dark:text-emerald-400", iconColor: "text-emerald-600" },
