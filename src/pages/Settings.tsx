@@ -398,9 +398,54 @@ export default function Settings() {
 
       <Card>
         <CardHeader><CardTitle className="font-heading text-lg text-destructive">Zona de Perigo</CardTitle></CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">Excluir sua conta é irreversível. Todos os seus dados serão apagados.</p>
-          <Button variant="destructive">Excluir minha conta</Button>
+        <CardContent className="space-y-6">
+          {/* Começar do Zero */}
+          <div>
+            <p className="text-sm font-medium mb-1">Começar do Zero</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Apaga todas as receitas, despesas, clientes, categorias, impostos, metas e dados da empresa. Seu perfil e conta serão mantidos.
+            </p>
+            <AlertDialog open={resetDialogOpen} onOpenChange={(open) => { setResetDialogOpen(open); if (!open) setConfirmText(""); }}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                  Começar do Zero
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação apagará permanentemente todos os seus dados financeiros. Digite <strong>CONFIRMAR</strong> abaixo para continuar.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Input
+                  placeholder='Digite "CONFIRMAR"'
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={confirmText !== "CONFIRMAR" || clearData.isPending}
+                    onClick={(e) => { e.preventDefault(); clearData.mutate(); }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {clearData.isPending ? "Apagando..." : "Apagar tudo"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+
+          <Separator />
+
+          {/* Excluir conta */}
+          <div>
+            <p className="text-sm font-medium mb-1">Excluir conta</p>
+            <p className="text-sm text-muted-foreground mb-3">Excluir sua conta é irreversível. Todos os seus dados serão apagados.</p>
+            <Button variant="destructive">Excluir minha conta</Button>
+          </div>
         </CardContent>
       </Card>
     </div>
