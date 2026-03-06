@@ -9,7 +9,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 
 // Lazy-loaded pages
-const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -52,7 +51,7 @@ const App = () => (
         <AuthProvider>
           <Suspense fallback={<PageFallback />}>
             <Routes>
-              <Route path="/" element={<Landing />} />
+              <Route path="/" element={<Login />} />
               <Route path="/login" element={<Login />} />
               <Route path="/cadastro" element={<Signup />} />
               <Route element={<ProtectedRoute />}>
