@@ -35,7 +35,21 @@
 </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f7f5;font-family:system-ui,-apple-system,sans-serif">
+        <div style="text-align:center">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto">
+            <rect width="48" height="48" rx="12" fill="#1a7a5a"/>
+            <path d="M14 34V14h14v5H20v4h7v5h-7v6h-6z" fill="#fff"/>
+          </svg>
+          <p style="color:#1a7a5a;font-size:14px;margin-top:12px;font-weight:500">Carregando...</p>
+          <div style="width:120px;height:3px;background:#e5e7eb;border-radius:4px;margin:10px auto 0;overflow:hidden">
+            <div style="width:40%;height:100%;background:#1a7a5a;border-radius:4px;animation:splash-bar 1.2s ease-in-out infinite"></div>
+          </div>
+        </div>
+      </div>
+      <style>@keyframes splash-bar{0%{transform:translateX(-100%)}50%{transform:translateX(150%)}100%{transform:translateX(-100%)}}</style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
