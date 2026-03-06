@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   TrendingUp, TrendingDown, Wallet, Receipt,
   Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert, Target,
+  FileText, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
@@ -93,6 +94,18 @@ export default function Dashboard() {
   const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
   const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
   const saldoMes = faturamentoMes - despesasMesTotal;
+
+  // Previous month for report summary
+  const prevMonth = useMemo(() => {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("pt-BR", { month: "long" });
+    const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const desp = despesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const lucro = rec - desp;
+    const varFat = rec > 0 && faturamentoMes > 0 ? ((faturamentoMes - rec) / rec) * 100 : 0;
+    return { label, rec, desp, lucro, varFat };
+  }, [receitas, despesas, faturamentoMes]);
 
   // Saúde Financeira
   const despesaPercent = faturamentoMes > 0 ? (despesasMesTotal / faturamentoMes) * 100 : 0;
@@ -334,6 +347,41 @@ export default function Dashboard() {
           </Card>
         </motion.div>
       )}
+
+      {/* Monthly Report Summary */}
+      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.52 }}>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/relatorio-mensal")}>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-chart-3" />
+                <span className="font-heading font-semibold">Resumo — {prevMonth.label}</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                {prevMonth.varFat >= 0
+                  ? <ArrowUpRight className="h-3.5 w-3.5 text-green-600" />
+                  : <ArrowDownRight className="h-3.5 w-3.5 text-red-600" />
+                }
+                {Math.abs(prevMonth.varFat).toFixed(1)}% vs mês anterior
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xs text-muted-foreground">Faturamento</p>
+                <p className="text-lg font-bold text-primary">{formatCurrency(prevMonth.rec)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Despesas</p>
+                <p className="text-lg font-bold text-destructive">{formatCurrency(prevMonth.desp)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Lucro</p>
+                <p className={`text-lg font-bold ${prevMonth.lucro >= 0 ? "text-primary" : "text-destructive"}`}>{formatCurrency(prevMonth.lucro)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Recent Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

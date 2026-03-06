@@ -14,6 +14,7 @@ import Expenses from "./pages/Expenses";
 import CashFlow from "./pages/CashFlow";
 import Taxes from "./pages/Taxes";
 import Reports from "./pages/Reports";
+import MonthlyReport from "./pages/MonthlyReport";
 import Settings from "./pages/Settings";
 import Clients from "./pages/Clients";
 import Goals from "./pages/Goals";
@@ -42,6 +43,7 @@ const App = () => (
                 <Route path="/fluxo-de-caixa" element={<CashFlow />} />
                 <Route path="/impostos" element={<Taxes />} />
                 <Route path="/relatorios" element={<Reports />} />
+                <Route path="/relatorio-mensal" element={<MonthlyReport />} />
                 <Route path="/configuracoes" element={<Settings />} />
                 <Route path="/clientes" element={<Clients />} />
                 <Route path="/clientes/:id" element={<ClientDetails />} />

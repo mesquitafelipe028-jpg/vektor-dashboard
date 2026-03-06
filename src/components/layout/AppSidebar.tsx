@@ -10,6 +10,7 @@ import {
   LogOut,
   Users,
   Target,
+  FileText,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -33,6 +34,7 @@ const mainItems = [
   { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
   { title: "Impostos", url: "/impostos", icon: Receipt },
   { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
+  { title: "Relatório Mensal", url: "/relatorio-mensal", icon: FileText },
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Metas", url: "/metas", icon: Target },
 ];
