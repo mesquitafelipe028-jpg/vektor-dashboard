@@ -12,7 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import {
   TrendingUp, TrendingDown, Wallet, Receipt,
   Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert, Target,
-  FileText, ArrowUpRight, ArrowDownRight, Building2,
+  FileText, ArrowUpRight, ArrowDownRight, Building2, X, Bell,
+  CheckCircle2, Clock, Flame,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
