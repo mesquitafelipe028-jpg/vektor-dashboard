@@ -103,9 +103,10 @@ export default function FinancialAnalysis() {
       });
     }
 
-    if (topCategory[1] > totalDespesas * 0.4) {
+    if ((topCategory[1] as number) > totalDespesas * 0.4) {
+      const topPct = (((topCategory[1] as number) / totalDespesas) * 100).toFixed(0);
       recommendations.push({
-        text: `A categoria "${topCategory[0]}" concentra ${((topCategory[1] as number / totalDespesas) * 100).toFixed(0)}% das suas despesas. Considere renegociar ou buscar alternativas mais econômicas.`,
+        text: `A categoria "${topCategory[0]}" concentra ${topPct}% das suas despesas. Considere renegociar ou buscar alternativas mais econômicas.`,
         type: "warning",
       });
     }
