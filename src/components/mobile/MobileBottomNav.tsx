@@ -47,10 +47,12 @@ export function MobileBottomNav() {
   const isActive = (path: string) => location.pathname === path;
   const isMoreActive = moreMenuItems.some((item) => isActive(item.path));
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setMoreOpen(false);
-    await signOut();
-    navigate("/login");
+    setTimeout(async () => {
+      await signOut();
+      navigate("/login");
+    }, 200);
   };
 
   return (
