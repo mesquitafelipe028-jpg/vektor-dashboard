@@ -6,23 +6,45 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Receipt, AlertTriangle, Check, Plus } from "lucide-react";
+import { Receipt, AlertTriangle, Check, Plus, Pencil, Trash2, Clock } from "lucide-react";
 import { formatCurrency } from "@/lib/mockData";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 
 const LIMITE_MEI = 81000;
+
+interface Imposto {
+  id: string;
+  competencia: string;
+  vencimento: string;
+  valor: number;
+  status: string;
+  user_id: string;
+}
+
+function getEffectiveStatus(imp: Imposto): "pago" | "pendente" | "vencido" {
+  if (imp.status === "pago") return "pago";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const venc = new Date(imp.vencimento + "T12:00:00");
+  venc.setHours(0, 0, 0, 0);
+  return venc < today ? "vencido" : "pendente";
+}
 
 export default function Taxes() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [competencia, setCompetencia] = useState("");
   const [vencimento, setVencimento] = useState("");
   const [valor, setValor] = useState("71.60");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: impostos = [], isLoading } = useQuery({
     queryKey: ["impostos_mei"],
@@ -32,7 +54,7 @@ export default function Taxes() {
         .select("*")
         .order("vencimento", { ascending: true });
       if (error) throw error;
-      return data;
+      return data as Imposto[];
     },
     enabled: !!user,
   });
@@ -49,30 +71,78 @@ export default function Taxes() {
 
   const currentYear = new Date().getFullYear().toString();
   const faturamentoAnual = receitas
-    .filter((r) => r.data.startsWith(currentYear))
-    .reduce((s, r) => s + r.valor, 0);
+    .filter((r: any) => r.data.startsWith(currentYear))
+    .reduce((s: number, r: any) => s + r.valor, 0);
   const percentLimit = Math.min((faturamentoAnual / LIMITE_MEI) * 100, 100);
+
+  // Guias próximas do vencimento (7 dias)
+  const alertas = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const limit = new Date(today);
+    limit.setDate(limit.getDate() + 7);
+    return impostos.filter((imp) => {
+      if (imp.status === "pago") return false;
+      const venc = new Date(imp.vencimento + "T12:00:00");
+      venc.setHours(0, 0, 0, 0);
+      return venc >= today && venc <= limit;
+    });
+  }, [impostos]);
+
+  const resetForm = () => {
+    setCompetencia("");
+    setVencimento("");
+    setValor("71.60");
+    setEditingId(null);
+  };
+
+  const openEdit = (imp: Imposto) => {
+    setEditingId(imp.id);
+    setCompetencia(imp.competencia);
+    setVencimento(imp.vencimento);
+    setValor(String(imp.valor));
+    setOpen(true);
+  };
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("impostos_mei").insert({
-        competencia,
-        vencimento,
-        valor: parseFloat(valor),
-        user_id: user!.id,
-        status: "pendente",
-      });
+      if (editingId) {
+        const { error } = await supabase
+          .from("impostos_mei")
+          .update({ competencia, vencimento, valor: parseFloat(valor) })
+          .eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("impostos_mei").insert({
+          competencia,
+          vencimento,
+          valor: parseFloat(valor),
+          user_id: user!.id,
+          status: "pendente",
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["impostos_mei"] });
+      toast.success(editingId ? "Guia atualizada" : "Guia DAS adicionada");
+      setOpen(false);
+      resetForm();
+    },
+    onError: () => toast.error("Erro ao salvar guia"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("impostos_mei").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["impostos_mei"] });
-      toast.success("Guia DAS adicionada");
-      setOpen(false);
-      setCompetencia("");
-      setVencimento("");
-      setValor("71.60");
+      toast.success("Guia excluída");
+      setDeleteId(null);
     },
-    onError: () => toast.error("Erro ao adicionar guia"),
+    onError: () => toast.error("Erro ao excluir"),
   });
 
   const togglePagoMutation = useMutation({
@@ -93,6 +163,12 @@ export default function Taxes() {
 
   const dasValue = impostos.length > 0 ? impostos[0].valor : 71.60;
 
+  const statusConfig = {
+    pago: { label: "Pago", class: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-400" },
+    pendente: { label: "Pendente", class: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400" },
+    vencido: { label: "Vencido", class: "bg-destructive/15 text-destructive border-destructive/30" },
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -100,12 +176,14 @@ export default function Taxes() {
           <h1 className="font-heading text-2xl font-bold">Impostos MEI</h1>
           <p className="text-muted-foreground text-sm">Controle do DAS e limite de faturamento</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="mr-2 h-4 w-4" />Nova Guia</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Adicionar Guia DAS</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Editar Guia DAS" : "Adicionar Guia DAS"}</DialogTitle>
+            </DialogHeader>
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
                 <Label>Competência</Label>
@@ -120,12 +198,25 @@ export default function Taxes() {
                 <Input type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
               </div>
               <Button className="w-full" onClick={() => createMutation.mutate()} disabled={!competencia || !vencimento || createMutation.isPending}>
-                Salvar
+                {editingId ? "Atualizar" : "Salvar"}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Alerta de vencimento próximo */}
+      {alertas.length > 0 && (
+        <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10 text-amber-800 dark:text-amber-300 [&>svg]:text-amber-600">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle className="font-heading">Vencimento próximo!</AlertTitle>
+          <AlertDescription>
+            {alertas.length === 1
+              ? `A guia de ${alertas[0].competencia} vence em ${new Date(alertas[0].vencimento + "T12:00:00").toLocaleDateString("pt-BR")}.`
+              : `${alertas.length} guias vencem nos próximos 7 dias: ${alertas.map((a) => a.competencia).join(", ")}.`}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
@@ -167,31 +258,63 @@ export default function Taxes() {
           ) : impostos.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhuma guia cadastrada. Clique em "Nova Guia" para começar.</p>
           ) : (
-            <div className="space-y-3">
-              {impostos.map((m, i) => (
-                <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                  className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                  <div>
-                    <span className="font-medium">{m.competencia}</span>
-                    <p className="text-xs text-muted-foreground">Vence: {new Date(m.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm">{formatCurrency(m.valor)}</span>
-                    <Badge
-                      variant={m.status === "pago" ? "default" : m.status === "pendente" ? "secondary" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => togglePagoMutation.mutate({ id: m.id, currentStatus: m.status })}
-                    >
-                      {m.status === "pago" && <Check className="mr-1 h-3 w-3" />}
-                      {m.status}
-                    </Badge>
-                  </div>
-                </motion.div>
-              ))}
+            <div className="space-y-1">
+              {impostos.map((m, i) => {
+                const effStatus = getEffectiveStatus(m);
+                const cfg = statusConfig[effStatus];
+                return (
+                  <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                    className="flex items-center justify-between py-3 px-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-2 w-2 rounded-full ${effStatus === "pago" ? "bg-emerald-500" : effStatus === "vencido" ? "bg-destructive" : "bg-amber-500"}`} />
+                      <div>
+                        <span className="font-medium">{m.competencia}</span>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Vence: {new Date(m.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{formatCurrency(m.valor)}</span>
+                      <Badge
+                        variant="outline"
+                        className={`cursor-pointer ${cfg.class}`}
+                        onClick={() => togglePagoMutation.mutate({ id: m.id, currentStatus: effStatus === "vencido" ? "pendente" : m.status })}
+                      >
+                        {effStatus === "pago" && <Check className="mr-1 h-3 w-3" />}
+                        {cfg.label}
+                      </Badge>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(m)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteId(m.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* AlertDialog de exclusão */}
+      <AlertDialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir guia DAS?</AlertDialogTitle>
+            <AlertDialogDescription>Essa ação não pode ser desfeita. A guia será removida permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
