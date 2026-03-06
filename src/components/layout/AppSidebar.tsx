@@ -15,6 +15,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { LogoVektor } from "@/components/branding/LogoVektor";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
