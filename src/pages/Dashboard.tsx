@@ -1,18 +1,38 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Wallet, Receipt } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import {
+  TrendingUp, TrendingDown, Wallet, Receipt,
+  Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert,
+} from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
 import {
-  BarChart, Bar, LineChart, Line,
+  BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 
+const PIE_COLORS = [
+  "hsl(160, 60%, 38%)",
+  "hsl(38, 90%, 55%)",
+  "hsl(200, 70%, 50%)",
+  "hsl(280, 60%, 55%)",
+  "hsl(0, 72%, 51%)",
+  "hsl(145, 60%, 42%)",
+  "hsl(220, 60%, 50%)",
+  "hsl(340, 60%, 50%)",
+];
+
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const { data: receitas = [] } = useQuery({
     queryKey: ["receitas"],
@@ -50,16 +70,46 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  // Current month calculations
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const receitasMes = receitas.filter((r) => r.data.startsWith(currentMonth));
   const despesasMes = despesas.filter((d) => d.data.startsWith(currentMonth));
   const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
   const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
-  const lucroLiquido = faturamentoMes - despesasMesTotal;
+  const saldoMes = faturamentoMes - despesasMesTotal;
+
+  // Saúde Financeira
+  const despesaPercent = faturamentoMes > 0 ? (despesasMesTotal / faturamentoMes) * 100 : 0;
+  const healthStatus = despesaPercent < 50 ? "healthy" : despesaPercent <= 75 ? "warning" : "critical";
+  const healthConfig = {
+    healthy: { label: "Saudável", icon: ShieldCheck, color: "text-green-600", bg: "bg-green-500/10", border: "border-green-500/30" },
+    warning: { label: "Atenção", icon: AlertTriangle, color: "text-yellow-600", bg: "bg-yellow-500/10", border: "border-yellow-500/30" },
+    critical: { label: "Crítico", icon: ShieldAlert, color: "text-red-600", bg: "bg-red-500/10", border: "border-red-500/30" },
+  }[healthStatus];
 
   const insights = useFinancialInsights(receitas, despesas);
+
+  // Despesas por categoria (PieChart)
+  const categoryData = useMemo(() => {
+    const map: Record<string, number> = {};
+    despesasMes.forEach((d) => {
+      const cat = d.categoria || "Outros";
+      map[cat] = (map[cat] || 0) + d.valor;
+    });
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [despesasMes]);
+
+  // Monthly chart data (last 6 months)
+  const monthlyData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+    const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const desp = despesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    return { month: label.charAt(0).toUpperCase() + label.slice(1), receitas: rec, despesas: desp };
+  });
 
   const insightColors: Record<string, string> = {
     success: "border-l-green-500 bg-green-500/5",
@@ -74,37 +124,80 @@ export default function Dashboard() {
     info: "text-blue-600",
   };
 
-  const stats = [
-    { label: "Faturamento do Mês", value: faturamentoMes, icon: TrendingUp, color: "text-primary" },
-    { label: "Despesas do Mês", value: despesasMesTotal, icon: TrendingDown, color: "text-destructive" },
-    { label: "Lucro Líquido", value: lucroLiquido, icon: Wallet, color: "text-chart-3" },
-    { label: "Imposto MEI Pendente", value: impostoPendente?.valor ?? 0, icon: Receipt, color: "text-warning" },
-  ];
-
-  // Monthly chart data (last 6 months)
-  const monthlyData = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-    const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    const desp = despesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    return { month: label.charAt(0).toUpperCase() + label.slice(1), receitas: rec, despesas: desp };
-  });
-
   const latestReceitas = receitas.slice(0, 5);
   const latestDespesas = despesas.slice(0, 5);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Visão geral das suas finanças</p>
+      {/* Header + CTAs */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Visão geral das suas finanças</p>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => navigate("/receitas")}>
+            <Plus className="h-4 w-4" /> Registrar Receita
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => navigate("/despesas")}>
+            <Plus className="h-4 w-4" /> Registrar Despesa
+          </Button>
+        </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
+      {/* Saldo + Saúde Financeira */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="h-full">
+            <CardContent className="p-6 flex flex-col justify-center h-full">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="h-5 w-5 text-chart-3" />
+                <span className="text-sm text-muted-foreground">Saldo do Mês</span>
+              </div>
+              <p className={`font-heading text-4xl font-bold ${saldoMes >= 0 ? "text-primary" : "text-destructive"}`}>
+                {formatCurrency(saldoMes)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Receitas: {formatCurrency(faturamentoMes)} — Despesas: {formatCurrency(despesasMesTotal)}
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+          <Card className={`h-full border ${healthConfig.border}`}>
+            <CardContent className="p-6 flex flex-col justify-center h-full">
+              <div className="flex items-center gap-2 mb-1">
+                <HeartPulse className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Saúde Financeira</span>
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <healthConfig.icon className={`h-6 w-6 ${healthConfig.color}`} />
+                <span className={`font-heading text-xl font-bold ${healthConfig.color}`}>{healthConfig.label}</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Despesas / Faturamento</span>
+                  <span>{despesaPercent.toFixed(0)}%</span>
+                </div>
+                <Progress value={Math.min(despesaPercent, 100)} className="h-2" />
+              </div>
+              <p className="text-sm font-medium mt-2">
+                Lucro: <span className={saldoMes >= 0 ? "text-primary" : "text-destructive"}>{formatCurrency(saldoMes)}</span>
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+
+      {/* Secondary Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: "Faturamento do Mês", value: faturamentoMes, icon: TrendingUp, color: "text-primary" },
+          { label: "Despesas do Mês", value: despesasMesTotal, icon: TrendingDown, color: "text-destructive" },
+          { label: "Imposto MEI Pendente", value: impostoPendente?.valor ?? 0, icon: Receipt, color: "text-accent" },
+        ].map((s, i) => (
+          <motion.div key={s.label} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 + i * 0.08 }}>
             <Card>
               <CardContent className="p-5">
                 <div className="mb-2 flex items-center justify-between">
@@ -124,12 +217,7 @@ export default function Dashboard() {
           <h2 className="font-heading text-lg font-semibold">Insights Financeiros</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {insights.map((insight, i) => (
-              <motion.div
-                key={insight.title}
-                initial={{ opacity: 0, x: -15 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + i * 0.08 }}
-              >
+              <motion.div key={insight.title} initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.08 }}>
                 <Card className={`border-l-4 ${insightColors[insight.type]}`}>
                   <CardContent className="p-4 flex items-start gap-3">
                     <insight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[insight.type]}`} />
@@ -145,6 +233,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <Separator />
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -171,18 +261,35 @@ export default function Dashboard() {
 
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
           <Card>
-            <CardHeader><CardTitle className="font-heading text-lg">Evolução do Faturamento</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="font-heading text-lg">Despesas por Categoria</CardTitle></CardHeader>
             <CardContent>
               <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis className="text-xs" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                    <Line type="monotone" dataKey="receitas" name="Faturamento" stroke="hsl(200, 70%, 50%)" strokeWidth={2.5} dot={{ r: 4 }} />
-                  </LineChart>
-                </ResponsiveContainer>
+                {categoryData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                    Nenhuma despesa registrada este mês.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={3}
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {categoryData.map((_, idx) => (
+                          <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </CardContent>
           </Card>
