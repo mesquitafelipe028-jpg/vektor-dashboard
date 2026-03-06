@@ -71,7 +71,7 @@ export default function Reports() {
         <Card>
           <CardHeader><CardTitle className="font-heading text-lg">Receitas vs Despesas</CardTitle></CardHeader>
           <CardContent>
-            <div className="h-72">
+            <div className="h-52 sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -90,13 +90,13 @@ export default function Reports() {
         <Card>
           <CardHeader><CardTitle className="font-heading text-lg">Despesas por Categoria</CardTitle></CardHeader>
           <CardContent>
-            <div className="h-72">
+            <div className="h-52 sm:h-72">
               {pieData.length === 0 ? (
                 <p className="text-sm text-muted-foreground flex items-center justify-center h-full">Nenhuma despesa cadastrada.</p>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                       {pieData.map((_, i) => (
                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}

@@ -150,12 +150,12 @@ export default function Expenses() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Despesas</h1>
           <p className="text-sm text-muted-foreground">Gerencie suas saídas financeiras</p>
         </div>
-        <Button onClick={() => { setForm(emptyForm); setEditingId(null); setOpen(true); }}>
+        <Button onClick={() => { setForm(emptyForm); setEditingId(null); setOpen(true); }} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Nova Despesa
         </Button>
       </div>
@@ -247,7 +247,7 @@ export default function Expenses() {
               {hasFilters ? "Nenhuma despesa encontrada com os filtros aplicados." : "Nenhuma despesa cadastrada."}
             </p>
           ) : (
-            <Table>
+            <div className="overflow-x-auto"><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Descrição</TableHead>
@@ -304,7 +304,7 @@ export default function Expenses() {
                   </motion.tr>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           )}
         </CardContent>
       </Card>

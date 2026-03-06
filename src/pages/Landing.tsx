@@ -38,14 +38,14 @@ export default function Landing() {
           <span className="inline-block mb-4 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
             Simples. Rápido. Para você.
           </span>
-          <h1 className="font-heading text-4xl md:text-6xl font-bold leading-tight mb-6 max-w-3xl mx-auto">
+          <h1 className="font-heading text-3xl sm:text-4xl md:text-6xl font-bold leading-tight mb-6 max-w-3xl mx-auto">
             Controle financeiro feito para{" "}
             <span className="text-primary">quem trabalha por conta própria</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-8">
             Receitas, despesas, impostos e fluxo de caixa em um só lugar. Sem complicação.
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 px-4">
             <Button size="lg" asChild>
               <Link to="/cadastro">Começar grátis <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
@@ -76,7 +76,7 @@ export default function Landing() {
         <h2 className="font-heading text-3xl font-bold text-center mb-12">Planos</h2>
         <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
           {plans.map((plan) => (
-            <div key={plan.name} className={`rounded-xl border p-8 ${plan.highlight ? "border-primary bg-primary/5 shadow-lg scale-105" : "border-border bg-card"}`}>
+            <div key={plan.name} className={`rounded-xl border p-6 sm:p-8 ${plan.highlight ? "border-primary bg-primary/5 shadow-lg sm:scale-105" : "border-border bg-card"}`}>
               <h3 className="font-heading text-xl font-semibold mb-1">{plan.name}</h3>
               <p className="text-3xl font-bold font-heading mb-6">{plan.price}</p>
               <ul className="space-y-3 mb-8">

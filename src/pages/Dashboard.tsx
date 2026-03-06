@@ -227,7 +227,7 @@ export default function Dashboard() {
                 <Wallet className="h-5 w-5 text-chart-3" />
                 <span className="text-sm text-muted-foreground">Saldo do Mês</span>
               </div>
-              <p className={`font-heading text-4xl font-bold ${saldoMes >= 0 ? "text-primary" : "text-destructive"}`}>
+              <p className={`font-heading text-2xl sm:text-4xl font-bold ${saldoMes >= 0 ? "text-primary" : "text-destructive"}`}>
                 {formatCurrency(saldoMes)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -315,7 +315,7 @@ export default function Dashboard() {
           <Card>
             <CardHeader><CardTitle className="font-heading text-lg">Receitas vs Despesas</CardTitle></CardHeader>
             <CardContent>
-              <div className="h-72">
+              <div className="h-52 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthlyData} barGap={4}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -336,7 +336,7 @@ export default function Dashboard() {
           <Card>
             <CardHeader><CardTitle className="font-heading text-lg">Despesas por Categoria</CardTitle></CardHeader>
             <CardContent>
-              <div className="h-72">
+              <div className="h-52 sm:h-72">
                 {categoryData.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
                     Nenhuma despesa registrada este mês.
@@ -348,8 +348,8 @@ export default function Dashboard() {
                         data={categoryData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
+                        innerRadius={45}
+                        outerRadius={75}
                         paddingAngle={3}
                         dataKey="value"
                         nameKey="name"

@@ -375,7 +375,7 @@ export default function Goals() {
 
                   <Separator />
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button size="sm" className="flex-1" onClick={() => { resetTxForm(); setDepositMeta(meta); }} disabled={pct >= 100}>
                       <PiggyBank className="h-4 w-4" /> Depositar
                     </Button>

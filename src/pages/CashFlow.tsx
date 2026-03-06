@@ -273,7 +273,7 @@ export default function CashFlow() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="lg:col-span-2">
           <Card className="h-full border-2 border-accent/30">
             <CardContent className="p-6 flex flex-col justify-center h-full">
@@ -283,7 +283,7 @@ export default function CashFlow() {
                 </div>
                 <p className="text-sm font-medium text-muted-foreground">Saldo Atual</p>
               </div>
-              <p className={`text-4xl font-bold font-heading ${saldoAtual >= 0 ? "text-primary" : "text-destructive"}`}>
+              <p className={`text-2xl sm:text-4xl font-bold font-heading ${saldoAtual >= 0 ? "text-primary" : "text-destructive"}`}>
                 {formatCurrency(saldoAtual)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -360,7 +360,7 @@ export default function CashFlow() {
               <p className="text-xs text-muted-foreground">Linha sólida: com recorrências · Linha tracejada: sem recorrências</p>
             </CardHeader>
             <CardContent>
-              <div className="h-72">
+              <div className="h-52 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={projectionData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -448,7 +448,7 @@ export default function CashFlow() {
               <p className="py-8 text-center text-muted-foreground">Nenhuma movimentação registrada.</p>
             ) : (
               <>
-                <Table>
+                <div className="overflow-x-auto"><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
@@ -503,7 +503,7 @@ export default function CashFlow() {
                       </>
                     ))}
                   </TableBody>
-                </Table>
+                </Table></div>
                 {hasMore && !showAll && (
                   <div className="flex justify-center pt-4">
                     <Button variant="ghost" size="sm" onClick={() => setShowAll(true)} className="gap-1">

@@ -269,7 +269,7 @@ export default function Taxes() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Impostos MEI</h1>
           <p className="text-muted-foreground text-sm">Assistente financeiro automático para MEI</p>
@@ -434,7 +434,7 @@ export default function Taxes() {
           <CardTitle className="font-heading text-lg">Faturamento Acumulado vs Limite MEI</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-72">
+          <div className="h-52 sm:h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyChartData} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
