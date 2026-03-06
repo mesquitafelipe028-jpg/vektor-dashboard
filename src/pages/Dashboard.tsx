@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -234,40 +234,6 @@ export default function Dashboard() {
 
   const isLoading = loadingReceitas || loadingDespesas;
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6 min-w-0 max-w-full">
-        <div>
-          <Skeleton className="h-8 w-48 mb-2" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Skeleton className="h-32 w-full rounded-lg" />
-          <Skeleton className="h-32 w-full rounded-lg" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-lg" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {[1, 2].map((i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-lg" />
-          ))}
-        </div>
-        <Skeleton className="h-px w-full" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Skeleton className="h-72 w-full rounded-lg" />
-          <Skeleton className="h-72 w-full rounded-lg" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Skeleton className="h-48 w-full rounded-lg" />
-          <Skeleton className="h-48 w-full rounded-lg" />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 min-w-0 max-w-full">
       {/* Header + CTAs */}
@@ -287,23 +253,17 @@ export default function Dashboard() {
       </div>
 
       {/* Financial Alerts */}
-      {financialAlerts.length > 0 && (
+      {!isLoading && financialAlerts.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-muted-foreground" />
             <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide">Alertas Financeiros</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {financialAlerts.map((alert, i) => {
+            {financialAlerts.map((alert) => {
               const style = alertStyles[alert.type];
               return (
-                <motion.div
-                  key={alert.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ delay: i * 0.05 }}
-                >
+                <div key={alert.id} className="animate-fade-in">
                   <div className={`flex items-start gap-3 rounded-lg border ${style.border} ${style.bg} p-3`}>
                     <alert.icon className={`h-4 w-4 mt-0.5 shrink-0 ${style.iconColor}`} />
                     <p className={`text-sm flex-1 ${style.text}`}>{alert.message}</p>
@@ -315,7 +275,7 @@ export default function Dashboard() {
                       <X className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
@@ -324,36 +284,39 @@ export default function Dashboard() {
 
       {/* Company Card */}
       {empresa && (
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}>
-          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-                <Building2 className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-heading font-semibold text-sm truncate">{empresa.razao_social || empresa.nome_fantasia || "Empresa"}</p>
-                {empresa.nome_fantasia && empresa.razao_social && (
-                  <p className="text-xs text-muted-foreground truncate">{empresa.nome_fantasia}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                {empresa.situacao_cadastral && (
-                  <Badge variant={empresa.situacao_cadastral.toLowerCase().includes("ativa") ? "default" : "destructive"} className="text-xs">
-                    {empresa.situacao_cadastral}
-                  </Badge>
-                )}
-                {empresa.cnae_principal && (
-                  <span className="text-xs text-muted-foreground hidden sm:block max-w-48 truncate">{empresa.cnae_principal}</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-heading font-semibold text-sm truncate">{empresa.razao_social || empresa.nome_fantasia || "Empresa"}</p>
+              {empresa.nome_fantasia && empresa.razao_social && (
+                <p className="text-xs text-muted-foreground truncate">{empresa.nome_fantasia}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {empresa.situacao_cadastral && (
+                <Badge variant={empresa.situacao_cadastral.toLowerCase().includes("ativa") ? "default" : "destructive"} className="text-xs">
+                  {empresa.situacao_cadastral}
+                </Badge>
+              )}
+              {empresa.cnae_principal && (
+                <span className="text-xs text-muted-foreground hidden sm:block max-w-48 truncate">{empresa.cnae_principal}</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Saldo + Saúde Financeira */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
+      {isLoading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Skeleton className="h-32 w-full rounded-lg" />
+          <Skeleton className="h-32 w-full rounded-lg" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="h-full">
             <CardContent className="p-6 flex flex-col justify-center h-full">
               <div className="flex items-center gap-2 mb-1">
@@ -368,9 +331,7 @@ export default function Dashboard() {
               </p>
             </CardContent>
           </Card>
-        </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
           <Card className={`h-full border ${healthConfig.border}`}>
             <CardContent className="p-6 flex flex-col justify-center h-full">
               <div className="flex items-center gap-2 mb-1">
@@ -393,18 +354,22 @@ export default function Dashboard() {
               </p>
             </CardContent>
           </Card>
-        </motion.div>
-      </div>
+        </div>
+      )}
 
       {/* Secondary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: "Faturamento do Mês", value: faturamentoMes, icon: TrendingUp, color: "text-primary" },
-          { label: "Despesas do Mês", value: despesasMesTotal, icon: TrendingDown, color: "text-destructive" },
-          { label: "Imposto MEI Pendente", value: impostoPendente?.valor ?? 0, icon: Receipt, color: "text-accent" },
-        ].map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 + i * 0.08 }}>
-            <Card>
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            { label: "Faturamento do Mês", value: faturamentoMes, icon: TrendingUp, color: "text-primary" },
+            { label: "Despesas do Mês", value: despesasMesTotal, icon: TrendingDown, color: "text-destructive" },
+            { label: "Imposto MEI Pendente", value: impostoPendente?.valor ?? 0, icon: Receipt, color: "text-accent" },
+          ].map((s) => (
+            <Card key={s.label}>
               <CardContent className="p-5">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">{s.label}</span>
@@ -413,28 +378,26 @@ export default function Dashboard() {
                 <p className="font-heading text-2xl font-bold">{formatCurrency(s.value)}</p>
               </CardContent>
             </Card>
-          </motion.div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Financial Insights */}
-      {insights.length > 0 && (
+      {!isLoading && insights.length > 0 && (
         <div className="space-y-2">
           <h2 className="font-heading text-lg font-semibold">Insights Financeiros</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {insights.map((insight, i) => (
-              <motion.div key={insight.title} initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 + i * 0.08 }}>
-                <Card className={`border-l-4 ${insightColors[insight.type]}`}>
-                  <CardContent className="p-4 flex items-start gap-3">
-                    <insight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[insight.type]}`} />
-                    <div>
-                      <p className="text-sm font-semibold">{insight.title}</p>
-                      <p className="text-xs text-muted-foreground">{insight.description}</p>
-                      <p className="text-xs text-muted-foreground italic mt-1">💡 {insight.suggestion}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+            {insights.map((insight) => (
+              <Card key={insight.title} className={`border-l-4 ${insightColors[insight.type]}`}>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <insight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[insight.type]}`} />
+                  <div>
+                    <p className="text-sm font-semibold">{insight.title}</p>
+                    <p className="text-xs text-muted-foreground">{insight.description}</p>
+                    <p className="text-xs text-muted-foreground italic mt-1">💡 {insight.suggestion}</p>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
@@ -449,71 +412,70 @@ export default function Dashboard() {
 
       {/* Meta Financeira Card */}
       {metaAtual && (
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-          <Card className="border-accent/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/metas")}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-accent" />
-                  <span className="font-heading font-semibold">Meta Atual: {metaAtual.titulo}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">{metaAtual.categoria}</span>
-              </div>
-              <Progress value={metaAtual.valor_alvo > 0 ? Math.min((metaAtual.valor_atual / metaAtual.valor_alvo) * 100, 100) : 0} className="h-3 mb-2" />
-              <div className="flex flex-wrap justify-between gap-2 text-sm">
-                <span className="text-muted-foreground">Acumulado: <span className="font-semibold text-primary">{formatCurrency(metaAtual.valor_atual)}</span></span>
-                <span className="text-muted-foreground">Meta: <span className="font-semibold">{formatCurrency(metaAtual.valor_alvo)}</span></span>
-                <span className="text-muted-foreground">Falta: <span className="font-semibold text-destructive">{formatCurrency(Math.max(metaAtual.valor_alvo - metaAtual.valor_atual, 0))}</span></span>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
-
-      {/* Monthly Report Summary */}
-      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.52 }}>
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/relatorio-mensal")}>
+        <Card className="border-accent/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/metas")}>
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-chart-3" />
-                <span className="font-heading font-semibold">Resumo — {prevMonth.label}</span>
+                <Target className="h-5 w-5 text-accent" />
+                <span className="font-heading font-semibold">Meta Atual: {metaAtual.titulo}</span>
               </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                {prevMonth.varFat >= 0
-                  ? <ArrowUpRight className="h-3.5 w-3.5 text-green-600" />
-                  : <ArrowDownRight className="h-3.5 w-3.5 text-red-600" />
-                }
-                {Math.abs(prevMonth.varFat).toFixed(1)}% vs mês anterior
-              </div>
+              <span className="text-xs text-muted-foreground">{metaAtual.categoria}</span>
             </div>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-xs text-muted-foreground">Faturamento</p>
-                <p className="text-lg font-bold text-primary">{formatCurrency(prevMonth.rec)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Despesas</p>
-                <p className="text-lg font-bold text-destructive">{formatCurrency(prevMonth.desp)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Lucro</p>
-                <p className={`text-lg font-bold ${prevMonth.lucro >= 0 ? "text-primary" : "text-destructive"}`}>{formatCurrency(prevMonth.lucro)}</p>
-              </div>
+            <Progress value={metaAtual.valor_alvo > 0 ? Math.min((metaAtual.valor_atual / metaAtual.valor_alvo) * 100, 100) : 0} className="h-3 mb-2" />
+            <div className="flex flex-wrap justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">Acumulado: <span className="font-semibold text-primary">{formatCurrency(metaAtual.valor_atual)}</span></span>
+              <span className="text-muted-foreground">Meta: <span className="font-semibold">{formatCurrency(metaAtual.valor_alvo)}</span></span>
+              <span className="text-muted-foreground">Falta: <span className="font-semibold text-destructive">{formatCurrency(Math.max(metaAtual.valor_alvo - metaAtual.valor_atual, 0))}</span></span>
             </div>
           </CardContent>
         </Card>
-      </motion.div>
+      )}
+
+      {/* Monthly Report Summary */}
+      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/relatorio-mensal")}>
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-chart-3" />
+              <span className="font-heading font-semibold">Resumo — {prevMonth.label}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {prevMonth.varFat >= 0
+                ? <ArrowUpRight className="h-3.5 w-3.5 text-primary" />
+                : <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />
+              }
+              {Math.abs(prevMonth.varFat).toFixed(1)}% vs mês anterior
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-xs text-muted-foreground">Faturamento</p>
+              <p className="text-lg font-bold text-primary">{formatCurrency(prevMonth.rec)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Despesas</p>
+              <p className="text-lg font-bold text-destructive">{formatCurrency(prevMonth.desp)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Lucro</p>
+              <p className={`text-lg font-bold ${prevMonth.lucro >= 0 ? "text-primary" : "text-destructive"}`}>{formatCurrency(prevMonth.lucro)}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
-          <Card>
-            <CardHeader><CardTitle className="font-heading text-lg">Últimas Receitas</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                {latestReceitas.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma receita cadastrada.</p>}
-                {latestReceitas.map((r) => (
+        <Card>
+          <CardHeader><CardTitle className="font-heading text-lg">Últimas Receitas</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)
+              ) : latestReceitas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma receita cadastrada.</p>
+              ) : (
+                latestReceitas.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
                       <TrendingUp className="h-4 w-4 text-primary" />
@@ -524,18 +486,21 @@ export default function Dashboard() {
                     </div>
                     <span className="text-sm font-bold text-primary shrink-0">+{formatCurrency(r.valor)}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
-          <Card>
-            <CardHeader><CardTitle className="font-heading text-lg">Últimas Despesas</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                {latestDespesas.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma despesa cadastrada.</p>}
-                {latestDespesas.map((d) => (
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="font-heading text-lg">Últimas Despesas</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)
+              ) : latestDespesas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma despesa cadastrada.</p>
+              ) : (
+                latestDespesas.map((d) => (
                   <div key={d.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10">
                       <TrendingDown className="h-4 w-4 text-destructive" />
@@ -546,11 +511,11 @@ export default function Dashboard() {
                     </div>
                     <span className="text-sm font-bold text-destructive shrink-0">-{formatCurrency(d.valor)}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
