@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingDown, Pencil, Trash2, Filter } from "lucide-react";
-import { formatCurrency, formatDate, expenseCategories } from "@/lib/mockData";
+import { formatCurrency, formatDate, expenseCategories, suggestCategory } from "@/lib/mockData";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { z } from "zod";
