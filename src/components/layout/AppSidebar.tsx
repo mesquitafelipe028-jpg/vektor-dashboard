@@ -6,7 +6,6 @@ import {
   Receipt,
   BarChart3,
   Settings,
-  Zap,
   LogOut,
   Users,
   Target,
@@ -14,6 +13,7 @@ import {
   Calculator,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { LogoVektor } from "@/components/branding/LogoVektor";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
