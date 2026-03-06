@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Wallet, Receipt } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
+import { useFinancialInsights } from "@/hooks/useFinancialInsights";
 import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -58,6 +59,21 @@ export default function Dashboard() {
   const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
   const lucroLiquido = faturamentoMes - despesasMesTotal;
 
+  const insights = useFinancialInsights(receitas, despesas);
+
+  const insightColors: Record<string, string> = {
+    success: "border-l-green-500 bg-green-500/5",
+    warning: "border-l-yellow-500 bg-yellow-500/5",
+    danger: "border-l-red-500 bg-red-500/5",
+    info: "border-l-blue-500 bg-blue-500/5",
+  };
+  const insightIconColors: Record<string, string> = {
+    success: "text-green-600",
+    warning: "text-yellow-600",
+    danger: "text-red-600",
+    info: "text-blue-600",
+  };
+
   const stats = [
     { label: "Faturamento do Mês", value: faturamentoMes, icon: TrendingUp, color: "text-primary" },
     { label: "Despesas do Mês", value: despesasMesTotal, icon: TrendingDown, color: "text-destructive" },
@@ -101,6 +117,33 @@ export default function Dashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Financial Insights */}
+      {insights.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="font-heading text-lg font-semibold">Insights Financeiros</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {insights.map((insight, i) => (
+              <motion.div
+                key={insight.title}
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + i * 0.08 }}
+              >
+                <Card className={`border-l-4 ${insightColors[insight.type]}`}>
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <insight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[insight.type]}`} />
+                    <div>
+                      <p className="text-sm font-semibold">{insight.title}</p>
+                      <p className="text-xs text-muted-foreground">{insight.description}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
