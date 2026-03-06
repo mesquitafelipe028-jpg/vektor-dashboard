@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, TrendingDown, Pencil, Trash2 } from "lucide-react";
+import { Plus, TrendingDown, Pencil, Trash2, Filter } from "lucide-react";
 import { formatCurrency, formatDate, expenseCategories } from "@/lib/mockData";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -33,6 +34,10 @@ export default function Expenses() {
   const [form, setForm] = useState<DespesaForm>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Filters
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterCategoria, setFilterCategoria] = useState("");
+
   const { data: despesas = [], isLoading } = useQuery({
     queryKey: ["despesas"],
     queryFn: async () => {
@@ -43,7 +48,37 @@ export default function Expenses() {
     enabled: !!user,
   });
 
-  const total = despesas.reduce((s, d) => s + d.valor, 0);
+  // Filtered list
+  const filtered = useMemo(() => {
+    let list = despesas;
+    if (filterMonth) {
+      list = list.filter((d) => d.data.startsWith(filterMonth));
+    }
+    if (filterCategoria) {
+      list = list.filter((d) => d.categoria === filterCategoria);
+    }
+    return list;
+  }, [despesas, filterMonth, filterCategoria]);
+
+  const total = filtered.reduce((s, d) => s + d.valor, 0);
+
+  // Monthly totals
+  const monthlyTotals = useMemo(() => {
+    const map: Record<string, number> = {};
+    despesas.forEach((d) => {
+      const key = d.data.slice(0, 7);
+      map[key] = (map[key] || 0) + d.valor;
+    });
+    return Object.entries(map)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .slice(0, 6)
+      .map(([month, value]) => {
+        const [y, m] = month.split("-");
+        const d = new Date(parseInt(y), parseInt(m) - 1);
+        const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+        return { label: label.charAt(0).toUpperCase() + label.slice(1), value };
+      });
+  }, [despesas]);
 
   const upsert = useMutation({
     mutationFn: async () => {
@@ -75,7 +110,9 @@ export default function Expenses() {
       toast.success(editingId ? "Despesa atualizada!" : "Despesa cadastrada!");
       closeDialog();
     },
-    onError: (e) => { if (e.message !== "validation") toast.error("Erro ao salvar despesa."); },
+    onError: (e) => {
+      if (e.message !== "validation") toast.error("Erro ao salvar despesa.");
+    },
   });
 
   const deleteMut = useMutation({
@@ -83,17 +120,32 @@ export default function Expenses() {
       const { error } = await supabase.from("despesas").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["despesas"] }); toast.success("Despesa excluída!"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["despesas"] });
+      toast.success("Despesa excluída!");
+    },
     onError: () => toast.error("Erro ao excluir despesa."),
   });
 
-  const closeDialog = () => { setOpen(false); setEditingId(null); setForm(emptyForm); setErrors({}); };
+  const closeDialog = () => {
+    setOpen(false);
+    setEditingId(null);
+    setForm(emptyForm);
+    setErrors({});
+  };
 
-  const openEdit = (d: typeof despesas[0]) => {
+  const openEdit = (d: (typeof despesas)[0]) => {
     setEditingId(d.id);
     setForm({ descricao: d.descricao, valor: String(d.valor), data: d.data, categoria: d.categoria ?? "" });
     setOpen(true);
   };
+
+  const clearFilters = () => {
+    setFilterMonth("");
+    setFilterCategoria("");
+  };
+
+  const hasFilters = filterMonth || filterCategoria;
 
   return (
     <div className="space-y-6">
@@ -107,25 +159,92 @@ export default function Expenses() {
         </Button>
       </div>
 
+      {/* Summary Card */}
       <Card>
         <CardContent className="flex items-center gap-4 p-5">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10">
             <TrendingDown className="h-6 w-6 text-destructive" />
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Total de Despesas</p>
+            <p className="text-sm text-muted-foreground">
+              {hasFilters ? "Total (filtrado)" : "Total de Despesas"}
+            </p>
             <p className="font-heading text-2xl font-bold">{formatCurrency(total)}</p>
           </div>
         </CardContent>
       </Card>
 
+      {/* Monthly Totals */}
+      {monthlyTotals.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="font-heading text-lg">Total por Mês</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {monthlyTotals.map((m) => (
+                <div key={m.label} className="rounded-lg border border-border p-3 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">{m.label}</p>
+                  <p className="font-heading font-bold text-destructive">{formatCurrency(m.value)}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filters */}
       <Card>
-        <CardHeader><CardTitle className="font-heading text-lg">Todas as Despesas</CardTitle></CardHeader>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Filter className="h-4 w-4" />
+              <span className="font-medium">Filtros</span>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Mês</Label>
+              <Input
+                type="month"
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="w-44"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Categoria</Label>
+              <Select value={filterCategoria} onValueChange={setFilterCategoria}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {expenseCategories.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-heading text-lg">
+            Despesas {hasFilters && <span className="text-sm font-normal text-muted-foreground">({filtered.length} resultado{filtered.length !== 1 ? "s" : ""})</span>}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
           {isLoading ? (
             <p className="py-8 text-center text-muted-foreground">Carregando...</p>
-          ) : despesas.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">Nenhuma despesa cadastrada.</p>
+          ) : filtered.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground">
+              {hasFilters ? "Nenhuma despesa encontrada com os filtros aplicados." : "Nenhuma despesa cadastrada."}
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -138,15 +257,48 @@ export default function Expenses() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {despesas.map((d, i) => (
-                  <motion.tr key={d.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="border-b transition-colors hover:bg-muted/50">
+                {filtered.map((d, i) => (
+                  <motion.tr
+                    key={d.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.03 }}
+                    className="border-b transition-colors hover:bg-muted/50"
+                  >
                     <TableCell className="font-medium">{d.descricao}</TableCell>
                     <TableCell>{d.categoria ?? "—"}</TableCell>
                     <TableCell>{formatDate(d.data)}</TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">{formatCurrency(d.valor)}</TableCell>
+                    <TableCell className="text-right font-semibold text-destructive">
+                      {formatCurrency(d.valor)}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteMut.mutate(d.id)}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(d)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir despesa?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Essa ação não pode ser desfeita. A despesa "{d.descricao}" será removida permanentemente.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMut.mutate(d.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </motion.tr>
                 ))}
@@ -156,31 +308,19 @@ export default function Expenses() {
         </CardContent>
       </Card>
 
+      {/* Form Dialog */}
       <Dialog open={open} onOpenChange={(v) => { if (!v) closeDialog(); else setOpen(true); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle className="font-heading">{editingId ? "Editar Despesa" : "Nova Despesa"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              {editingId ? "Editar Despesa" : "Nova Despesa"}
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Descrição *</Label>
-              <Input value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} placeholder="Descrição da despesa" />
-              {errors.descricao && <p className="text-sm text-destructive">{errors.descricao}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Valor (R$) *</Label>
-                <Input type="number" step="0.01" value={form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value })} placeholder="0,00" />
-                {errors.valor && <p className="text-sm text-destructive">{errors.valor}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Data *</Label>
-                <Input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} />
-                {errors.data && <p className="text-sm text-destructive">{errors.data}</p>}
-              </div>
-            </div>
             <div className="space-y-2">
               <Label>Categoria</Label>
               <Select value={form.categoria} onValueChange={(v) => setForm({ ...form, categoria: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
                 <SelectContent>
                   {expenseCategories.map((c) => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -188,10 +328,44 @@ export default function Expenses() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Descrição *</Label>
+              <Input
+                value={form.descricao}
+                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+                placeholder="Descrição da despesa"
+                maxLength={200}
+              />
+              {errors.descricao && <p className="text-sm text-destructive">{errors.descricao}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Valor (R$) *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={form.valor}
+                  onChange={(e) => setForm({ ...form, valor: e.target.value })}
+                  placeholder="0,00"
+                />
+                {errors.valor && <p className="text-sm text-destructive">{errors.valor}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Data *</Label>
+                <Input
+                  type="date"
+                  value={form.data}
+                  onChange={(e) => setForm({ ...form, data: e.target.value })}
+                />
+                {errors.data && <p className="text-sm text-destructive">{errors.data}</p>}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={() => upsert.mutate()} disabled={upsert.isPending}>{upsert.isPending ? "Salvando..." : "Salvar"}</Button>
+            <Button onClick={() => upsert.mutate()} disabled={upsert.isPending}>
+              {upsert.isPending ? "Salvando..." : "Salvar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
