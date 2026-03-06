@@ -448,7 +448,7 @@ export default function CashFlow() {
               <p className="py-8 text-center text-muted-foreground">Nenhuma movimentação registrada.</p>
             ) : (
               <>
-                <Table>
+                <div className="overflow-x-auto"><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
