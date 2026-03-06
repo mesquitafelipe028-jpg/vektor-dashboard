@@ -106,7 +106,7 @@ export function MobileBottomNav() {
                   key={item.path}
                   onClick={() => {
                     setMoreOpen(false);
-                    navigate(item.path);
+                    setTimeout(() => navigate(item.path), 200);
                   }}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
