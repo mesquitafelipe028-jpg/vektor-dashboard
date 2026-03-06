@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import {
   TrendingUp, TrendingDown, Wallet, Receipt,
   Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert, Target,
-  FileText, ArrowUpRight, ArrowDownRight, Building2,
+  FileText, ArrowUpRight, ArrowDownRight, Building2, X, Bell,
+  CheckCircle2, Clock, Flame,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
@@ -102,13 +103,25 @@ export default function Dashboard() {
 
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
+  const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
+  const dismissAlert = useCallback((id: string) => {
+    setHiddenAlerts((prev) => new Set(prev).add(id));
+  }, []);
+
   const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const currentYear = now.getFullYear().toString();
+  const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const receitasMes = receitas.filter((r) => r.data.startsWith(currentMonth));
   const despesasMes = despesas.filter((d) => d.data.startsWith(currentMonth));
   const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
   const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
   const saldoMes = faturamentoMes - despesasMesTotal;
+
+  const LIMITE_MEI = 81000;
+  const faturamentoAnual = receitas
+    .filter((r) => r.data.startsWith(currentYear))
+    .reduce((s, r) => s + r.valor, 0);
+  const percentLimit = Math.min((faturamentoAnual / LIMITE_MEI) * 100, 100);
 
   // Previous month for report summary
   const prevMonth = useMemo(() => {
@@ -171,6 +184,46 @@ export default function Dashboard() {
   const latestReceitas = receitas.slice(0, 5);
   const latestDespesas = despesas.slice(0, 5);
 
+  // Smart Financial Alerts
+  const financialAlerts = useMemo(() => {
+    type AlertItem = { id: string; icon: typeof AlertTriangle; message: string; type: "success" | "warning" | "danger" };
+    const alerts: AlertItem[] = [];
+
+    // Alerta 1 — Limite MEI
+    if (percentLimit >= 90) {
+      alerts.push({ id: "mei-90", icon: ShieldAlert, type: "danger", message: `Atenção: você está próximo de ultrapassar o limite do MEI (${percentLimit.toFixed(1)}% utilizado).` });
+    } else if (percentLimit >= 70) {
+      alerts.push({ id: "mei-70", icon: AlertTriangle, type: "warning", message: `Você já utilizou ${percentLimit.toFixed(1)}% do limite anual do MEI.` });
+    }
+
+    // Alerta 2 — DAS próximo do vencimento
+    const dayOfMonth = now.getDate();
+    if (dayOfMonth >= 15 && dayOfMonth < 20) {
+      const diasRestantes = 20 - dayOfMonth;
+      alerts.push({ id: "das-vencimento", icon: Clock, type: "warning", message: `Seu imposto MEI (DAS) vence em ${diasRestantes} dia${diasRestantes > 1 ? "s" : ""}.` });
+    } else if (dayOfMonth === 20) {
+      alerts.push({ id: "das-hoje", icon: Clock, type: "danger", message: "Seu imposto MEI (DAS) vence hoje!" });
+    }
+
+    // Alerta 3 & 4 — Variação de faturamento
+    if (prevMonth.rec > 0 && faturamentoMes > 0) {
+      const variation = ((faturamentoMes - prevMonth.rec) / prevMonth.rec) * 100;
+      if (variation > 20) {
+        alerts.push({ id: "fat-cresceu", icon: Flame, type: "success", message: `Parabéns! Seu faturamento cresceu ${variation.toFixed(0)}% este mês. 🚀` });
+      } else if (variation < 0) {
+        alerts.push({ id: "fat-caiu", icon: TrendingDown, type: "warning", message: `Seu faturamento caiu ${Math.abs(variation).toFixed(0)}% comparado ao mês passado.` });
+      }
+    }
+
+    return alerts.filter((a) => !hiddenAlerts.has(a.id));
+  }, [percentLimit, now, prevMonth, faturamentoMes, hiddenAlerts]);
+
+  const alertStyles = {
+    success: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-700 dark:text-emerald-400", iconColor: "text-emerald-600" },
+    warning: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-700 dark:text-amber-400", iconColor: "text-amber-600" },
+    danger: { bg: "bg-destructive/10", border: "border-destructive/30", text: "text-destructive", iconColor: "text-destructive" },
+  };
+
   return (
     <div className="space-y-6">
       {/* Header + CTAs */}
@@ -188,6 +241,42 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Financial Alerts */}
+      {financialAlerts.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide">Alertas Financeiros</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {financialAlerts.map((alert, i) => {
+              const style = alertStyles[alert.type];
+              return (
+                <motion.div
+                  key={alert.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <div className={`flex items-start gap-3 rounded-lg border ${style.border} ${style.bg} p-3`}>
+                    <alert.icon className={`h-4 w-4 mt-0.5 shrink-0 ${style.iconColor}`} />
+                    <p className={`text-sm flex-1 ${style.text}`}>{alert.message}</p>
+                    <button
+                      onClick={() => dismissAlert(alert.id)}
+                      className="shrink-0 rounded-md p-0.5 hover:bg-background/50 transition-colors"
+                      aria-label="Ocultar alerta"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Company Card */}
       {empresa && (
