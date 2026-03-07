@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft, Plus, DollarSign, Clock, Calendar, CheckCircle,
-  Pencil, Send, CreditCard, AlertTriangle,
+  Pencil, Send, CreditCard, AlertTriangle, CalendarClock,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatCurrency, formatDate } from "@/lib/mockData";
