@@ -12,6 +12,7 @@ import {
   Activity,
   Calculator,
   CreditCard,
+  Wallet,
   Search,
   Plus,
   LucideIcon,
