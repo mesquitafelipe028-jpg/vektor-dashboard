@@ -436,11 +436,14 @@ export default function Dashboard() {
           <p className="text-sm text-muted-foreground">Seu centro de controle financeiro.</p>
         </div>
         <div className="hidden md:flex gap-2">
-          <Button size="sm" onClick={() => navigate("/receitas")}>
+          <Button size="sm" onClick={() => navigate("/receitas?novo=true")}>
             <Plus className="h-4 w-4" /> Registrar Receita
           </Button>
-          <Button size="sm" variant="outline" onClick={() => navigate("/despesas")}>
+          <Button size="sm" variant="outline" onClick={() => navigate("/despesas?novo=true")}>
             <Plus className="h-4 w-4" /> Registrar Despesa
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => navigate("/clientes?novo=true")}>
+            <Plus className="h-4 w-4" /> Novo Cliente
           </Button>
         </div>
       </div>
