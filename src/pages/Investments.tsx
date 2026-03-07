@@ -210,6 +210,35 @@ export default function Investments() {
   const defaultTab = searchParams.get("tab") || "dashboard";
   const { toast } = useToast();
   const { ativos, addAtivo, deleteAtivo, dividendos, addDividendo, deleteDividendo } = useInvestments();
+  const { quotes, isLoading: quotesLoading, lastUpdated: quotesLastUpdated, fetchQuotes } = useStockQuotes();
+
+  // Auto-fetch quotes when ativos load
+  const hasFetchedRef = useRef(false);
+  useEffect(() => {
+    if (ativos.data && ativos.data.length > 0 && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      const tickers = ativos.data.map(a => a.nome);
+      fetchQuotes(tickers);
+    }
+  }, [ativos.data, fetchQuotes]);
+
+  const handleRefreshQuotes = useCallback(() => {
+    if (ativos.data && ativos.data.length > 0) {
+      fetchQuotes(ativos.data.map(a => a.nome));
+    }
+  }, [ativos.data, fetchQuotes]);
+
+  // Merge live prices: use quote price if available, else fallback to stored preco_atual
+  const ativosComCotacao = useMemo(() => {
+    if (!ativos.data) return [];
+    return ativos.data.map(a => {
+      const q = quotes[a.nome] || quotes[a.nome.toUpperCase()] || quotes[a.nome.toLowerCase()];
+      if (q) {
+        return { ...a, preco_atual: q.price, _liveChange: q.change, _liveName: q.name };
+      }
+      return { ...a, _liveChange: null, _liveName: null };
+    });
+  }, [ativos.data, quotes]);
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value }, { replace: true });
