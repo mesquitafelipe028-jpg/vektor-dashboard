@@ -185,10 +185,10 @@ export default function CreditCards() {
       };
       if (!payload.nome) throw new Error("Nome obrigatório");
       if (editingCardId) {
-        const { error } = await supabase.from("cartoes_credito").update(payload).eq("id", editingCardId) as any;
+        const { error } = await (supabase as any).from("cartoes_credito").update(payload).eq("id", editingCardId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("cartoes_credito").insert(payload) as any;
+        const { error } = await (supabase as any).from("cartoes_credito").insert(payload);
         if (error) throw error;
       }
     },
