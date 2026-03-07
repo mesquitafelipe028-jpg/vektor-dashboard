@@ -30,6 +30,7 @@ type ReceitaForm = {
   data: string;
   forma_pagamento: string;
   cliente_id: string;
+  tipo_conta: string;
 };
 
 const emptyForm: ReceitaForm = {
@@ -38,6 +39,7 @@ const emptyForm: ReceitaForm = {
   data: new Date().toISOString().slice(0, 10),
   forma_pagamento: "",
   cliente_id: "",
+  tipo_conta: "mei",
 };
 
 export default function Revenues() {
