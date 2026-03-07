@@ -11,6 +11,7 @@ import {
   Target,
   Activity,
   Calculator,
+  CreditCard,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
