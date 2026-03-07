@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   TrendingUp, TrendingDown, Wallet, Receipt,
   Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert, Target,
   FileText, ArrowUpRight, ArrowDownRight, Building2, X, Bell,
-  CheckCircle2, Clock, Flame,
+  CheckCircle2, Clock, Flame, User, Briefcase, Layers,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
