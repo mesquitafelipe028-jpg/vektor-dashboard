@@ -22,7 +22,6 @@ const quickActions = [
 
 export function MobileBottomNav() {
   const [fabOpen, setFabOpen] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
