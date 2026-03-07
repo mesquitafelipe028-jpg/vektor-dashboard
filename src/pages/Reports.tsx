@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/mockData";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell,
