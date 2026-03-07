@@ -267,6 +267,30 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Financial View Selector */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-muted-foreground font-medium">Visualizar:</span>
+        <ToggleGroup
+          type="single"
+          value={financialView}
+          onValueChange={(v) => { if (v) setFinancialView(v as FinancialView); }}
+          className="bg-muted/50 rounded-lg p-1"
+        >
+          <ToggleGroupItem value="pessoal" aria-label="Pessoal" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+            <User className="h-3.5 w-3.5" />
+            Pessoal
+          </ToggleGroupItem>
+          <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+            <Briefcase className="h-3.5 w-3.5" />
+            MEI
+          </ToggleGroupItem>
+          <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+            <Layers className="h-3.5 w-3.5" />
+            Tudo
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+
       {/* Financial Alerts */}
       {!isLoading && financialAlerts.length > 0 && (
         <div className="space-y-2">
