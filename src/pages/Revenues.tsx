@@ -212,6 +212,7 @@ export default function Revenues() {
       frequencia: r.frequencia ?? "",
       data_inicio: r.data_inicio ?? "",
       data_fim: r.data_fim ?? "",
+      efetivada: r.status === "recebido",
     });
     setOpen(true);
   };
