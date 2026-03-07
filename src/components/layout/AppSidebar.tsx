@@ -16,6 +16,7 @@ import {
   Plus,
   LucideIcon,
   LineChart,
+  Calculator,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { LogoVektor } from "@/components/branding/LogoVektor";
@@ -62,7 +63,7 @@ const menuGroups = [
   {
     label: "Investimentos",
     items: [
-      { title: "Investimentos", url: "/investimentos", icon: LineChart },
+      { title: "Simulador", url: "/calculadora-investimentos", icon: Calculator },
     ],
   },
   {
