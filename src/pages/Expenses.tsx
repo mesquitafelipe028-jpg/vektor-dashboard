@@ -246,6 +246,7 @@ export default function Expenses() {
       numero_parcelas: d.numero_parcelas ? String(d.numero_parcelas) : "",
       data_inicio: d.data_inicio ?? "",
       data_fim: d.data_fim ?? "",
+      efetivada: d.status === "pago",
     });
     setOpen(true);
   };
