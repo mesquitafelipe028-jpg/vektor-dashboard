@@ -174,8 +174,8 @@ export default function Dashboard() {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-    const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    const desp = despesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const rec = filteredReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const desp = filteredDespesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
     return { month: label.charAt(0).toUpperCase() + label.slice(1), receitas: rec, despesas: desp };
   });
 
