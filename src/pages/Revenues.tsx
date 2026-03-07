@@ -414,6 +414,16 @@ export default function Revenues() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Tipo de Conta</Label>
+              <Select value={form.tipo_conta} onValueChange={(v) => setForm({ ...form, tipo_conta: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mei">MEI</SelectItem>
+                  <SelectItem value="pessoal">Pessoal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
