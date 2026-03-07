@@ -40,19 +40,21 @@ export interface InvestimentoDividendoInsert {
   tipo?: string;
 }
 
+// Use untyped client for tables not yet in generated types
+const db = supabase as any;
+
 export function useInvestments() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const userId = user?.id;
 
-  // ---- Ativos ----
   const ativos = useQuery({
     queryKey: ["investimento_ativos", userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("investimento_ativos")
         .select("*")
-        .eq("user_id", userId!)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as InvestimentoAtivo[];
@@ -62,9 +64,9 @@ export function useInvestments() {
 
   const addAtivo = useMutation({
     mutationFn: async (ativo: InvestimentoAtivoInsert) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("investimento_ativos")
-        .insert({ ...ativo, user_id: userId! });
+        .insert({ ...ativo, user_id: userId });
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_ativos"] }),
@@ -72,11 +74,11 @@ export function useInvestments() {
 
   const updateAtivo = useMutation({
     mutationFn: async ({ id, ...data }: Partial<InvestimentoAtivo> & { id: string }) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("investimento_ativos")
         .update(data)
         .eq("id", id)
-        .eq("user_id", userId!);
+        .eq("user_id", userId);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_ativos"] }),
@@ -84,24 +86,23 @@ export function useInvestments() {
 
   const deleteAtivo = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("investimento_ativos")
         .delete()
         .eq("id", id)
-        .eq("user_id", userId!);
+        .eq("user_id", userId);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_ativos"] }),
   });
 
-  // ---- Dividendos ----
   const dividendos = useQuery({
     queryKey: ["investimento_dividendos", userId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("investimento_dividendos")
         .select("*")
-        .eq("user_id", userId!)
+        .eq("user_id", userId)
         .order("data_recebimento", { ascending: false });
       if (error) throw error;
       return (data ?? []) as InvestimentoDividendo[];
@@ -111,9 +112,9 @@ export function useInvestments() {
 
   const addDividendo = useMutation({
     mutationFn: async (div: InvestimentoDividendoInsert) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("investimento_dividendos")
-        .insert({ ...div, user_id: userId! });
+        .insert({ ...div, user_id: userId });
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_dividendos"] }),
@@ -121,23 +122,15 @@ export function useInvestments() {
 
   const deleteDividendo = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from("investimento_dividendos")
         .delete()
         .eq("id", id)
-        .eq("user_id", userId!);
+        .eq("user_id", userId);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_dividendos"] }),
   });
 
-  return {
-    ativos,
-    addAtivo,
-    updateAtivo,
-    deleteAtivo,
-    dividendos,
-    addDividendo,
-    deleteDividendo,
-  };
+  return { ativos, addAtivo, updateAtivo, deleteAtivo, dividendos, addDividendo, deleteDividendo };
 }
