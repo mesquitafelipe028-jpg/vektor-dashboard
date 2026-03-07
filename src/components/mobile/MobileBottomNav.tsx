@@ -5,7 +5,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { QuickAddModal } from "./QuickAddModal";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -16,14 +15,13 @@ const navItems = [
 ];
 
 const quickActions = [
-  { label: "Adicionar Receita", icon: TrendingUp, path: "/receitas", color: "text-primary" },
-  { label: "Adicionar Despesa", icon: Receipt, path: "/despesas", color: "text-destructive" },
-  { label: "Adicionar Cliente", icon: UserPlus, path: "/clientes", color: "text-chart-3" },
+  { label: "Nova Receita", icon: TrendingUp, path: "/receitas?novo=true", color: "text-primary" },
+  { label: "Nova Despesa", icon: Receipt, path: "/despesas?novo=true", color: "text-destructive" },
+  { label: "Novo Cliente", icon: UserPlus, path: "/clientes?novo=true", color: "text-chart-3" },
 ];
 
 export function MobileBottomNav() {
   const [fabOpen, setFabOpen] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -31,8 +29,6 @@ export function MobileBottomNav() {
 
   return (
     <>
-      <QuickAddModal open={quickAddOpen} onOpenChange={setQuickAddOpen} />
-
       <AnimatePresence>
         {fabOpen && (
           <>
@@ -45,13 +41,6 @@ export function MobileBottomNav() {
               initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
               className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[999] flex flex-col gap-3 items-center"
             >
-              <button
-                onClick={() => { setFabOpen(false); setTimeout(() => setQuickAddOpen(true), 200); }}
-                className="flex items-center gap-3 bg-card border border-border rounded-full px-5 py-3 shadow-lg min-w-[200px]"
-              >
-                <Plus className="h-5 w-5 text-primary" />
-                <span className="text-sm font-medium text-foreground">Registro Rápido</span>
-              </button>
               {quickActions.map((action) => (
                 <button
                   key={action.label}

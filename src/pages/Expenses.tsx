@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, expenseCategories, suggestCategory } from "@/lib/mockData";
 import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
 import { TransactionFormSheet, type TransactionFormData } from "@/components/transaction/TransactionFormSheet";
+import { useSearchParams } from "react-router-dom";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
@@ -47,7 +48,16 @@ const emptyForm: TransactionFormData = {
 export default function Expenses() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("novo") === "true") {
+      setOpen(true);
+      searchParams.delete("novo");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
