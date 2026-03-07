@@ -28,6 +28,7 @@ const More = lazy(() => import("./pages/More"));
 const InvestmentCalculator = lazy(() => import("./pages/InvestmentCalculator"));
 const CreditCards = lazy(() => import("./pages/CreditCards"));
 const Categories = lazy(() => import("./pages/Categories"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -65,6 +66,7 @@ const App = () => {
                 <Route path="/login" element={<Login />} />
                 <Route path="/cadastro" element={<Signup />} />
                 <Route element={<ProtectedRoute />}>
+                  <Route path="/onboarding" element={<Onboarding />} />
                   <Route element={<AppLayout />}>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/receitas" element={<Revenues />} />

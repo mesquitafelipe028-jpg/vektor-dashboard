@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function LayoutSkeleton() {
@@ -35,9 +35,16 @@ function LayoutSkeleton() {
 
 export default function ProtectedRoute() {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) return <LayoutSkeleton />;
   if (!user) return <Navigate to="/login" replace />;
+
+  // Redirect to onboarding if not completed (skip if already on /onboarding)
+  const onboardingDone = localStorage.getItem(`vektor_onboarding_done_${user.id}`);
+  if (!onboardingDone && location.pathname !== "/onboarding") {
+    return <Navigate to="/onboarding" replace />;
+  }
 
   return <Outlet />;
 }
