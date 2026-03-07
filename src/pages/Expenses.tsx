@@ -24,8 +24,8 @@ const schema = z.object({
   categoria: z.string().optional(),
 });
 
-type DespesaForm = { descricao: string; valor: string; data: string; categoria: string };
-const emptyForm: DespesaForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" };
+type DespesaForm = { descricao: string; valor: string; data: string; categoria: string; tipo_conta: string };
+const emptyForm: DespesaForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "", tipo_conta: "mei" };
 
 export default function Expenses() {
   const { user } = useAuth();
