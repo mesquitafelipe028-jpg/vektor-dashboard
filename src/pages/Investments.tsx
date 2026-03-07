@@ -975,6 +975,9 @@ function CarteiraTab({
   setOpenDialog,
   onAdd,
   onDelete,
+  quotesLoading,
+  quotesLastUpdated,
+  onRefreshQuotes,
 }: {
   ativos: any[];
   dividendos: any[];
@@ -983,6 +986,9 @@ function CarteiraTab({
   setOpenDialog: (v: boolean) => void;
   onAdd: (a: InvestimentoAtivoInsert) => void;
   onDelete: (id: string) => void;
+  quotesLoading?: boolean;
+  quotesLastUpdated?: Date | null;
+  onRefreshQuotes?: () => void;
 }) {
   const [filtro, setFiltro] = useState<string>("todos");
   const [visibleCols, setVisibleCols] = useState<string[]>(() => {
