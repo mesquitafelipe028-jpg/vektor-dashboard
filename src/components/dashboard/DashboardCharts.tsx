@@ -9,7 +9,7 @@ const FALLBACK_COLOR = "hsl(220, 9%, 46%)";
 
 interface DashboardChartsProps {
   monthlyData: { month: string; receitas: number; despesas: number }[];
-  categoryData: { name: string; value: number }[];
+  categoryData: { name: string; value: number; fill?: string }[];
 }
 
 export default function DashboardCharts({ monthlyData, categoryData }: DashboardChartsProps) {
