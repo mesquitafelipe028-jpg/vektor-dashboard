@@ -69,8 +69,8 @@ function KpiCards({
   const despPessoal = despesas.filter((d: any) => d.tipo_conta === "pessoal" && d.data.startsWith(currentMonth) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
   const taxaPoupanca = rendaPessoal > 0 ? ((rendaPessoal - despPessoal) / rendaPessoal) * 100 : 0;
 
-  const rendaPessoalPrev = receitas.filter((r) => r.tipo_conta === "pessoal" && r.data.startsWith(prevKey)).reduce((s: number, r: any) => s + r.valor, 0);
-  const despPessoalPrev = despesas.filter((d) => d.tipo_conta === "pessoal" && d.data.startsWith(prevKey)).reduce((s: number, d: any) => s + d.valor, 0);
+  const rendaPessoalPrev = receitas.filter((r: any) => r.tipo_conta === "pessoal" && r.data.startsWith(prevKey) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
+  const despPessoalPrev = despesas.filter((d: any) => d.tipo_conta === "pessoal" && d.data.startsWith(prevKey) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
   const taxaPoupancaPrev = rendaPessoalPrev > 0 ? ((rendaPessoalPrev - despPessoalPrev) / rendaPessoalPrev) * 100 : 0;
 
   function variation(cur: number, prev: number) {
