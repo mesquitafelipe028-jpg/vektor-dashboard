@@ -36,10 +36,6 @@ export function useCategories(tipo?: "despesa" | "receita") {
       let rows = (data as any[]) as CategoriaDB[];
       if (tipo) rows = rows.filter((r) => r.tipo === tipo);
       rows.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
-      if (error) throw error;
-
-      // Cast since types.ts doesn't have new columns yet
-      const rows = (data as any[]) as CategoriaDB[];
 
       // Build hierarchy
       const parents = rows.filter((r) => !r.categoria_pai_id);

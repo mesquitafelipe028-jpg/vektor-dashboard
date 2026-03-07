@@ -41,6 +41,7 @@ const menuGroups = [
     label: "Sistema",
     items: [
       { label: "Configurações", icon: Settings, path: "/configuracoes", color: "bg-muted text-muted-foreground" },
+      { label: "Categorias", icon: Tag, path: "/categorias", color: "bg-chart-4/10 text-chart-4" },
     ],
   },
 ];
