@@ -1,1 +1,4 @@
 project_id = "rpgczlwqquxvxsvfflyh"
+
+[functions.fetch-quotes]
+verify_jwt = false

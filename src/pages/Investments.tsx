@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +65,7 @@ import {
   Save,
   StickyNote,
   Filter,
+  RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -83,6 +84,7 @@ import {
   Legend,
 } from "recharts";
 import { useInvestments, type InvestimentoAtivoInsert, type InvestimentoDividendoInsert } from "@/hooks/useInvestments";
+import { useStockQuotes, type QuoteResult } from "@/hooks/useStockQuotes";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, isAfter, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -208,6 +210,35 @@ export default function Investments() {
   const defaultTab = searchParams.get("tab") || "dashboard";
   const { toast } = useToast();
   const { ativos, addAtivo, deleteAtivo, dividendos, addDividendo, deleteDividendo } = useInvestments();
+  const { quotes, isLoading: quotesLoading, lastUpdated: quotesLastUpdated, fetchQuotes } = useStockQuotes();
+
+  // Auto-fetch quotes when ativos load
+  const hasFetchedRef = useRef(false);
+  useEffect(() => {
+    if (ativos.data && ativos.data.length > 0 && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      const tickers = ativos.data.map(a => a.nome);
+      fetchQuotes(tickers);
+    }
+  }, [ativos.data, fetchQuotes]);
+
+  const handleRefreshQuotes = useCallback(() => {
+    if (ativos.data && ativos.data.length > 0) {
+      fetchQuotes(ativos.data.map(a => a.nome));
+    }
+  }, [ativos.data, fetchQuotes]);
+
+  // Merge live prices: use quote price if available, else fallback to stored preco_atual
+  const ativosComCotacao = useMemo(() => {
+    if (!ativos.data) return [];
+    return ativos.data.map(a => {
+      const q = quotes[a.nome] || quotes[a.nome.toUpperCase()] || quotes[a.nome.toLowerCase()];
+      if (q) {
+        return { ...a, preco_atual: q.price, _liveChange: q.change, _liveName: q.name };
+      }
+      return { ...a, _liveChange: null, _liveName: null };
+    });
+  }, [ativos.data, quotes]);
 
   const handleTabChange = (value: string) => {
     setSearchParams({ tab: value }, { replace: true });
@@ -217,9 +248,9 @@ export default function Investments() {
   const mesAnoLabel = format(now, "MMMM yyyy", { locale: ptBR });
 
   const patrimonio = useMemo(() => {
-    if (!ativos.data) return 0;
-    return ativos.data.reduce((s, a) => s + Number(a.quantidade) * Number(a.preco_atual), 0);
-  }, [ativos.data]);
+    if (!ativosComCotacao.length) return 0;
+    return ativosComCotacao.reduce((s, a) => s + Number(a.quantidade) * Number(a.preco_atual), 0);
+  }, [ativosComCotacao]);
 
   const totalInvestido = useMemo(() => {
     if (!ativos.data) return 0;
@@ -281,10 +312,27 @@ export default function Investments() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Carteira Geral</h1>
-            <p className="text-sm text-muted-foreground capitalize">{mesAnoLabel}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground capitalize">{mesAnoLabel}</p>
+              {quotesLastUpdated && (
+                <span className="text-[10px] text-muted-foreground">
+                  • Cotações {quotesLastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRefreshQuotes}
+            disabled={quotesLoading || !hasAtivos}
+            className="gap-1"
+          >
+            <RefreshCw className={`h-4 w-4 ${quotesLoading ? "animate-spin" : ""}`} />
+            Atualizar cotações
+          </Button>
           <Button size="sm" onClick={() => { setOpenAtivo(true); handleTabChange("carteira"); }}>
             <Plus className="h-4 w-4 mr-1" /> Adicionar ativo
           </Button>
@@ -316,7 +364,7 @@ export default function Investments() {
             rentabilidadeMes={rentabilidadeMes}
             dividendosMes={dividendosMes}
             dividendosAno={dividendosAno}
-            ativos={ativos.data ?? []}
+            ativos={ativosComCotacao}
             dividendos={dividendos.data ?? []}
             onNavigate={handleTabChange}
           />
@@ -324,8 +372,11 @@ export default function Investments() {
 
         <TabsContent value="carteira">
           <CarteiraTab
-            ativos={ativos.data ?? []}
+            ativos={ativosComCotacao}
             dividendos={dividendos.data ?? []}
+            quotesLoading={quotesLoading}
+            quotesLastUpdated={quotesLastUpdated}
+            onRefreshQuotes={handleRefreshQuotes}
             isLoading={ativos.isLoading}
             openDialog={openAtivo}
             setOpenDialog={setOpenAtivo}
@@ -924,6 +975,9 @@ function CarteiraTab({
   setOpenDialog,
   onAdd,
   onDelete,
+  quotesLoading,
+  quotesLastUpdated,
+  onRefreshQuotes,
 }: {
   ativos: any[];
   dividendos: any[];
@@ -932,6 +986,9 @@ function CarteiraTab({
   setOpenDialog: (v: boolean) => void;
   onAdd: (a: InvestimentoAtivoInsert) => void;
   onDelete: (id: string) => void;
+  quotesLoading?: boolean;
+  quotesLastUpdated?: Date | null;
+  onRefreshQuotes?: () => void;
 }) {
   const [filtro, setFiltro] = useState<string>("todos");
   const [visibleCols, setVisibleCols] = useState<string[]>(() => {
@@ -1036,8 +1093,20 @@ function CarteiraTab({
   return (
     <div className="space-y-4 mt-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-foreground">Meus Ativos</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Meus Ativos</h2>
+          {quotesLastUpdated && (
+            <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+              Cotações {quotesLastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-2">
+          {onRefreshQuotes && (
+            <Button variant="outline" size="sm" onClick={onRefreshQuotes} disabled={quotesLoading}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${quotesLoading ? "animate-spin" : ""}`} /> Cotações
+            </Button>
+          )}
           {/* Column settings */}
           <Popover>
             <PopoverTrigger asChild>
