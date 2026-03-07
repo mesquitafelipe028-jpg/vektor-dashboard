@@ -138,7 +138,7 @@ export default function Expenses() {
 
   const openEdit = (d: (typeof despesas)[0]) => {
     setEditingId(d.id);
-    setForm({ descricao: d.descricao, valor: String(d.valor), data: d.data, categoria: d.categoria ?? "" });
+    setForm({ descricao: d.descricao, valor: String(d.valor), data: d.data, categoria: d.categoria ?? "", tipo_conta: (d as any).tipo_conta ?? "mei" });
     setOpen(true);
   };
 
