@@ -332,6 +332,7 @@ export default function CreditCards() {
       dia_fechamento: String(c.dia_fechamento),
       dia_vencimento: String(c.dia_vencimento),
       tipo_conta: c.tipo_conta,
+      banco: (c as any).banco ?? "",
     });
     setCardDialogOpen(true);
   };
