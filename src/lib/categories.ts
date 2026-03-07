@@ -6,50 +6,61 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// ── Category → Icon mapping ──
-const expenseCategoryIcons: Record<string, LucideIcon> = {
-  "Alimentação": Utensils,
-  "Transporte": Car,
-  "Aluguel": Home,
-  "Moradia": Home,
-  "Saúde": Heart,
-  "Educação": GraduationCap,
-  "Lazer": Gamepad2,
-  "Entretenimento": Gamepad2,
-  "Tecnologia": Monitor,
-  "Software/Assinaturas": Monitor,
-  "Internet/Telefone": Wifi,
-  "Marketing": Megaphone,
-  "Material de Escritório": FileText,
-  "Impostos": Receipt,
-  "Cartão de Crédito": CreditCard,
-  "Outros": Package,
-};
+// ── Category metadata with individual colors ──
 
-const revenueCategoryIcons: Record<string, LucideIcon> = {
-  "Prestação de Serviço": Briefcase,
-  "Venda de Produto": ShoppingBag,
-  "Consultoria": Users,
-  "Comissão": Zap,
-  "Salário": Banknote,
-  "Cliente": Users,
-  "Outros": Package,
-};
+export interface CategoryMeta {
+  name: string;
+  icon: LucideIcon;
+  color: string;   // tailwind text color class
+  bg: string;       // tailwind bg color class
+}
+
+export const expenseCategories: CategoryMeta[] = [
+  { name: "Alimentação",          icon: Utensils,       color: "text-orange-600 dark:text-orange-400",  bg: "bg-orange-500/20" },
+  { name: "Transporte",           icon: Car,            color: "text-blue-600 dark:text-blue-400",      bg: "bg-blue-500/20" },
+  { name: "Aluguel",              icon: Home,           color: "text-violet-600 dark:text-violet-400",  bg: "bg-violet-500/20" },
+  { name: "Moradia",              icon: Home,           color: "text-violet-600 dark:text-violet-400",  bg: "bg-violet-500/20" },
+  { name: "Saúde",                icon: Heart,          color: "text-rose-600 dark:text-rose-400",      bg: "bg-rose-500/20" },
+  { name: "Educação",             icon: GraduationCap,  color: "text-sky-600 dark:text-sky-400",        bg: "bg-sky-500/20" },
+  { name: "Lazer",                icon: Gamepad2,       color: "text-pink-600 dark:text-pink-400",      bg: "bg-pink-500/20" },
+  { name: "Entretenimento",       icon: Gamepad2,       color: "text-pink-600 dark:text-pink-400",      bg: "bg-pink-500/20" },
+  { name: "Tecnologia",           icon: Monitor,        color: "text-slate-600 dark:text-slate-400",    bg: "bg-slate-500/20" },
+  { name: "Software/Assinaturas", icon: Monitor,        color: "text-indigo-600 dark:text-indigo-400",  bg: "bg-indigo-500/20" },
+  { name: "Internet/Telefone",    icon: Wifi,           color: "text-cyan-600 dark:text-cyan-400",      bg: "bg-cyan-500/20" },
+  { name: "Marketing",            icon: Megaphone,      color: "text-fuchsia-600 dark:text-fuchsia-400",bg: "bg-fuchsia-500/20" },
+  { name: "Material de Escritório", icon: FileText,     color: "text-amber-600 dark:text-amber-400",    bg: "bg-amber-500/20" },
+  { name: "Impostos",             icon: Receipt,        color: "text-red-600 dark:text-red-400",        bg: "bg-red-500/20" },
+  { name: "Cartão de Crédito",    icon: CreditCard,     color: "text-purple-600 dark:text-purple-400",  bg: "bg-purple-500/20" },
+  { name: "Outros",               icon: Package,        color: "text-gray-600 dark:text-gray-400",      bg: "bg-gray-500/20" },
+];
+
+export const revenueCategories: CategoryMeta[] = [
+  { name: "Prestação de Serviço", icon: Briefcase,      color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/20" },
+  { name: "Venda de Produto",     icon: ShoppingBag,    color: "text-blue-600 dark:text-blue-400",       bg: "bg-blue-500/20" },
+  { name: "Consultoria",          icon: Users,          color: "text-violet-600 dark:text-violet-400",   bg: "bg-violet-500/20" },
+  { name: "Comissão",             icon: Zap,            color: "text-amber-600 dark:text-amber-400",     bg: "bg-amber-500/20" },
+  { name: "Salário",              icon: Banknote,       color: "text-green-600 dark:text-green-400",     bg: "bg-green-500/20" },
+  { name: "Cliente",              icon: Users,          color: "text-sky-600 dark:text-sky-400",         bg: "bg-sky-500/20" },
+  { name: "Outros",               icon: Package,        color: "text-gray-600 dark:text-gray-400",       bg: "bg-gray-500/20" },
+];
+
+// ── Lookup maps (kept for backward compat) ──
+
+const expenseCategoryIcons: Record<string, LucideIcon> = Object.fromEntries(
+  expenseCategories.map((c) => [c.name, c.icon])
+);
+
+const revenueCategoryIcons: Record<string, LucideIcon> = Object.fromEntries(
+  revenueCategories.map((c) => [c.name, c.icon])
+);
 
 const paymentMethodIcons: Record<string, LucideIcon> = {
-  "Pix": Zap,
-  "PIX": Zap,
-  "pix": Zap,
-  "Boleto": FileText,
-  "boleto": FileText,
-  "Transferência": ArrowRightLeft,
-  "transferência": ArrowRightLeft,
-  "Dinheiro": Coins,
-  "dinheiro": Coins,
-  "Cartão": CreditCard,
-  "cartão": CreditCard,
-  "Cartão de Crédito": CreditCard,
-  "Cartão de Débito": CreditCard,
+  "Pix": Zap, "PIX": Zap, "pix": Zap,
+  "Boleto": FileText, "boleto": FileText,
+  "Transferência": ArrowRightLeft, "transferência": ArrowRightLeft,
+  "Dinheiro": Coins, "dinheiro": Coins,
+  "Cartão": CreditCard, "cartão": CreditCard,
+  "Cartão de Crédito": CreditCard, "Cartão de Débito": CreditCard,
 };
 
 export function getExpenseCategoryIcon(category: string | null): LucideIcon {

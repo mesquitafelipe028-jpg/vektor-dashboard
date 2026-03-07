@@ -4,6 +4,7 @@ import {
   Building2, ChevronRight, ChevronDown, Users, Tag, X,
   CreditCard,
 } from "lucide-react";
+import { expenseCategories, revenueCategories, type CategoryMeta } from "@/lib/categories";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
