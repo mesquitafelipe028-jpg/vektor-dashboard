@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import {
-  Users, ArrowLeftRight, Receipt, BarChart3, Target, Activity, Settings, LogOut, Calculator,
+  Users, ArrowLeftRight, Receipt, BarChart3, Target, Activity, Settings, LogOut, Calculator, CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
