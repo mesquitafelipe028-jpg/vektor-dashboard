@@ -130,6 +130,7 @@ export default function Revenues() {
           data: form.data_inicio || parsed.data.data,
           forma_pagamento: parsed.data.forma_pagamento || null,
           cliente_id: parsed.data.cliente_id || null,
+          categoria: form.categoria || null,
           tipo_conta: form.tipo_conta || "mei",
           user_id: user!.id,
           tipo_transacao: "recorrente",
@@ -149,6 +150,7 @@ export default function Revenues() {
         data: parsed.data.data,
         forma_pagamento: parsed.data.forma_pagamento || null,
         cliente_id: parsed.data.cliente_id || null,
+        categoria: form.categoria || null,
         tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
         tipo_transacao: tipoTransacao,
@@ -211,6 +213,7 @@ export default function Revenues() {
       data: r.data,
       forma_pagamento: r.forma_pagamento ?? "",
       cliente_id: r.cliente_id ?? "",
+      categoria: r.categoria ?? "",
       tipo_conta: r.tipo_conta ?? "mei",
       tipo_transacao: r.tipo_transacao || "unica",
       frequencia: r.frequencia ?? "",
@@ -339,7 +342,7 @@ export default function Revenues() {
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <CategoryIcon category={r.forma_pagamento ?? r.descricao} type="receita" size={28} />
+                        <CategoryIcon category={r.categoria ?? r.descricao} type="receita" size={28} />
                         <span className="font-medium">{r.descricao}</span>
                       </div>
                     </TableCell>
