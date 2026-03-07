@@ -439,8 +439,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Company Card */}
-      {empresa && (
+      {/* Company Card or CTA Banner */}
+      {hasCnpj ? (
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
           <CardContent className="p-5 flex items-center gap-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
@@ -462,6 +462,21 @@ export default function Dashboard() {
                 <span className="text-xs text-muted-foreground hidden sm:block max-w-48 truncate">{empresa.cnae_principal}</span>
               )}
             </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-dashed" onClick={() => navigate("/configuracoes")}>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-heading font-semibold text-sm">Você é MEI?</p>
+              <p className="text-xs text-muted-foreground">Cadastre seu CNPJ nas Configurações para desbloquear o controle financeiro empresarial.</p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0">
+              Cadastrar CNPJ
+            </Button>
           </CardContent>
         </Card>
       )}
