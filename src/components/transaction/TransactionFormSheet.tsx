@@ -203,7 +203,10 @@ export function TransactionFormSheet({
       </div>
 
       {/* Form Fields */}
-      <div className="flex-1 overflow-y-auto min-h-0 pb-[env(safe-area-inset-bottom)]">
+      <div 
+        className="flex-1 overflow-y-auto min-h-0 overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+      >
         {/* Descrição */}
         <div className="px-4 py-3.5 flex items-center gap-3">
           <AlignLeft className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -494,6 +497,7 @@ export function TransactionFormSheet({
             </Select>
           </div>
         </div>
+        <div style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }} className="min-h-4" />
       </div>
     </div>
   );

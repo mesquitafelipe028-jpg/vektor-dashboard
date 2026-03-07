@@ -107,3 +107,10 @@
     max-width: 100%;
   }
 }
+
+/* Garantir scroll interno em modais Radix com scroll lock ativo */
+[data-scroll-locked] .overflow-y-auto,
+[data-scroll-locked] .overscroll-contain {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
