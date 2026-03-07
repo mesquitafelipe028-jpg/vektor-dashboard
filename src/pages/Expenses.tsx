@@ -51,6 +51,8 @@ export default function Expenses() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { categories: dbCategories } = useCategories("despesa");
+  const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
 
   // Filters
   const [filterMonth, setFilterMonth] = useState("");
