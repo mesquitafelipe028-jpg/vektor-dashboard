@@ -4,6 +4,7 @@ import {
   Building2, ChevronRight, ChevronDown, Users, Tag, X,
   CreditCard,
 } from "lucide-react";
+import { expenseCategories, revenueCategories, type CategoryMeta } from "@/lib/categories";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -92,6 +93,47 @@ function FormRow({
   );
 }
 
+function CategoryGrid({
+  categories,
+  selected,
+  onSelect,
+}: {
+  categories: CategoryMeta[];
+  selected: string;
+  onSelect: (name: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+      {categories.map((cat) => {
+        const isSelected = selected === cat.name;
+        const Icon = cat.icon;
+        return (
+          <button
+            key={cat.name}
+            type="button"
+            onClick={() => onSelect(cat.name)}
+            className={`flex flex-col items-center gap-1.5 rounded-xl p-2 transition-all ${
+              isSelected
+                ? `ring-2 ring-primary ${cat.bg} scale-[1.02]`
+                : "hover:bg-muted/60"
+            }`}
+          >
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center ${cat.bg}`}
+            >
+              <Icon className={`h-5 w-5 ${cat.color}`} />
+            </div>
+            <span className={`text-[10px] leading-tight text-center font-medium ${
+              isSelected ? "text-foreground" : "text-muted-foreground"
+            }`}>
+              {cat.name.length > 10 ? cat.name.split("/")[0].split(" ")[0] : cat.name}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 function RecurrenceLabel(tipo: TipoTransacao, frequencia: string, numero_parcelas?: string): string {
   if (tipo === "recorrente" && frequencia) {
     return frequenciaLabels[frequencia as Frequencia] || "Recorrente";
@@ -394,27 +436,24 @@ export function TransactionFormSheet({
           </>
         )}
 
-        {/* Categoria (despesa only) */}
-        {type === "despesa" && categories && (
+        {/* Categoria (grid visual) */}
+        {(type === "despesa" || type === "receita") && (
           <>
-            <div className="px-4 py-3.5 flex items-center gap-3">
-              <Tag className="h-5 w-5 text-muted-foreground shrink-0" />
-              <div className="flex-1">
+            <div className="px-4 py-3.5">
+              <div className="flex items-center gap-3 mb-3">
+                <Tag className="h-5 w-5 text-muted-foreground shrink-0" />
                 <div className="flex items-center gap-2">
-                  <p className="text-xs text-muted-foreground mb-0.5">Categoria</p>
+                  <p className="text-sm font-medium text-foreground">Categoria</p>
                   {suggestedCategory && form.categoria === suggestedCategory && (
                     <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Sugerida</Badge>
                   )}
                 </div>
-                <Select value={form.categoria || ""} onValueChange={(v) => update({ categoria: v })}>
-                  <SelectTrigger className="border-0 p-0 h-auto shadow-none focus:ring-0 text-sm font-medium bg-transparent">
-                    <SelectValue placeholder="Selecionar categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
               </div>
+              <CategoryGrid
+                categories={type === "despesa" ? (categories ? expenseCategories.filter(c => categories.includes(c.name)) : expenseCategories) : revenueCategories}
+                selected={form.categoria || ""}
+                onSelect={(name) => update({ categoria: name })}
+              />
             </div>
             <Separator />
           </>
