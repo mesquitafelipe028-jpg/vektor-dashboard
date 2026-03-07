@@ -154,12 +154,16 @@ export default function CashFlow() {
   const entradasFuturas = receitasFuturas.reduce((s, r) => s + r.valor, 0);
   const saidasFuturas = despesasFuturas.reduce((s, d) => s + d.valor, 0);
 
-  // Recurring patterns detection
+  // Recurring patterns detection (heuristic)
   const recurringPatterns = useMemo(() => detectRecurring(receitas, despesas), [receitas, despesas]);
   const projectedRecurring = useMemo(
     () => projectRecurring(recurringPatterns, today, endStr),
     [recurringPatterns, today, endStr]
   );
+
+  // DB-stored recurring/installment entries that are already in the future
+  // are included in receitasFuturas/despesasFuturas automatically.
+  // The heuristic projections complement by detecting patterns not explicitly stored.
 
   const entradasRecorrentes = projectedRecurring.filter((p) => p.tipo === "receita").reduce((s, p) => s + p.valor, 0);
   const saidasRecorrentes = projectedRecurring.filter((p) => p.tipo === "despesa").reduce((s, p) => s + p.valor, 0);
