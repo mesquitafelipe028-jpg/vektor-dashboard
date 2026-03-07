@@ -51,6 +51,8 @@ export default function Revenues() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { categories: dbCategories } = useCategories("receita");
+  const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
 
   // Filters
   const [filterMonth, setFilterMonth] = useState("");
