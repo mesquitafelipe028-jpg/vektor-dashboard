@@ -277,8 +277,8 @@ export default function Expenses() {
                     </TableCell>
                     <TableCell>{d.categoria ?? "—"}</TableCell>
                     <TableCell>{formatDate(d.data)}</TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">
-                      {formatCurrency(d.valor)}
+                    <TableCell className={`text-right font-semibold ${transactionColors.despesa.text}`}>
+                      -{formatCurrency(d.valor)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(d)}>

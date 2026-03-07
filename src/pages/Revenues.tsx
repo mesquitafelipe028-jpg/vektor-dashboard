@@ -318,8 +318,8 @@ export default function Revenues() {
                     <TableCell>{(r.clientes as any)?.nome ?? "—"}</TableCell>
                     <TableCell>{r.forma_pagamento ?? "—"}</TableCell>
                     <TableCell>{formatDate(r.data)}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary">
-                      {formatCurrency(r.valor)}
+                    <TableCell className={`text-right font-semibold ${transactionColors.receita.text}`}>
+                      +{formatCurrency(r.valor)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
