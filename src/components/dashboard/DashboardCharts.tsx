@@ -5,16 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 
-const PIE_COLORS = [
-  "hsl(160, 60%, 38%)",
-  "hsl(38, 90%, 55%)",
-  "hsl(200, 70%, 50%)",
-  "hsl(280, 60%, 55%)",
-  "hsl(0, 72%, 51%)",
-  "hsl(145, 60%, 42%)",
-  "hsl(220, 60%, 50%)",
-  "hsl(340, 60%, 50%)",
-];
+const FALLBACK_COLOR = "hsl(220, 9%, 46%)";
 
 interface DashboardChartsProps {
   monthlyData: { month: string; receitas: number; despesas: number }[];
