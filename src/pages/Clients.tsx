@@ -59,7 +59,18 @@ export default function Clients() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("novo") === "true") {
+      setOpen(true);
+      setEditingId(null);
+      setForm(emptyForm);
+      searchParams.delete("novo");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ClienteForm>(emptyForm);
   const [search, setSearch] = useState("");

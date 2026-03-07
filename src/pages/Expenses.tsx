@@ -47,7 +47,16 @@ const emptyForm: TransactionFormData = {
 export default function Expenses() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("novo") === "true") {
+      setOpen(true);
+      searchParams.delete("novo");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
