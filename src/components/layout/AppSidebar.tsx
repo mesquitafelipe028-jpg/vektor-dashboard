@@ -54,6 +54,7 @@ const menuGroups = [
     items: [
       { title: "Receitas", url: "/receitas", icon: TrendingUp },
       { title: "Despesas", url: "/despesas", icon: TrendingDown },
+      { title: "Contas", url: "/contas", icon: Wallet },
       { title: "Cartões", url: "/cartoes", icon: CreditCard },
       { title: "Clientes", url: "/clientes", icon: Users },
     ],
