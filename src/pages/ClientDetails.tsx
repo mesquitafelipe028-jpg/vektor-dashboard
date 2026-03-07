@@ -344,7 +344,7 @@ export default function ClientDetails() {
                       <TableCell>{formatDate(r.data)}</TableCell>
                       <TableCell className="font-medium">{r.descricao}</TableCell>
                       <TableCell>
-                        <TransactionTypeBadge tipo={r.tipo_transacao || "unica"} parcela_atual={r.parcela_atual} numero_parcelas={r.numero_parcelas} />
+                        <TransactionTypeBadge tipo={r.tipo_transacao || "unica"} />
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={r.status || "pendente"} type="receita" />
