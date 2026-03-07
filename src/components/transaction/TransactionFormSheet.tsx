@@ -134,8 +134,7 @@ function CategoryGrid({
     </div>
   );
 }
-
-
+function RecurrenceLabel(tipo: TipoTransacao, frequencia: string, numero_parcelas?: string): string {
   if (tipo === "recorrente" && frequencia) {
     return frequenciaLabels[frequencia as Frequencia] || "Recorrente";
   }
