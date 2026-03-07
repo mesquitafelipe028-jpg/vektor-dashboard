@@ -31,22 +31,44 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const mainItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Receitas", url: "/receitas", icon: TrendingUp },
-  { title: "Despesas", url: "/despesas", icon: TrendingDown },
-  { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
-  { title: "Área Fiscal", url: "/impostos", icon: Receipt },
-  { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
-  { title: "Clientes", url: "/clientes", icon: Users },
-  { title: "Metas", url: "/metas", icon: Target },
-  { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
-  { title: "Calculadora", url: "/calculadora-investimentos", icon: Calculator },
-  { title: "Cartões", url: "/cartoes", icon: CreditCard },
-];
-
-const configItems = [
-  { title: "Configurações", url: "/configuracoes", icon: Settings },
+const menuGroups = [
+  {
+    label: "Visão Geral",
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
+    ],
+  },
+  {
+    label: "Movimentações",
+    items: [
+      { title: "Receitas", url: "/receitas", icon: TrendingUp },
+      { title: "Despesas", url: "/despesas", icon: TrendingDown },
+      { title: "Cartões", url: "/cartoes", icon: CreditCard },
+      { title: "Clientes", url: "/clientes", icon: Users },
+    ],
+  },
+  {
+    label: "Planejamento",
+    items: [
+      { title: "Metas", url: "/metas", icon: Target },
+      { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
+      { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
+      { title: "Calculadora", url: "/calculadora-investimentos", icon: Calculator },
+    ],
+  },
+  {
+    label: "Fiscal",
+    items: [
+      { title: "Área Fiscal", url: "/impostos", icon: Receipt },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [
+      { title: "Configurações", url: "/configuracoes", icon: Settings },
+    ],
+  },
 ];
 
 interface SidebarNavItemProps {
@@ -88,36 +110,29 @@ export function AppSidebar() {
           <LogoVektor size={collapsed ? "sm" : "md"} showText={!collapsed} textClassName="text-sidebar-primary-foreground" />
         </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainItems.map((item) => (
-                <SidebarNavItem
-                  key={item.title}
-                  title={item.title}
-                  url={item.url}
-                  icon={item.icon}
-                  isActive={isActive(item.url)}
-                />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {menuGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarNavItem
+                    key={item.url}
+                    title={item.title}
+                    url={item.url}
+                    icon={item.icon}
+                    isActive={isActive(item.url)}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
 
         <SidebarGroup>
-          <SidebarGroupLabel>Sistema</SidebarGroupLabel>
+          <SidebarGroupLabel>Conta</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {configItems.map((item) => (
-                <SidebarNavItem
-                  key={item.title}
-                  title={item.title}
-                  url={item.url}
-                  icon={item.icon}
-                  isActive={isActive(item.url)}
-                />
-              ))}
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
