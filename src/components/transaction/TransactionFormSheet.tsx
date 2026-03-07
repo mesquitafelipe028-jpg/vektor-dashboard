@@ -93,7 +93,49 @@ function FormRow({
   );
 }
 
-function RecurrenceLabel(tipo: TipoTransacao, frequencia: string, numero_parcelas?: string): string {
+function CategoryGrid({
+  categories,
+  selected,
+  onSelect,
+}: {
+  categories: CategoryMeta[];
+  selected: string;
+  onSelect: (name: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+      {categories.map((cat) => {
+        const isSelected = selected === cat.name;
+        const Icon = cat.icon;
+        return (
+          <button
+            key={cat.name}
+            type="button"
+            onClick={() => onSelect(cat.name)}
+            className={`flex flex-col items-center gap-1.5 rounded-xl p-2 transition-all ${
+              isSelected
+                ? `ring-2 ring-primary ${cat.bg} scale-[1.02]`
+                : "hover:bg-muted/60"
+            }`}
+          >
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center ${cat.bg}`}
+            >
+              <Icon className={`h-5 w-5 ${cat.color}`} />
+            </div>
+            <span className={`text-[10px] leading-tight text-center font-medium ${
+              isSelected ? "text-foreground" : "text-muted-foreground"
+            }`}>
+              {cat.name.length > 10 ? cat.name.split("/")[0].split(" ")[0] : cat.name}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+
   if (tipo === "recorrente" && frequencia) {
     return frequenciaLabels[frequencia as Frequencia] || "Recorrente";
   }
