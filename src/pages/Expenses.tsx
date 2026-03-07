@@ -29,20 +29,7 @@ const schema = z.object({
   categoria: z.string().optional(),
 });
 
-type DespesaForm = {
-  descricao: string;
-  valor: string;
-  data: string;
-  categoria: string;
-  tipo_conta: string;
-  tipo_transacao: TipoTransacao;
-  frequencia: string;
-  numero_parcelas: string;
-  data_inicio: string;
-  data_fim: string;
-};
-
-const emptyForm: DespesaForm = {
+const emptyForm: TransactionFormData = {
   descricao: "",
   valor: "",
   data: new Date().toISOString().slice(0, 10),
@@ -53,6 +40,7 @@ const emptyForm: DespesaForm = {
   numero_parcelas: "",
   data_inicio: new Date().toISOString().slice(0, 10),
   data_fim: "",
+  efetivada: false,
 };
 
 export default function Expenses() {
