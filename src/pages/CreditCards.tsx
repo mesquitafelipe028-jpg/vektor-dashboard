@@ -112,9 +112,9 @@ export default function CreditCards() {
   const { data: cartoes = [], isLoading: loadingCards } = useQuery({
     queryKey: ["cartoes_credito"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("cartoes_credito").select("*").order("nome") as { data: Cartao[] | null; error: any };
+      const { data, error } = await (supabase as any).from("cartoes_credito").select("*").order("nome");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Cartao[];
     },
     enabled: !!user,
   });
@@ -122,9 +122,9 @@ export default function CreditCards() {
   const { data: compras = [] } = useQuery({
     queryKey: ["compras_cartao"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("compras_cartao").select("*").order("data", { ascending: false }) as { data: Compra[] | null; error: any };
+      const { data, error } = await (supabase as any).from("compras_cartao").select("*").order("data", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Compra[];
     },
     enabled: !!user,
   });
@@ -132,9 +132,9 @@ export default function CreditCards() {
   const { data: faturas = [] } = useQuery({
     queryKey: ["faturas_cartao"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("faturas_cartao").select("*").order("mes_referencia", { ascending: false }) as { data: Fatura[] | null; error: any };
+      const { data, error } = await (supabase as any).from("faturas_cartao").select("*").order("mes_referencia", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Fatura[];
     },
     enabled: !!user,
   });
