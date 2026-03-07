@@ -271,11 +271,11 @@ export default function CreditCards() {
       // Upsert fatura
       const existing = cardFaturas.find((f) => f.mes_referencia === mesRef);
       if (existing) {
-        const { error } = await supabase.from("faturas_cartao").update({
+        const { error } = await (supabase as any).from("faturas_cartao").update({
           status: "paga",
           valor_total: total,
           data_pagamento: new Date().toISOString().slice(0, 10),
-        }).eq("id", existing.id) as any;
+        }).eq("id", existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("faturas_cartao").insert({
