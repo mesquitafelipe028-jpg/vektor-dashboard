@@ -84,6 +84,7 @@ import {
   Legend,
 } from "recharts";
 import { useInvestments, type InvestimentoAtivoInsert, type InvestimentoDividendoInsert } from "@/hooks/useInvestments";
+import { useStockQuotes, type QuoteResult } from "@/hooks/useStockQuotes";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, isAfter, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
