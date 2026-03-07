@@ -16,6 +16,7 @@ import {
   Plus,
   LucideIcon,
   LineChart,
+  Calculator,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { LogoVektor } from "@/components/branding/LogoVektor";
