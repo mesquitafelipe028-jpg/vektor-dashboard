@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import type { DespesaExtended, TipoTransacao, Frequencia } from "@/types/transactions";
-import { generateInstallments, generateRecurringDates } from "@/types/transactions";
+import { generateInstallments } from "@/types/transactions";
 
 const schema = z.object({
   descricao: z.string().trim().min(1, "Descrição obrigatória").max(200),
