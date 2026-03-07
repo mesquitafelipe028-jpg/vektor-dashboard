@@ -364,7 +364,7 @@ export default function Investments() {
             rentabilidadeMes={rentabilidadeMes}
             dividendosMes={dividendosMes}
             dividendosAno={dividendosAno}
-            ativos={ativos.data ?? []}
+            ativos={ativosComCotacao}
             dividendos={dividendos.data ?? []}
             onNavigate={handleTabChange}
           />
