@@ -47,7 +47,7 @@ export default function Revenues() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<ReceitaForm>(emptyForm);
+  const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Filters
