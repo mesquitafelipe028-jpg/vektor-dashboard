@@ -497,6 +497,7 @@ export function TransactionFormSheet({
             </Select>
           </div>
         </div>
+        <div style={{ paddingBottom: 'env(safe-area-inset-bottom, 16px)' }} className="min-h-4" />
       </div>
     </div>
   );
