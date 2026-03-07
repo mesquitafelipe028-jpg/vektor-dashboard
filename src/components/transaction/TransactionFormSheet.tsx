@@ -501,7 +501,7 @@ export function TransactionFormSheet({
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="h-[92vh] p-0 rounded-t-2xl">
+        <SheetContent side="bottom" className="h-[92vh] p-0 rounded-t-2xl overflow-hidden flex flex-col">
           <SheetHeader className="sr-only">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
