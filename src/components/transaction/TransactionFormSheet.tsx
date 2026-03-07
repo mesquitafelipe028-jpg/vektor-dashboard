@@ -395,27 +395,24 @@ export function TransactionFormSheet({
           </>
         )}
 
-        {/* Categoria (despesa only) */}
-        {type === "despesa" && categories && (
+        {/* Categoria (grid visual) */}
+        {(type === "despesa" || type === "receita") && (
           <>
-            <div className="px-4 py-3.5 flex items-center gap-3">
-              <Tag className="h-5 w-5 text-muted-foreground shrink-0" />
-              <div className="flex-1">
+            <div className="px-4 py-3.5">
+              <div className="flex items-center gap-3 mb-3">
+                <Tag className="h-5 w-5 text-muted-foreground shrink-0" />
                 <div className="flex items-center gap-2">
-                  <p className="text-xs text-muted-foreground mb-0.5">Categoria</p>
+                  <p className="text-sm font-medium text-foreground">Categoria</p>
                   {suggestedCategory && form.categoria === suggestedCategory && (
                     <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Sugerida</Badge>
                   )}
                 </div>
-                <Select value={form.categoria || ""} onValueChange={(v) => update({ categoria: v })}>
-                  <SelectTrigger className="border-0 p-0 h-auto shadow-none focus:ring-0 text-sm font-medium bg-transparent">
-                    <SelectValue placeholder="Selecionar categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
               </div>
+              <CategoryGrid
+                categories={type === "despesa" ? (categories ? expenseCategories.filter(c => categories.includes(c.name)) : expenseCategories) : revenueCategories}
+                selected={form.categoria || ""}
+                onSelect={(name) => update({ categoria: name })}
+              />
             </div>
             <Separator />
           </>
