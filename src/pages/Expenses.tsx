@@ -269,7 +269,12 @@ export default function Expenses() {
                     transition={{ delay: i * 0.03 }}
                     className="border-b transition-colors hover:bg-muted/50"
                   >
-                    <TableCell className="font-medium">{d.descricao}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <CategoryIcon category={d.categoria} type="despesa" size={28} />
+                        <span className="font-medium">{d.descricao}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>{d.categoria ?? "—"}</TableCell>
                     <TableCell>{formatDate(d.data)}</TableCell>
                     <TableCell className="text-right font-semibold text-destructive">
