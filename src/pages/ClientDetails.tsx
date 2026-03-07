@@ -93,6 +93,38 @@ export default function ClientDetails() {
     return { totalPago, totalAberto, ultimoPagamento, proximaCobranca, pendentes };
   }, [receitas]);
 
+  // --- Future projections for recurring charges ---
+  const projections = useMemo(() => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const parentRecurrentes = receitas.filter(
+      (r) => r.tipo_transacao === "recorrente" && !r.transacao_pai_id && r.frequencia
+    );
+    if (parentRecurrentes.length === 0) return [];
+
+    const allProjections: { descricao: string; valor: number; data: string; frequencia: string }[] = [];
+
+    for (const r of parentRecurrentes) {
+      const dates = generateRecurringDates(r.data, r.frequencia!, r.data_fim, 12);
+      const existingDates = new Set(
+        receitas.filter((rx) => rx.transacao_pai_id === r.id || rx.id === r.id).map((rx) => rx.data)
+      );
+      for (const d of dates) {
+        if (d > hoje && !existingDates.has(d)) {
+          allProjections.push({
+            descricao: r.descricao,
+            valor: r.valor,
+            data: d,
+            frequencia: frequenciaLabels[r.frequencia!] || r.frequencia!,
+          });
+        }
+      }
+    }
+
+    return allProjections.sort((a, b) => a.data.localeCompare(b.data));
+  }, [receitas]);
+
+  const visibleProjections = showAllProjections ? projections : projections.slice(0, 6);
+
   // --- Mutations ---
   const updateCliente = useMutation({
     mutationFn: async () => {
