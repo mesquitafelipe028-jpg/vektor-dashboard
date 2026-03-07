@@ -54,6 +54,8 @@ interface TransactionFormSheetProps {
   categories?: string[];
   suggestedCategory?: string | null;
   onDescriptionChange?: (desc: string) => void;
+  // Custom categories from DB
+  customCategories?: CategoryMeta[];
 }
 
 function FormRow({
