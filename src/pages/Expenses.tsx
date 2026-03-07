@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, TrendingDown, Pencil, Trash2, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, expenseCategories, suggestCategory } from "@/lib/mockData";
+import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
 import { TransactionFormSheet, type TransactionFormData } from "@/components/transaction/TransactionFormSheet";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
@@ -50,6 +51,8 @@ export default function Expenses() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { categories: dbCategories } = useCategories("despesa");
+  const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
 
   // Filters
   const [filterMonth, setFilterMonth] = useState("");
@@ -456,6 +459,7 @@ export default function Expenses() {
         isEditing={!!editingId}
         errors={errors}
         categories={expenseCategories}
+        customCategories={customCategories.length > 0 ? customCategories : undefined}
         suggestedCategory={suggestCategory(form.descricao)}
         onDescriptionChange={(desc) => {
           const updates: Partial<TransactionFormData> = { descricao: desc };

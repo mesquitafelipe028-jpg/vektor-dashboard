@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, TrendingUp, Pencil, Trash2, Filter } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { TransactionFormSheet, type TransactionFormData } from "@/components/transaction/TransactionFormSheet";
+import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
@@ -50,6 +51,8 @@ export default function Revenues() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { categories: dbCategories } = useCategories("receita");
+  const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
 
   // Filters
   const [filterMonth, setFilterMonth] = useState("");
@@ -415,6 +418,7 @@ export default function Revenues() {
         isEditing={!!editingId}
         errors={errors}
         clientes={clientes}
+        customCategories={customCategories.length > 0 ? customCategories : undefined}
       />
     </div>
   );

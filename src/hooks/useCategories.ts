@@ -1,7 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { expenseCategories, revenueCategories } from "@/lib/categories";
+import { expenseCategories, revenueCategories, type CategoryMeta } from "@/lib/categories";
+import { getColorClasses } from "@/lib/categoryColors";
+import {
+  Utensils, Car, Home, Heart, GraduationCap, Gamepad2,
+  Monitor, Banknote, Users, Phone, Megaphone, FileText,
+  Receipt, Briefcase, ShoppingBag, Zap, Wifi, Package,
+  CreditCard, Repeat, Calendar, Coins, Target, Gift,
+  Music, Camera, Plane, Coffee, Droplets, Shirt,
+  Baby, Dog, Dumbbell, Wrench, Palette, BookOpen,
+  ArrowRightLeft, TrendingUp, RotateCcw, ShoppingCart,
+  type LucideIcon,
+} from "lucide-react";
+
+const iconMap: Record<string, LucideIcon> = {
+  Utensils, Car, Home, Heart, GraduationCap, Gamepad2,
+  Monitor, Banknote, Users, Phone, Megaphone, FileText,
+  Receipt, Briefcase, ShoppingBag, Zap, Wifi, Package,
+  CreditCard, Repeat, Calendar, Coins, Target, Gift,
+  Music, Camera, Plane, Coffee, Droplets, Shirt,
+  Baby, Dog, Dumbbell, Wrench, Palette, BookOpen,
+  ArrowRightLeft, TrendingUp, RotateCcw, ShoppingCart,
+};
+
+export function toCategoryMeta(cat: CategoriaDB): CategoryMeta {
+  const colors = getColorClasses(cat.cor);
+  return {
+    name: cat.nome,
+    icon: iconMap[cat.icone] ?? Package,
+    color: colors.text,
+    bg: colors.bg,
+  };
+}
 
 export interface CategoriaDB {
   id: string;

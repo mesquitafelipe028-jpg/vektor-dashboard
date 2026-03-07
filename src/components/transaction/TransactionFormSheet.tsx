@@ -54,6 +54,8 @@ interface TransactionFormSheetProps {
   categories?: string[];
   suggestedCategory?: string | null;
   onDescriptionChange?: (desc: string) => void;
+  // Custom categories from DB
+  customCategories?: CategoryMeta[];
 }
 
 function FormRow({
@@ -160,6 +162,7 @@ export function TransactionFormSheet({
   categories,
   suggestedCategory,
   onDescriptionChange,
+  customCategories,
 }: TransactionFormSheetProps) {
   const isMobile = useIsMobile();
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
@@ -463,7 +466,7 @@ export function TransactionFormSheet({
                 >
                   <div className="px-4 pb-3 pt-2 bg-muted/30">
                     <CategoryGrid
-                      categories={type === "despesa" ? (categories ? expenseCategories.filter(c => categories.includes(c.name)) : expenseCategories) : revenueCategories}
+                      categories={customCategories && customCategories.length > 0 ? customCategories : (type === "despesa" ? (categories ? expenseCategories.filter(c => categories.includes(c.name)) : expenseCategories) : revenueCategories)}
                       selected={form.categoria || ""}
                       onSelect={(name) => update({ categoria: name })}
                     />
