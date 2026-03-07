@@ -163,6 +163,7 @@ export function TransactionFormSheet({
 }: TransactionFormSheetProps) {
   const isMobile = useIsMobile();
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
 
   const update = (partial: Partial<TransactionFormData>) => {
     onFormChange({ ...form, ...partial });
