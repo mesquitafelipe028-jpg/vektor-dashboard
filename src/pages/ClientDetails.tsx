@@ -312,7 +312,7 @@ export default function ClientDetails() {
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{formatDate(r.data)}</span>
                     <div className="flex items-center gap-1.5">
-                      <TransactionTypeBadge tipo={r.tipo_transacao || "unica"} parcela_atual={r.parcela_atual} numero_parcelas={r.numero_parcelas} />
+                      <TransactionTypeBadge tipo={r.tipo_transacao || "unica"} />
                       <StatusBadge status={r.status || "pendente"} type="receita" />
                     </div>
                   </div>
