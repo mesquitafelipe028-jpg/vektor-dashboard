@@ -383,14 +383,18 @@ export default function Dashboard() {
             <User className="h-3.5 w-3.5" />
             Pessoal
           </ToggleGroupItem>
-          <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-            <Briefcase className="h-3.5 w-3.5" />
-            MEI
-          </ToggleGroupItem>
-          <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-            <Layers className="h-3.5 w-3.5" />
-            Tudo
-          </ToggleGroupItem>
+          {hasCnpj && (
+            <>
+              <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+                <Briefcase className="h-3.5 w-3.5" />
+                MEI
+              </ToggleGroupItem>
+              <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+                <Layers className="h-3.5 w-3.5" />
+                Tudo
+              </ToggleGroupItem>
+            </>
+          )}
         </ToggleGroup>
       </div>
 
