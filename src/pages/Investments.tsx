@@ -248,9 +248,9 @@ export default function Investments() {
   const mesAnoLabel = format(now, "MMMM yyyy", { locale: ptBR });
 
   const patrimonio = useMemo(() => {
-    if (!ativos.data) return 0;
-    return ativos.data.reduce((s, a) => s + Number(a.quantidade) * Number(a.preco_atual), 0);
-  }, [ativos.data]);
+    if (!ativosComCotacao.length) return 0;
+    return ativosComCotacao.reduce((s, a) => s + Number(a.quantidade) * Number(a.preco_atual), 0);
+  }, [ativosComCotacao]);
 
   const totalInvestido = useMemo(() => {
     if (!ativos.data) return 0;
