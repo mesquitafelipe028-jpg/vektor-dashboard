@@ -303,15 +303,15 @@ export default function Dashboard() {
     type AlertItem = { id: string; icon: typeof AlertTriangle; message: string; type: "success" | "warning" | "danger" };
     const alerts: AlertItem[] = [];
 
-    // Alerta 1 — Limite MEI (thresholds: 70%, 90%)
-    if (percentLimit >= 90) {
+    // Alerta 1 — Limite MEI (thresholds: 70%, 90%) — only with CNPJ
+    if (hasCnpj && percentLimit >= 90) {
       alerts.push({ id: "mei-90", icon: ShieldAlert, type: "danger", message: `Atenção: você está próximo de ultrapassar o limite do MEI (${percentLimit.toFixed(1)}% utilizado).` });
-    } else if (percentLimit >= 70) {
+    } else if (hasCnpj && percentLimit >= 70) {
       alerts.push({ id: "mei-70", icon: AlertTriangle, type: "warning", message: `Você já utilizou ${percentLimit.toFixed(1)}% do limite anual do MEI.` });
     }
 
-    // Alerta 2 — DAS pendente ou próximo do vencimento
-    if (impostoPendente) {
+    // Alerta 2 — DAS pendente ou próximo do vencimento — only with CNPJ
+    if (hasCnpj && impostoPendente) {
       const vencDate = new Date(impostoPendente.vencimento + "T12:00:00");
       const today = new Date();
       today.setHours(0, 0, 0, 0);
