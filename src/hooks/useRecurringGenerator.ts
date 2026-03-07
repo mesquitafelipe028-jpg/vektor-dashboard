@@ -41,12 +41,12 @@ function getNextDate(currentDate: string, freq: Frequencia): string {
 
 async function generateNext(table: "receitas" | "despesas", userId: string) {
   // Get all recurring parent transactions (no transacao_pai_id)
-  const { data: parents, error } = await supabase
+  const { data: parents, error } = await (supabase
     .from(table)
     .select("*")
-    .eq("user_id", userId)
-    .eq("tipo_transacao" as any, "recorrente")
-    .is("transacao_pai_id" as any, null);
+    .eq("user_id", userId) as any)
+    .eq("tipo_transacao", "recorrente")
+    .is("transacao_pai_id", null);
 
   if (error || !parents?.length) return;
 
