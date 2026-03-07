@@ -14,9 +14,12 @@ import { Plus, TrendingUp, Pencil, Trash2, Filter } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
+import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { z } from "zod";
+import type { ReceitaExtended, TipoTransacao, Frequencia } from "@/types/transactions";
+import { generateRecurringDates } from "@/types/transactions";
 
 const schema = z.object({
   descricao: z.string().trim().min(1, "Descrição obrigatória").max(200),
@@ -33,6 +36,10 @@ type ReceitaForm = {
   forma_pagamento: string;
   cliente_id: string;
   tipo_conta: string;
+  tipo_transacao: TipoTransacao;
+  frequencia: string;
+  data_inicio: string;
+  data_fim: string;
 };
 
 const emptyForm: ReceitaForm = {
@@ -42,6 +49,10 @@ const emptyForm: ReceitaForm = {
   forma_pagamento: "",
   cliente_id: "",
   tipo_conta: "mei",
+  tipo_transacao: "unica",
+  frequencia: "",
+  data_inicio: new Date().toISOString().slice(0, 10),
+  data_fim: "",
 };
 
 export default function Revenues() {
@@ -64,7 +75,7 @@ export default function Revenues() {
         .select("*, clientes(nome)")
         .order("data", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as unknown as ReceitaExtended[];
     },
     enabled: !!user,
   });
@@ -72,35 +83,26 @@ export default function Revenues() {
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("id, nome")
-        .order("nome");
+      const { data, error } = await supabase.from("clientes").select("id, nome").order("nome");
       if (error) throw error;
       return data;
     },
     enabled: !!user,
   });
 
-  // Filtered list
   const filtered = useMemo(() => {
     let list = receitas;
-    if (filterMonth) {
-      list = list.filter((r) => r.data.startsWith(filterMonth));
-    }
-    if (filterClientId) {
-      list = list.filter((r) => r.cliente_id === filterClientId);
-    }
+    if (filterMonth) list = list.filter((r) => r.data.startsWith(filterMonth));
+    if (filterClientId) list = list.filter((r) => r.cliente_id === filterClientId);
     return list;
   }, [receitas, filterMonth, filterClientId]);
 
   const total = filtered.reduce((s, r) => s + r.valor, 0);
 
-  // Monthly totals
   const monthlyTotals = useMemo(() => {
     const map: Record<string, number> = {};
     receitas.forEach((r) => {
-      const key = r.data.slice(0, 7); // "YYYY-MM"
+      const key = r.data.slice(0, 7);
       map[key] = (map[key] || 0) + r.valor;
     });
     return Object.entries(map)
@@ -124,7 +126,59 @@ export default function Revenues() {
         throw new Error("validation");
       }
       setErrors({});
-      const payload = {
+
+      const tipoTransacao = form.tipo_transacao;
+
+      // Recorrente: generate future entries
+      if (tipoTransacao === "recorrente" && !editingId) {
+        const freq = form.frequencia as Frequencia;
+        const dates = generateRecurringDates(
+          form.data_inicio || parsed.data.data,
+          freq,
+          form.data_fim || null,
+          12
+        );
+
+        const { data: parent, error: parentErr } = await supabase.from("receitas").insert({
+          descricao: parsed.data.descricao,
+          valor: parsed.data.valor,
+          data: dates[0],
+          forma_pagamento: parsed.data.forma_pagamento || null,
+          cliente_id: parsed.data.cliente_id || null,
+          tipo_conta: form.tipo_conta || "mei",
+          user_id: user!.id,
+          tipo_transacao: "recorrente",
+          frequencia: freq,
+          data_inicio: form.data_inicio || parsed.data.data,
+          data_fim: form.data_fim || null,
+          status: "pendente",
+        } as any).select("id").single();
+        if (parentErr) throw parentErr;
+
+        if (dates.length > 1) {
+          const children = dates.slice(1).map((d) => ({
+            descricao: parsed.data.descricao,
+            valor: parsed.data.valor,
+            data: d,
+            forma_pagamento: parsed.data.forma_pagamento || null,
+            cliente_id: parsed.data.cliente_id || null,
+            tipo_conta: form.tipo_conta || "mei",
+            user_id: user!.id,
+            tipo_transacao: "recorrente",
+            frequencia: freq,
+            transacao_pai_id: parent.id,
+            data_inicio: form.data_inicio || parsed.data.data,
+            data_fim: form.data_fim || null,
+            status: "pendente",
+          } as any));
+          const { error } = await supabase.from("receitas").insert(children);
+          if (error) throw error;
+        }
+        return;
+      }
+
+      // Única or edit
+      const payload: any = {
         descricao: parsed.data.descricao,
         valor: parsed.data.valor,
         data: parsed.data.data,
@@ -132,6 +186,8 @@ export default function Revenues() {
         cliente_id: parsed.data.cliente_id || null,
         tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
+        tipo_transacao: tipoTransacao,
+        status: tipoTransacao === "unica" ? "recebido" : "pendente",
       };
       if (editingId) {
         const { error } = await supabase.from("receitas").update(payload).eq("id", editingId);
@@ -155,12 +211,24 @@ export default function Revenues() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("receitas").delete().eq("id", id);
       if (error) throw error;
+      await supabase.from("receitas").delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["receitas"] });
       toast.success("Receita excluída!");
     },
     onError: () => toast.error("Erro ao excluir receita."),
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("receitas").update({ status } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["receitas"] });
+      toast.success("Status atualizado!");
+    },
   });
 
   const closeDialog = () => {
@@ -170,7 +238,7 @@ export default function Revenues() {
     setErrors({});
   };
 
-  const openEdit = (r: (typeof receitas)[0]) => {
+  const openEdit = (r: ReceitaExtended) => {
     setEditingId(r.id);
     setForm({
       descricao: r.descricao,
@@ -178,7 +246,11 @@ export default function Revenues() {
       data: r.data,
       forma_pagamento: r.forma_pagamento ?? "",
       cliente_id: r.cliente_id ?? "",
-      tipo_conta: (r as any).tipo_conta ?? "mei",
+      tipo_conta: r.tipo_conta ?? "mei",
+      tipo_transacao: r.tipo_transacao || "unica",
+      frequencia: r.frequencia ?? "",
+      data_inicio: r.data_inicio ?? "",
+      data_fim: r.data_fim ?? "",
     });
     setOpen(true);
   };
@@ -244,31 +316,20 @@ export default function Revenues() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Mês</Label>
-              <Input
-                type="month"
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className="w-44"
-              />
+              <Input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-44" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Cliente</Label>
               <Select value={filterClientId} onValueChange={setFilterClientId}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
+                <SelectTrigger className="w-48"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                  ))}
+                  {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Limpar filtros
-              </Button>
+              <Button variant="ghost" size="sm" onClick={clearFilters}>Limpar filtros</Button>
             )}
           </div>
         </CardContent>
@@ -294,7 +355,8 @@ export default function Revenues() {
                 <TableRow>
                   <TableHead>Descrição</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Pagamento</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -316,7 +378,28 @@ export default function Revenues() {
                       </div>
                     </TableCell>
                     <TableCell>{(r.clientes as any)?.nome ?? "—"}</TableCell>
-                    <TableCell>{r.forma_pagamento ?? "—"}</TableCell>
+                    <TableCell>
+                      <TransactionTypeBadge tipo={r.tipo_transacao || "unica"} />
+                    </TableCell>
+                    <TableCell>
+                      {r.tipo_transacao === "recorrente" ? (
+                        <Select
+                          value={r.status || "pendente"}
+                          onValueChange={(v) => updateStatus.mutate({ id: r.id, status: v })}
+                        >
+                          <SelectTrigger className="h-7 w-28 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente">Pendente</SelectItem>
+                            <SelectItem value="recebido">Recebido</SelectItem>
+                            <SelectItem value="atrasado">Atrasado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <StatusBadge status={r.status || "recebido"} type="receita" />
+                      )}
+                    </TableCell>
                     <TableCell>{formatDate(r.data)}</TableCell>
                     <TableCell className={`text-right font-semibold ${transactionColors.receita.text}`}>
                       +{formatCurrency(r.valor)}
@@ -336,6 +419,8 @@ export default function Revenues() {
                             <AlertDialogTitle>Excluir receita?</AlertDialogTitle>
                             <AlertDialogDescription>
                               Essa ação não pode ser desfeita. A receita "{r.descricao}" será removida permanentemente.
+                              {r.tipo_transacao === "recorrente" && !r.transacao_pai_id &&
+                                " Todas as ocorrências futuras também serão excluídas."}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -357,25 +442,51 @@ export default function Revenues() {
 
       {/* Form Dialog */}
       <Dialog open={open} onOpenChange={(v) => { if (!v) closeDialog(); else setOpen(true); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading">
               {editingId ? "Editar Receita" : "Nova Receita"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Transaction Type Selector */}
+            {!editingId && (
+              <div className="space-y-2">
+                <Label>Essa receita é:</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: "unica" as const, label: "Única", desc: "Receita avulsa" },
+                    { value: "recorrente" as const, label: "Recorrente", desc: "Cliente fixo / mensalidade" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, tipo_transacao: opt.value })}
+                      className={`rounded-lg border-2 p-3 text-left transition-all ${
+                        form.tipo_transacao === opt.value
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/30"
+                      }`}
+                    >
+                      <p className="text-sm font-medium">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Cliente</Label>
               <Select value={form.cliente_id} onValueChange={(v) => setForm({ ...form, cliente_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione um cliente (opcional)" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                  ))}
+                  {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label>Descrição *</Label>
               <Input
@@ -386,6 +497,7 @@ export default function Revenues() {
               />
               {errors.descricao && <p className="text-sm text-destructive">{errors.descricao}</p>}
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Valor (R$) *</Label>
@@ -408,6 +520,44 @@ export default function Revenues() {
                 {errors.data && <p className="text-sm text-destructive">{errors.data}</p>}
               </div>
             </div>
+
+            {/* Recorrente fields */}
+            {form.tipo_transacao === "recorrente" && !editingId && (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                <p className="text-sm font-medium">Configuração da Recorrência</p>
+                <div className="space-y-2">
+                  <Label>Frequência *</Label>
+                  <Select value={form.frequencia} onValueChange={(v) => setForm({ ...form, frequencia: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="semanal">Semanal</SelectItem>
+                      <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                      <SelectItem value="mensal">Mensal</SelectItem>
+                      <SelectItem value="anual">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Data de Início</Label>
+                    <Input
+                      type="date"
+                      value={form.data_inicio}
+                      onChange={(e) => setForm({ ...form, data_inicio: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data Final (opcional)</Label>
+                    <Input
+                      type="date"
+                      value={form.data_fim}
+                      onChange={(e) => setForm({ ...form, data_fim: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Forma de Pagamento</Label>
               <Select value={form.forma_pagamento} onValueChange={(v) => setForm({ ...form, forma_pagamento: v })}>
@@ -421,6 +571,7 @@ export default function Revenues() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label>Tipo de Conta</Label>
               <Select value={form.tipo_conta} onValueChange={(v) => setForm({ ...form, tipo_conta: v })}>
