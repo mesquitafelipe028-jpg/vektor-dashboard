@@ -34,6 +34,7 @@ const emptyForm: TransactionFormData = {
   data: new Date().toISOString().slice(0, 10),
   forma_pagamento: "",
   cliente_id: "",
+  categoria: "",
   tipo_conta: "mei",
   tipo_transacao: "unica",
   frequencia: "",
