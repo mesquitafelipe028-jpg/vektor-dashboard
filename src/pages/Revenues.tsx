@@ -176,6 +176,7 @@ export default function Revenues() {
       data: r.data,
       forma_pagamento: r.forma_pagamento ?? "",
       cliente_id: r.cliente_id ?? "",
+      tipo_conta: (r as any).tipo_conta ?? "mei",
     });
     setOpen(true);
   };
