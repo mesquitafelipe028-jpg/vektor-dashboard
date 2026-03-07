@@ -245,7 +245,7 @@ export default function Expenses() {
       const { error } = await supabase.from("despesas").delete().eq("id", id);
       if (error) throw error;
       // Also delete children
-      await supabase.from("despesas").delete().eq("transacao_pai_id", id);
+      await (supabase.from("despesas") as any).delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["despesas"] });

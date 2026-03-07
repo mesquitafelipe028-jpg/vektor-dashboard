@@ -211,7 +211,7 @@ export default function Revenues() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("receitas").delete().eq("id", id);
       if (error) throw error;
-      await supabase.from("receitas").delete().eq("transacao_pai_id", id);
+      await (supabase.from("receitas") as any).delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["receitas"] });
