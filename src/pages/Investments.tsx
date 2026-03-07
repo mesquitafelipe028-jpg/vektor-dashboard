@@ -21,15 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  LineChart,
+  LineChart as LineChartIcon,
   TrendingUp,
   TrendingDown,
   Wallet,
@@ -41,6 +33,11 @@ import {
   Lightbulb,
   BarChart3,
   Calendar,
+  Trophy,
+  Target,
+  ArrowUpRight,
+  ArrowDownRight,
+  Percent,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -51,22 +48,29 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
 } from "recharts";
 import { useInvestments, type InvestimentoAtivoInsert, type InvestimentoDividendoInsert } from "@/hooks/useInvestments";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const fmt = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+const fmtPct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+
 const TIPO_ATIVO_LABELS: Record<string, string> = {
-  acao: "Ação",
-  fii: "FII",
-  etf: "ETF",
+  acao: "Ações",
+  fii: "FIIs",
+  etf: "ETFs",
   cripto: "Cripto",
   renda_fixa: "Renda Fixa",
-  fundo: "Fundo",
+  fundo: "Fundos",
 };
 
 const TIPO_ATIVO_COLORS: Record<string, string> = {
@@ -78,13 +82,21 @@ const TIPO_ATIVO_COLORS: Record<string, string> = {
   fundo: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
 };
 
+const PIE_COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--primary))",
+];
+
 const TIPO_DIVIDENDO_LABELS: Record<string, string> = {
   dividendo: "Dividendo",
   jcp: "JCP",
   rendimento: "Rendimento",
 };
 
-// ─── Simulator helpers (from InvestmentCalculator) ───
 const PRESET_RATES = [
   { label: "6%", value: 6 },
   { label: "10%", value: 10 },
@@ -149,7 +161,8 @@ export default function Investments() {
     setSearchParams({ tab: value }, { replace: true });
   };
 
-  // ─── Computed values ───
+  const now = new Date();
+
   const patrimonio = useMemo(() => {
     if (!ativos.data) return 0;
     return ativos.data.reduce((s, a) => s + Number(a.quantidade) * Number(a.preco_atual), 0);
@@ -161,8 +174,8 @@ export default function Investments() {
   }, [ativos.data]);
 
   const lucroPrejuizo = patrimonio - totalInvestido;
+  const variacaoPct = totalInvestido > 0 ? (lucroPrejuizo / totalInvestido) * 100 : 0;
 
-  const now = new Date();
   const dividendosMes = useMemo(() => {
     if (!dividendos.data) return 0;
     const start = startOfMonth(now);
@@ -189,9 +202,14 @@ export default function Investments() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <LineChart className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold text-foreground">Investimentos</h1>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary/10">
+          <LineChartIcon className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Investimentos</h1>
+          <p className="text-sm text-muted-foreground">Acompanhe sua carteira, dividendos e simule aportes</p>
+        </div>
       </div>
 
       <Tabs value={defaultTab} onValueChange={handleTabChange}>
@@ -205,10 +223,13 @@ export default function Investments() {
         <TabsContent value="dashboard">
           <DashboardTab
             patrimonio={patrimonio}
+            totalInvestido={totalInvestido}
             lucroPrejuizo={lucroPrejuizo}
+            variacaoPct={variacaoPct}
             dividendosMes={dividendosMes}
             dividendosAno={dividendosAno}
             ativos={ativos.data ?? []}
+            dividendos={dividendos.data ?? []}
           />
         </TabsContent>
 
@@ -236,6 +257,7 @@ export default function Investments() {
             isLoading={dividendos.isLoading}
             dividendosMes={dividendosMes}
             dividendosAno={dividendosAno}
+            patrimonio={patrimonio}
             onAdd={(d) =>
               addDividendo.mutate(d, {
                 onSuccess: () => toast({ title: "Dividendo registrado" }),
@@ -258,34 +280,88 @@ export default function Investments() {
 }
 
 // ═══════════════════════════════════════════════
-// Dashboard Tab
+// Dashboard Tab – Investidor10 inspired
 // ═══════════════════════════════════════════════
 function DashboardTab({
   patrimonio,
+  totalInvestido,
   lucroPrejuizo,
+  variacaoPct,
   dividendosMes,
   dividendosAno,
   ativos,
+  dividendos,
 }: {
   patrimonio: number;
+  totalInvestido: number;
   lucroPrejuizo: number;
+  variacaoPct: number;
   dividendosMes: number;
   dividendosAno: number;
   ativos: any[];
+  dividendos: any[];
 }) {
-  const cards = [
-    { label: "Patrimônio Investido", value: fmt(patrimonio), icon: Wallet, color: "text-primary" },
-    {
-      label: "Lucro / Prejuízo",
-      value: fmt(lucroPrejuizo),
-      icon: lucroPrejuizo >= 0 ? TrendingUp : TrendingDown,
-      color: lucroPrejuizo >= 0 ? "text-emerald-500" : "text-destructive",
-    },
-    { label: "Dividendos no mês", value: fmt(dividendosMes), icon: DollarSign, color: "text-chart-2" },
-    { label: "Dividendos no ano", value: fmt(dividendosAno), icon: Calendar, color: "text-chart-4" },
-  ];
+  // Composition by type
+  const composicao = useMemo(() => {
+    if (!ativos.length) return [];
+    const grouped: Record<string, number> = {};
+    ativos.forEach((a) => {
+      const val = Number(a.quantidade) * Number(a.preco_atual);
+      grouped[a.tipo] = (grouped[a.tipo] || 0) + val;
+    });
+    return Object.entries(grouped)
+      .map(([tipo, valor]) => ({
+        name: TIPO_ATIVO_LABELS[tipo] || tipo,
+        value: Math.round(valor * 100) / 100,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [ativos]);
 
-  // Build simple chart from ativos sorted by date
+  // Rankings
+  const topRendimentos = useMemo(() => {
+    if (!ativos.length) return [];
+    return [...ativos]
+      .map((a) => {
+        const invested = Number(a.quantidade) * Number(a.preco_medio);
+        const current = Number(a.quantidade) * Number(a.preco_atual);
+        const pct = invested > 0 ? ((current - invested) / invested) * 100 : 0;
+        return { nome: a.nome, tipo: a.tipo, pct, valor: current };
+      })
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 5);
+  }, [ativos]);
+
+  const topPosicoes = useMemo(() => {
+    if (!ativos.length) return [];
+    return [...ativos]
+      .map((a) => ({
+        nome: a.nome,
+        tipo: a.tipo,
+        valor: Number(a.quantidade) * Number(a.preco_atual),
+      }))
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 5);
+  }, [ativos]);
+
+  const topDividendos = useMemo(() => {
+    if (!ativos.length || !dividendos.length) return [];
+    const divByAtivo: Record<string, number> = {};
+    dividendos.forEach((d) => {
+      if (d.ativo_id) divByAtivo[d.ativo_id] = (divByAtivo[d.ativo_id] || 0) + Number(d.valor);
+    });
+    const ativoMap: Record<string, any> = {};
+    ativos.forEach((a) => (ativoMap[a.id] = a));
+    return Object.entries(divByAtivo)
+      .map(([id, total]) => ({
+        nome: ativoMap[id]?.nome || "—",
+        tipo: ativoMap[id]?.tipo || "",
+        valor: total,
+      }))
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 5);
+  }, [ativos, dividendos]);
+
+  // Evolution chart
   const chartData = useMemo(() => {
     if (!ativos.length) return [];
     const sorted = [...ativos].sort(
@@ -301,86 +377,271 @@ function DashboardTab({
     });
   }, [ativos]);
 
+  const indicadores = [
+    {
+      label: "Patrimônio Total",
+      value: fmt(patrimonio),
+      sub: `Investido: ${fmt(totalInvestido)}`,
+      icon: Wallet,
+      gradient: "from-primary/20 to-primary/5 dark:from-primary/15 dark:to-primary/5",
+      iconBg: "bg-primary/15",
+      iconColor: "text-primary",
+      valueColor: "text-foreground",
+    },
+    {
+      label: "Variação Total",
+      value: fmtPct(variacaoPct),
+      sub: fmt(lucroPrejuizo),
+      icon: lucroPrejuizo >= 0 ? TrendingUp : TrendingDown,
+      gradient: lucroPrejuizo >= 0
+        ? "from-emerald-500/20 to-emerald-500/5 dark:from-emerald-500/15 dark:to-emerald-500/5"
+        : "from-destructive/20 to-destructive/5 dark:from-destructive/15 dark:to-destructive/5",
+      iconBg: lucroPrejuizo >= 0 ? "bg-emerald-500/15" : "bg-destructive/15",
+      iconColor: lucroPrejuizo >= 0 ? "text-emerald-500" : "text-destructive",
+      valueColor: lucroPrejuizo >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive",
+    },
+    {
+      label: "Dividendos no Mês",
+      value: fmt(dividendosMes),
+      sub: format(new Date(), "MMMM yyyy", { locale: ptBR }),
+      icon: DollarSign,
+      gradient: "from-chart-2/20 to-chart-2/5",
+      iconBg: "bg-chart-2/15",
+      iconColor: "text-chart-2",
+      valueColor: "text-foreground",
+    },
+    {
+      label: "Dividendos no Ano",
+      value: fmt(dividendosAno),
+      sub: `Média: ${fmt(dividendosAno / (new Date().getMonth() + 1))}/mês`,
+      icon: Calendar,
+      gradient: "from-chart-4/20 to-chart-4/5",
+      iconBg: "bg-chart-4/15",
+      iconColor: "text-chart-4",
+      valueColor: "text-foreground",
+    },
+  ];
+
   return (
     <div className="space-y-6 mt-4">
+      {/* Indicator Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((c) => (
-          <Card key={c.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted shrink-0">
-                <c.icon className={`h-5 w-5 ${c.color}`} />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">{c.label}</p>
-                <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
-              </div>
-            </CardContent>
-          </Card>
+        {indicadores.map((ind, i) => (
+          <motion.div
+            key={ind.label}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05, duration: 0.3 }}
+          >
+            <Card className={`bg-gradient-to-br ${ind.gradient} border-0 shadow-sm overflow-hidden relative`}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{ind.label}</p>
+                  <div className={`flex items-center justify-center h-8 w-8 rounded-lg ${ind.iconBg}`}>
+                    <ind.icon className={`h-4 w-4 ${ind.iconColor}`} />
+                  </div>
+                </div>
+                <p className={`text-xl lg:text-2xl font-bold ${ind.valueColor} truncate`}>{ind.value}</p>
+                <p className="text-xs text-muted-foreground mt-1 truncate">{ind.sub}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
       </div>
 
-      {chartData.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Evolução Patrimonial</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56 sm:h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="gradPatrimonio" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="data" className="text-xs fill-muted-foreground" />
-                  <YAxis
-                    tickFormatter={(v) =>
-                      v >= 1_000_000
-                        ? `R$${(v / 1_000_000).toFixed(1)}M`
-                        : `R$${(v / 1000).toFixed(0)}k`
-                    }
-                    className="text-xs fill-muted-foreground"
-                    width={65}
-                  />
-                  <Tooltip
-                    formatter={(v: number) => [fmt(v), "Patrimônio"]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      borderColor: "hsl(var(--border))",
-                      borderRadius: 8,
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="patrimonio"
-                    stroke="hsl(var(--primary))"
-                    fill="url(#gradPatrimonio)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {ativos.length === 0 && (
+      {ativos.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="p-8 text-center">
-            <BarChart3 className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">Adicione ativos na aba Carteira para ver seu dashboard.</p>
+          <CardContent className="p-10 text-center">
+            <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-lg font-medium text-muted-foreground mb-1">Sua carteira está vazia</p>
+            <p className="text-sm text-muted-foreground">Adicione ativos na aba Carteira para ver análises detalhadas.</p>
           </CardContent>
         </Card>
+      ) : (
+        <>
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Evolution Chart */}
+            <Card className="lg:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Evolução Patrimonial
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-56 sm:h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData}>
+                      <defs>
+                        <linearGradient id="gradPatrimonio" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="data" className="text-xs fill-muted-foreground" />
+                      <YAxis
+                        tickFormatter={(v) =>
+                          v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : `${(v / 1000).toFixed(0)}k`
+                        }
+                        className="text-xs fill-muted-foreground"
+                        width={50}
+                      />
+                      <Tooltip
+                        formatter={(v: number) => [fmt(v), "Patrimônio"]}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          borderColor: "hsl(var(--border))",
+                          borderRadius: 8,
+                        }}
+                      />
+                      <Area type="monotone" dataKey="patrimonio" stroke="hsl(var(--primary))" fill="url(#gradPatrimonio)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Pie Chart - Composição */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Composição da Carteira
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={composicao}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={75}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {composicao.map((_, idx) => (
+                          <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: number) => [fmt(v)]}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          borderColor: "hsl(var(--border))",
+                          borderRadius: 8,
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-1.5 mt-2">
+                  {composicao.map((item, idx) => (
+                    <div key={item.name} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
+                        <span className="text-muted-foreground">{item.name}</span>
+                      </div>
+                      <span className="font-medium text-foreground">{fmt(item.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Rankings */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <RankingCard
+              title="Melhores Rendimentos"
+              icon={Trophy}
+              iconColor="text-amber-500"
+              items={topRendimentos.map((r) => ({
+                nome: r.nome,
+                tipo: r.tipo,
+                display: fmtPct(r.pct),
+                positive: r.pct >= 0,
+              }))}
+            />
+            <RankingCard
+              title="Maiores Posições"
+              icon={Target}
+              iconColor="text-primary"
+              items={topPosicoes.map((r) => ({
+                nome: r.nome,
+                tipo: r.tipo,
+                display: fmt(r.valor),
+                positive: true,
+              }))}
+            />
+            <RankingCard
+              title="Maiores Pagadores"
+              icon={DollarSign}
+              iconColor="text-chart-2"
+              items={topDividendos.map((r) => ({
+                nome: r.nome,
+                tipo: r.tipo,
+                display: fmt(r.valor),
+                positive: true,
+              }))}
+            />
+          </div>
+        </>
       )}
     </div>
   );
 }
 
+// Ranking Card
+function RankingCard({
+  title,
+  icon: Icon,
+  iconColor,
+  items,
+}: {
+  title: string;
+  icon: any;
+  iconColor: string;
+  items: { nome: string; tipo: string; display: string; positive: boolean }[];
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${iconColor}`} />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {items.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Sem dados</p>
+        ) : (
+          <div className="space-y-2.5">
+            {items.map((item, idx) => (
+              <div key={idx} className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-bold text-muted-foreground w-4">{idx + 1}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate text-foreground">{item.nome}</p>
+                    <p className="text-xs text-muted-foreground">{TIPO_ATIVO_LABELS[item.tipo] || item.tipo}</p>
+                  </div>
+                </div>
+                <span className={`text-sm font-semibold whitespace-nowrap ${item.positive ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                  {item.display}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ═══════════════════════════════════════════════
-// Carteira Tab
+// Carteira Tab – Card-based layout
 // ═══════════════════════════════════════════════
 function CarteiraTab({
   ativos,
@@ -394,6 +655,7 @@ function CarteiraTab({
   onDelete: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [filtro, setFiltro] = useState<string>("todos");
   const [form, setForm] = useState({
     nome: "",
     tipo: "acao",
@@ -417,9 +679,19 @@ function CarteiraTab({
     setOpen(false);
   };
 
+  const filteredAtivos = useMemo(() => {
+    if (filtro === "todos") return ativos;
+    return ativos.filter((a) => a.tipo === filtro);
+  }, [ativos, filtro]);
+
+  const filterOptions = [
+    { key: "todos", label: "Todos" },
+    ...Object.entries(TIPO_ATIVO_LABELS).map(([k, v]) => ({ key: k, label: v })),
+  ];
+
   return (
     <div className="space-y-4 mt-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-foreground">Meus Ativos</h2>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -434,11 +706,7 @@ function CarteiraTab({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Nome do ativo</Label>
-                <Input
-                  placeholder="Ex: PETR4, HGLG11, Bitcoin"
-                  value={form.nome}
-                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                />
+                <Input placeholder="Ex: PETR4, HGLG11, Bitcoin" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Tipo</Label>
@@ -477,72 +745,114 @@ function CarteiraTab({
         </Dialog>
       </div>
 
+      {/* Filtros por tipo */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {filterOptions.map((opt) => (
+          <Button
+            key={opt.key}
+            variant={filtro === opt.key ? "default" : "outline"}
+            size="sm"
+            className="shrink-0 rounded-full text-xs h-8"
+            onClick={() => setFiltro(opt.key)}
+          >
+            {opt.label}
+          </Button>
+        ))}
+      </div>
+
       {isLoading ? (
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
-      ) : ativos.length === 0 ? (
+      ) : filteredAtivos.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="p-8 text-center">
             <PiggyBank className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">Nenhum ativo registrado. Comece adicionando seu primeiro investimento!</p>
+            <p className="text-muted-foreground">
+              {ativos.length === 0
+                ? "Nenhum ativo registrado. Comece adicionando seu primeiro investimento!"
+                : "Nenhum ativo nesta categoria."}
+            </p>
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ativo</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Qtd</TableHead>
-                  <TableHead className="text-right">PM</TableHead>
-                  <TableHead className="text-right">Atual</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Resultado</TableHead>
-                  <TableHead className="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ativos.map((a) => {
-                  const total = Number(a.quantidade) * Number(a.preco_atual);
-                  const invested = Number(a.quantidade) * Number(a.preco_medio);
-                  const result = invested > 0 ? ((total - invested) / invested) * 100 : 0;
-                  return (
-                    <TableRow key={a.id}>
-                      <TableCell className="font-medium">{a.nome}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={TIPO_ATIVO_COLORS[a.tipo]}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAtivos.map((a) => {
+            const total = Number(a.quantidade) * Number(a.preco_atual);
+            const invested = Number(a.quantidade) * Number(a.preco_medio);
+            const result = invested > 0 ? ((total - invested) / invested) * 100 : 0;
+            const isPositive = result >= 0;
+
+            return (
+              <motion.div
+                key={a.id}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Card className="hover:shadow-md transition-shadow relative group">
+                  <CardContent className="p-4">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-bold text-foreground text-base">{a.nome}</h3>
+                        <Badge variant="outline" className={`text-[10px] mt-1 ${TIPO_ATIVO_COLORS[a.tipo]}`}>
                           {TIPO_ATIVO_LABELS[a.tipo] || a.tipo}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{Number(a.quantidade).toLocaleString("pt-BR")}</TableCell>
-                      <TableCell className="text-right">{fmt(Number(a.preco_medio))}</TableCell>
-                      <TableCell className="text-right">{fmt(Number(a.preco_atual))}</TableCell>
-                      <TableCell className="text-right font-medium">{fmt(total)}</TableCell>
-                      <TableCell className={`text-right font-medium ${result >= 0 ? "text-emerald-500" : "text-destructive"}`}>
-                        {result >= 0 ? "+" : ""}{result.toFixed(2)}%
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => onDelete(a.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => onDelete(a.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+
+                    {/* Preço Atual */}
+                    <div className="flex items-end gap-2 mb-3">
+                      <span className="text-2xl font-bold text-foreground">{fmt(Number(a.preco_atual))}</span>
+                      <span className={`text-sm font-semibold flex items-center gap-0.5 ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                        {isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                        {fmtPct(result)}
+                      </span>
+                    </div>
+
+                    {/* Details */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Quantidade</span>
+                        <span className="font-medium text-foreground">{Number(a.quantidade).toLocaleString("pt-BR")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">PM</span>
+                        <span className="font-medium text-foreground">{fmt(Number(a.preco_medio))}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total</span>
+                        <span className="font-bold text-foreground">{fmt(total)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Resultado</span>
+                        <span className={`font-bold ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                          {fmt(total - invested)}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════
-// Dividendos Tab
+// Dividendos Tab – with bar chart
 // ═══════════════════════════════════════════════
 function DividendosTab({
   dividendos,
@@ -550,6 +860,7 @@ function DividendosTab({
   isLoading,
   dividendosMes,
   dividendosAno,
+  patrimonio,
   onAdd,
   onDelete,
 }: {
@@ -558,6 +869,7 @@ function DividendosTab({
   isLoading: boolean;
   dividendosMes: number;
   dividendosAno: number;
+  patrimonio: number;
   onAdd: (d: InvestimentoDividendoInsert) => void;
   onDelete: (id: string) => void;
 }) {
@@ -587,24 +899,93 @@ function DividendosTab({
     return map;
   }, [ativos]);
 
+  // Yield médio
+  const yieldMedio = patrimonio > 0 ? (dividendosAno / patrimonio) * 100 : 0;
+
+  // Monthly bar chart (last 12 months)
+  const monthlyData = useMemo(() => {
+    const now = new Date();
+    const months: { label: string; value: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = subMonths(now, i);
+      const start = startOfMonth(d);
+      const end = endOfMonth(d);
+      const total = dividendos
+        .filter((dv) => {
+          const dt = new Date(dv.data_recebimento);
+          return dt >= start && dt <= end;
+        })
+        .reduce((s, dv) => s + Number(dv.valor), 0);
+      months.push({
+        label: format(d, "MMM", { locale: ptBR }),
+        value: Math.round(total * 100) / 100,
+      });
+    }
+    return months;
+  }, [dividendos]);
+
   return (
     <div className="space-y-4 mt-4">
-      {/* Summary */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-chart-2/15 to-chart-2/5 border-0">
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Recebidos no mês</p>
-            <p className="text-xl font-bold text-chart-2">{fmt(dividendosMes)}</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Recebidos no mês</p>
+            <p className="text-xl font-bold text-foreground mt-1">{fmt(dividendosMes)}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-gradient-to-br from-primary/15 to-primary/5 border-0">
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Acumulados no ano</p>
-            <p className="text-xl font-bold text-primary">{fmt(dividendosAno)}</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Acumulado no ano</p>
+            <p className="text-xl font-bold text-foreground mt-1">{fmt(dividendosAno)}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-chart-4/15 to-chart-4/5 border-0">
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+              Yield médio <Percent className="h-3 w-3" />
+            </p>
+            <p className="text-xl font-bold text-foreground mt-1">{yieldMedio.toFixed(2)}%</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Bar Chart */}
+      {dividendos.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Dividendos por Mês
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="label" className="text-xs fill-muted-foreground" />
+                  <YAxis
+                    tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                    className="text-xs fill-muted-foreground"
+                    width={40}
+                  />
+                  <Tooltip
+                    formatter={(v: number) => [fmt(v), "Dividendos"]}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      borderColor: "hsl(var(--border))",
+                      borderRadius: 8,
+                    }}
+                  />
+                  <Bar dataKey="value" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* List */}
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold text-foreground">Histórico</h2>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -668,45 +1049,48 @@ function DividendosTab({
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Ativo</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dividendos.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell>{format(new Date(d.data_recebimento), "dd/MM/yyyy")}</TableCell>
-                    <TableCell>{d.ativo_id ? ativoMap[d.ativo_id] || "—" : "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{TIPO_DIVIDENDO_LABELS[d.tipo] || d.tipo}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-chart-2">{fmt(Number(d.valor))}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => onDelete(d.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          {dividendos.map((d) => (
+            <Card key={d.id} className="group">
+              <CardContent className="p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-chart-2/10 shrink-0">
+                    <DollarSign className="h-4 w-4 text-chart-2" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {d.ativo_id ? ativoMap[d.ativo_id] || "—" : "Geral"}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{format(new Date(d.data_recebimento), "dd/MM/yyyy")}</span>
+                      <Badge variant="outline" className="text-[10px] py-0 h-4">
+                        {TIPO_DIVIDENDO_LABELS[d.tipo] || d.tipo}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-chart-2">{fmt(Number(d.valor))}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => onDelete(d.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════
-// Simulador Tab (migrated from InvestmentCalculator)
+// Simulador Tab
 // ═══════════════════════════════════════════════
 function SimuladorTab() {
   const [initialDisplay, setInitialDisplay] = useState("");
