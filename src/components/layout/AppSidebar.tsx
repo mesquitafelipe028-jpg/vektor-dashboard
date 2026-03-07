@@ -12,6 +12,7 @@ import {
   Activity,
   Calculator,
   CreditCard,
+  Tag,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -67,6 +68,7 @@ const menuGroups = [
     label: "Sistema",
     items: [
       { title: "Configurações", url: "/configuracoes", icon: Settings },
+      { title: "Categorias", url: "/categorias", icon: Tag },
     ],
   },
 ];
