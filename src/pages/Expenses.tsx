@@ -48,7 +48,7 @@ export default function Expenses() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<DespesaForm>(emptyForm);
+  const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Filters
