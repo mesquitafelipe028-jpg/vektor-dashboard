@@ -163,6 +163,7 @@ export function TransactionFormSheet({
 }: TransactionFormSheetProps) {
   const isMobile = useIsMobile();
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
 
   const update = (partial: Partial<TransactionFormData>) => {
     onFormChange({ ...form, ...partial });
@@ -439,22 +440,37 @@ export function TransactionFormSheet({
         {/* Categoria (grid visual) */}
         {(type === "despesa" || type === "receita") && (
           <>
-            <div className="px-4 py-3.5">
-              <div className="flex items-center gap-3 mb-3">
-                <Tag className="h-5 w-5 text-muted-foreground shrink-0" />
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-foreground">Categoria</p>
-                  {suggestedCategory && form.categoria === suggestedCategory && (
-                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Sugerida</Badge>
-                  )}
-                </div>
-              </div>
-              <CategoryGrid
-                categories={type === "despesa" ? (categories ? expenseCategories.filter(c => categories.includes(c.name)) : expenseCategories) : revenueCategories}
-                selected={form.categoria || ""}
-                onSelect={(name) => update({ categoria: name })}
-              />
-            </div>
+            <FormRow
+              icon={Tag}
+              label="Categoria"
+              sublabel={form.categoria || "Selecionar categoria"}
+              onClick={() => setCategoryOpen(!categoryOpen)}
+              expandable
+              expanded={categoryOpen}
+            >
+              {suggestedCategory && form.categoria === suggestedCategory && (
+                <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Sugerida</Badge>
+              )}
+            </FormRow>
+            <AnimatePresence>
+              {categoryOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-4 pb-3 pt-2 bg-muted/30">
+                    <CategoryGrid
+                      categories={type === "despesa" ? (categories ? expenseCategories.filter(c => categories.includes(c.name)) : expenseCategories) : revenueCategories}
+                      selected={form.categoria || ""}
+                      onSelect={(name) => update({ categoria: name })}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <Separator />
           </>
         )}
