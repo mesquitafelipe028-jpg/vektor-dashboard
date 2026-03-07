@@ -26,15 +26,16 @@ export function useCategories(tipo?: "despesa" | "receita") {
     queryKey: [QUERY_KEY, user?.id, tipo],
     queryFn: async () => {
       if (!user) return [];
-      let q = supabase
+      const { data, error } = await supabase
         .from("categorias")
         .select("*")
-        .eq("user_id", user.id)
-        .order("ordem", { ascending: true });
+        .eq("user_id", user.id) as any;
+      if (error) throw error;
 
-      if (tipo) q = q.eq("tipo" as any, tipo);
-
-      const { data, error } = await q;
+      // Filter by tipo if needed and sort by ordem
+      let rows = (data as any[]) as CategoriaDB[];
+      if (tipo) rows = rows.filter((r) => r.tipo === tipo);
+      rows.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
       if (error) throw error;
 
       // Cast since types.ts doesn't have new columns yet
