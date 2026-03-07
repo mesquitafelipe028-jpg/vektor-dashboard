@@ -115,6 +115,7 @@ export default function Revenues() {
       setErrors({});
 
       const tipoTransacao = form.tipo_transacao;
+      const status = form.efetivada ? "recebido" : "pendente";
 
       // Recorrente: insert only 1 record (lazy generation)
       if (tipoTransacao === "recorrente" && !editingId) {
@@ -131,7 +132,7 @@ export default function Revenues() {
           frequencia: freq,
           data_inicio: form.data_inicio || parsed.data.data,
           data_fim: form.data_fim || null,
-          status: "pendente",
+          status,
         } as any);
         if (error) throw error;
         return;
@@ -147,7 +148,7 @@ export default function Revenues() {
         tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
         tipo_transacao: tipoTransacao,
-        status: tipoTransacao === "unica" ? "recebido" : "pendente",
+        status,
       };
       if (editingId) {
         const { error } = await supabase.from("receitas").update(payload).eq("id", editingId);
