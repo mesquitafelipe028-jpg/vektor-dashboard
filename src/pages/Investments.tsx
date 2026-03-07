@@ -312,7 +312,14 @@ export default function Investments() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Carteira Geral</h1>
-            <p className="text-sm text-muted-foreground capitalize">{mesAnoLabel}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground capitalize">{mesAnoLabel}</p>
+              {quotesLastUpdated && (
+                <span className="text-[10px] text-muted-foreground">
+                  • Cotações {quotesLastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
