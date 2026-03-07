@@ -15,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Plus, Pencil, Trash2, CheckCircle, Calendar, DollarSign } from "lucide-react";
 import { formatCurrency, formatDate, expenseCategories } from "@/lib/mockData";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
+import { banks, BankLogo } from "@/lib/banks";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
