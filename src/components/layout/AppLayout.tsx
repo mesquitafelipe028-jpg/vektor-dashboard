@@ -8,7 +8,9 @@ import { useRecurringGenerator } from "@/hooks/useRecurringGenerator";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function AppLayout() {
+  const { user } = useAuth();
   const isMobile = useIsMobile();
+  useRecurringGenerator(user?.id);
 
   return (
     <SidebarProvider>
