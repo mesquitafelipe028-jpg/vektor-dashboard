@@ -150,6 +150,7 @@ export default function Revenues() {
         data: parsed.data.data,
         forma_pagamento: parsed.data.forma_pagamento || null,
         cliente_id: parsed.data.cliente_id || null,
+        categoria: form.categoria || null,
         tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
         tipo_transacao: tipoTransacao,
