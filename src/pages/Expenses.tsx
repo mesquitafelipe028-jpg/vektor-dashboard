@@ -96,6 +96,7 @@ export default function Expenses() {
         valor: parsed.data.valor,
         data: parsed.data.data,
         categoria: parsed.data.categoria || null,
+        tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
       };
       if (editingId) {
