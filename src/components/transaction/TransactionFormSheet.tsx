@@ -185,7 +185,7 @@ export function TransactionFormSheet({
     : type === "receita" ? "Nova Receita" : "Nova Despesa";
 
   const formContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <button type="button" onClick={() => onOpenChange(false)} className="p-1">
