@@ -20,6 +20,8 @@ import {
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
 
+import { PiggyBank } from "lucide-react";
+
 // Lazy-load heavy recharts components
 const DashboardCharts = lazy(() => import("@/components/dashboard/DashboardCharts"));
 
@@ -29,6 +31,91 @@ const ChartsFallback = () => (
     <Skeleton className="h-72 w-full rounded-lg" />
   </div>
 );
+
+function getMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function KpiCards({
+  receitas,
+  despesas,
+  currentMonth,
+  now,
+}: {
+  receitas: any[];
+  despesas: any[];
+  currentMonth: string;
+  now: Date;
+}) {
+  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevKey = getMonthKey(prevDate);
+
+  // MEI metrics
+  const faturamentoMei = receitas.filter((r) => r.tipo_conta === "mei" && r.data.startsWith(currentMonth)).reduce((s: number, r: any) => s + r.valor, 0);
+  const despesasMei = despesas.filter((d) => d.tipo_conta === "mei" && d.data.startsWith(currentMonth)).reduce((s: number, d: any) => s + d.valor, 0);
+  const lucroMei = faturamentoMei - despesasMei;
+
+  const faturamentoMeiPrev = receitas.filter((r) => r.tipo_conta === "mei" && r.data.startsWith(prevKey)).reduce((s: number, r: any) => s + r.valor, 0);
+  const despesasMeiPrev = despesas.filter((d) => d.tipo_conta === "mei" && d.data.startsWith(prevKey)).reduce((s: number, d: any) => s + d.valor, 0);
+  const lucroMeiPrev = faturamentoMeiPrev - despesasMeiPrev;
+
+  // Personal savings
+  const rendaPessoal = receitas.filter((r) => r.tipo_conta === "pessoal" && r.data.startsWith(currentMonth)).reduce((s: number, r: any) => s + r.valor, 0);
+  const despPessoal = despesas.filter((d) => d.tipo_conta === "pessoal" && d.data.startsWith(currentMonth)).reduce((s: number, d: any) => s + d.valor, 0);
+  const taxaPoupanca = rendaPessoal > 0 ? ((rendaPessoal - despPessoal) / rendaPessoal) * 100 : 0;
+
+  const rendaPessoalPrev = receitas.filter((r) => r.tipo_conta === "pessoal" && r.data.startsWith(prevKey)).reduce((s: number, r: any) => s + r.valor, 0);
+  const despPessoalPrev = despesas.filter((d) => d.tipo_conta === "pessoal" && d.data.startsWith(prevKey)).reduce((s: number, d: any) => s + d.valor, 0);
+  const taxaPoupancaPrev = rendaPessoalPrev > 0 ? ((rendaPessoalPrev - despPessoalPrev) / rendaPessoalPrev) * 100 : 0;
+
+  function variation(cur: number, prev: number) {
+    if (prev === 0) return cur > 0 ? 100 : 0;
+    return ((cur - prev) / Math.abs(prev)) * 100;
+  }
+
+  const varFat = variation(faturamentoMei, faturamentoMeiPrev);
+  const varLucro = variation(lucroMei, lucroMeiPrev);
+  const varPoup = taxaPoupanca - taxaPoupancaPrev;
+
+  const cards = [
+    { title: "Faturamento MEI", value: formatCurrency(faturamentoMei), change: varFat, icon: Briefcase, prefix: "" },
+    { title: "Lucro MEI", value: formatCurrency(lucroMei), change: varLucro, icon: TrendingUp, prefix: "" },
+    { title: "Taxa de Poupança", value: `${taxaPoupanca.toFixed(1)}%`, change: varPoup, icon: PiggyBank, prefix: "pp", isSavings: true },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {cards.map((c) => {
+        const positive = c.change >= 0;
+        const Arrow = positive ? ArrowUpRight : ArrowDownRight;
+        const changeColor = c.isSavings
+          ? positive ? "text-emerald-600" : "text-destructive"
+          : positive ? "text-emerald-600" : "text-destructive";
+
+        return (
+          <Card key={c.title}>
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                  <c.icon className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm text-muted-foreground">{c.title}</span>
+              </div>
+              <p className="font-heading text-2xl font-bold">{c.value}</p>
+              <div className="flex items-center gap-1 mt-1">
+                <Arrow className={`h-3.5 w-3.5 ${changeColor}`} />
+                <span className={`text-xs font-medium ${changeColor}`}>
+                  {Math.abs(c.change).toFixed(1)}{c.prefix === "pp" ? "pp" : "%"}
+                </span>
+                <span className="text-xs text-muted-foreground">vs mês anterior</span>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -290,6 +377,17 @@ export default function Dashboard() {
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
+
+      {/* Key Financial Indicators */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+        </div>
+      ) : (
+        <KpiCards receitas={receitas} despesas={despesas} currentMonth={currentMonth} now={now} />
+      )}
 
       {/* Financial Alerts */}
       {!isLoading && financialAlerts.length > 0 && (
