@@ -19,7 +19,7 @@ export default function AppLayout() {
         {!isMobile && <AppSidebar />}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header: show sidebar trigger only on desktop */}
-          <header className="h-14 flex items-center border-b border-border px-3 sm:px-4 sticky top-[env(safe-area-inset-top)] z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <header className="h-14 flex items-center border-b border-border px-3 sm:px-4 sticky top-[env(safe-area-inset-top)] z-50 <header className="h-14 flex items-center border-b border-border px-3 sm:px-4 sticky top-[env(safe-area-inset-top)] z-50 bg-background">">
             {!isMobile && <SidebarTrigger className="mr-3 sm:mr-4" />}
             <LogoVektor size="sm" textClassName="text-muted-foreground" />
           </header>
