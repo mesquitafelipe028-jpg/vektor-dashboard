@@ -109,13 +109,15 @@ export default function Expenses() {
       setErrors({});
 
       const tipoTransacao = form.tipo_transacao;
+      const status = form.efetivada
+        ? (tipoTransacao === "unica" ? "pago" : "pago")
+        : "pendente";
 
       // Parcelada: generate all installments
       if (tipoTransacao === "parcelada" && !editingId) {
-        const numParcelas = parseInt(form.numero_parcelas) || 1;
+        const numParcelas = parseInt(form.numero_parcelas || "1") || 1;
         const installments = generateInstallments(parsed.data.valor, numParcelas, parsed.data.data);
 
-        // Insert the parent first
         const { data: parent, error: parentErr } = await supabase.from("despesas").insert({
           descricao: parsed.data.descricao,
           valor: installments[0].valor,
@@ -130,7 +132,6 @@ export default function Expenses() {
         } as any).select("id").single();
         if (parentErr) throw parentErr;
 
-        // Insert remaining installments
         if (installments.length > 1) {
           const children = installments.slice(1).map((inst) => ({
             descricao: parsed.data.descricao,
@@ -165,7 +166,7 @@ export default function Expenses() {
           frequencia: freq,
           data_inicio: form.data_inicio || parsed.data.data,
           data_fim: form.data_fim || null,
-          status: "pendente",
+          status,
         } as any);
         if (error) throw error;
         return;
@@ -180,7 +181,7 @@ export default function Expenses() {
         tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
         tipo_transacao: tipoTransacao,
-        status: tipoTransacao === "unica" ? "pago" : "pendente",
+        status,
       };
       if (editingId) {
         const { error } = await supabase.from("despesas").update(payload).eq("id", editingId);
