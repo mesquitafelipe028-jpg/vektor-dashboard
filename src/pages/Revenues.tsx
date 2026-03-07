@@ -213,6 +213,7 @@ export default function Revenues() {
       data: r.data,
       forma_pagamento: r.forma_pagamento ?? "",
       cliente_id: r.cliente_id ?? "",
+      categoria: r.categoria ?? "",
       tipo_conta: r.tipo_conta ?? "mei",
       tipo_transacao: r.tipo_transacao || "unica",
       frequencia: r.frequencia ?? "",
