@@ -32,6 +32,12 @@ const menuGroups = [
     ],
   },
   {
+    label: "Investimentos",
+    items: [
+      { label: "Investimentos", icon: LineChart, path: "/investimentos", color: "bg-chart-2/10 text-chart-2" },
+    ],
+  },
+  {
     label: "Fiscal",
     items: [
       { label: "Área Fiscal", icon: Receipt, path: "/impostos", color: "bg-chart-4/10 text-chart-4" },

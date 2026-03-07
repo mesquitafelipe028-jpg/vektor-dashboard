@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus, MoreHorizontal,
+  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus, LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
