@@ -4,38 +4,55 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function fetchWithTimeout(url: string, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
     const BRAPI_TOKEN = Deno.env.get("BRAPI_TOKEN");
     if (!BRAPI_TOKEN) {
-      return new Response(
-        JSON.stringify({ error: "BRAPI_TOKEN not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "BRAPI_TOKEN not configured" }, 500);
     }
 
-    const { tickers } = await req.json();
+    let body: { tickers?: string[] };
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
+
+    const { tickers } = body;
     if (!tickers || !Array.isArray(tickers) || tickers.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "tickers array is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "tickers array is required" }, 400);
     }
 
-    // Crypto map
     const CRYPTO_MAP: Record<string, string> = {
       bitcoin: "BTC", ethereum: "ETH", solana: "SOL", cardano: "ADA",
       dogecoin: "DOGE", bnb: "BNB", xrp: "XRP", polkadot: "DOT",
     };
     const CRYPTO_IDS = new Set(Object.keys(CRYPTO_MAP));
-
-    // Currency tickers use format "USD-BRL", "EUR-BRL"
     const CURRENCY_REGEX = /^[A-Z]{3}-[A-Z]{3}$/;
 
     const cryptoTickers: string[] = [];
@@ -53,14 +70,14 @@ serve(async (req) => {
       }
     });
 
-    const results: Record<string, { price: number; change: number; name: string } | null> = {};
+    const results: Record<string, { price: number; change: number; name: string }> = {};
 
-    // 1) Stocks & FIIs via /api/quote
+    // 1) Stocks & FIIs
     if (stockTickers.length > 0) {
-      const tickerStr = stockTickers.join(",");
-      const url = `https://brapi.dev/api/quote/${tickerStr}?token=${BRAPI_TOKEN}`;
       try {
-        const res = await fetch(url);
+        const tickerStr = stockTickers.join(",");
+        const url = `https://brapi.dev/api/quote/${tickerStr}?token=${BRAPI_TOKEN}`;
+        const res = await fetchWithTimeout(url);
         if (res.ok) {
           const data = await res.json();
           if (data.results) {
@@ -80,21 +97,19 @@ serve(async (req) => {
       }
     }
 
-    // 2) Currencies via /api/v2/currency
+    // 2) Currencies
     if (currencyTickers.length > 0) {
       for (const pair of currencyTickers) {
         try {
           const url = `https://brapi.dev/api/v2/currency?currency=${pair}&token=${BRAPI_TOKEN}`;
-          const res = await fetch(url);
+          const res = await fetchWithTimeout(url);
           if (res.ok) {
             const data = await res.json();
             if (data.currency && data.currency.length > 0) {
               const c = data.currency[0];
-              const price = parseFloat(c.bidPrice) || 0;
-              const pctChange = parseFloat(c.bidVariation) || 0;
               results[pair] = {
-                price,
-                change: pctChange,
+                price: parseFloat(c.bidPrice) || 0,
+                change: parseFloat(c.bidVariation) || 0,
                 name: c.name || pair,
               };
             }
@@ -107,12 +122,12 @@ serve(async (req) => {
       }
     }
 
-    // 3) Crypto via /api/v2/crypto
+    // 3) Crypto
     if (cryptoTickers.length > 0) {
       for (const ct of cryptoTickers) {
         try {
           const url = `https://brapi.dev/api/v2/crypto?coin=${ct}&currency=BRL&token=${BRAPI_TOKEN}`;
-          const res = await fetch(url);
+          const res = await fetchWithTimeout(url);
           if (res.ok) {
             const data = await res.json();
             if (data.coins && data.coins.length > 0) {
@@ -130,14 +145,9 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ quotes: results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ quotes: results });
   } catch (error) {
     console.error("Error in fetch-quotes:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error.message }, 500);
   }
 });
