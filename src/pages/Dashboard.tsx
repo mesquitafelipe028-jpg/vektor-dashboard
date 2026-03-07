@@ -192,8 +192,8 @@ export default function Dashboard() {
     info: "text-blue-600",
   };
 
-  const latestReceitas = receitas.slice(0, 5);
-  const latestDespesas = despesas.slice(0, 5);
+  const latestReceitas = filteredReceitas.slice(0, 5);
+  const latestDespesas = filteredDespesas.slice(0, 5);
 
   // Smart Financial Alerts
   const financialAlerts = useMemo(() => {
