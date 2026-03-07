@@ -43,6 +43,7 @@ export default function ClientDetails() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [showAllProjections, setShowAllProjections] = useState(false);
   const [editForm, setEditForm] = useState({ nome: "", email: "", telefone: "" });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
