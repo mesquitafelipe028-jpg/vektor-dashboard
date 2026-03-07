@@ -233,10 +233,10 @@ export default function CreditCards() {
         user_id: user!.id,
       };
       if (editingCompraId) {
-        const { error } = await supabase.from("compras_cartao").update(payload).eq("id", editingCompraId) as any;
+        const { error } = await (supabase as any).from("compras_cartao").update(payload).eq("id", editingCompraId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("compras_cartao").insert(payload) as any;
+        const { error } = await (supabase as any).from("compras_cartao").insert(payload);
         if (error) throw error;
       }
     },
