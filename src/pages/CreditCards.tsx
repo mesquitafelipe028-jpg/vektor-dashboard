@@ -518,8 +518,8 @@ export default function CreditCards() {
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <CreditCard className="h-6 w-6 text-primary" />
+                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${transactionColors.cartao.bg}`}>
+                  <CreditCard className={`h-6 w-6 ${transactionColors.cartao.text}`} />
                 </div>
                 <div>
                   <h2 className="font-heading text-lg font-bold">{activeCard.nome}</h2>
