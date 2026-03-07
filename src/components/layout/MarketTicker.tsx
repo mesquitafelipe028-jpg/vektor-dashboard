@@ -4,9 +4,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 const DEFAULT_TICKERS = [
-  "^BVSP",
-  "USDBRL=X",
-  "EURBRL=X",
+  "USD-BRL",
+  "EUR-BRL",
   "PETR4",
   "VALE3",
   "ITUB4",
@@ -16,9 +15,8 @@ const DEFAULT_TICKERS = [
 ];
 
 const LABEL_MAP: Record<string, string> = {
-  "^BVSP": "IBOV",
-  "USDBRL=X": "USD/BRL",
-  "EURBRL=X": "EUR/BRL",
+  "USD-BRL": "USD/BRL",
+  "EUR-BRL": "EUR/BRL",
   bitcoin: "BTC",
   ethereum: "ETH",
 };
