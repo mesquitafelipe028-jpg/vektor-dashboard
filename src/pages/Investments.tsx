@@ -1093,8 +1093,20 @@ function CarteiraTab({
   return (
     <div className="space-y-4 mt-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-foreground">Meus Ativos</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Meus Ativos</h2>
+          {quotesLastUpdated && (
+            <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+              Cotações {quotesLastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-2">
+          {onRefreshQuotes && (
+            <Button variant="outline" size="sm" onClick={onRefreshQuotes} disabled={quotesLoading}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${quotesLoading ? "animate-spin" : ""}`} /> Cotações
+            </Button>
+          )}
           {/* Column settings */}
           <Popover>
             <PopoverTrigger asChild>
