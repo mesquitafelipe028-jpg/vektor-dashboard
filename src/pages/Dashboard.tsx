@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
 
 import { PiggyBank } from "lucide-react";
 
