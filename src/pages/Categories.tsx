@@ -221,7 +221,7 @@ function CategoryList({ tipo }: { tipo: "despesa" | "receita" }) {
                     <LucideIconByName name={sub.icone} className={`h-3.5 w-3.5 ${subColors.text}`} />
                   </div>
                   <span className="flex-1 text-sm text-foreground">{sub.nome}</span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={() => setEditModal({ open: true, cat: sub })}
