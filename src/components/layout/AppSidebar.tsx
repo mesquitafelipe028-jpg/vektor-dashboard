@@ -12,6 +12,7 @@ import {
   Activity,
   Calculator,
   CreditCard,
+  Tag,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
