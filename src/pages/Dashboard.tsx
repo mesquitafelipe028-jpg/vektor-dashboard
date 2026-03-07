@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -435,17 +436,24 @@ export default function Dashboard() {
           <h1 className="font-heading text-2xl font-bold">Olá, bem-vindo ao Vektor</h1>
           <p className="text-sm text-muted-foreground">Seu centro de controle financeiro.</p>
         </div>
-        <div className="hidden md:flex gap-2">
-          <Button size="sm" onClick={() => navigate("/receitas?novo=true")}>
-            <Plus className="h-4 w-4" /> Registrar Receita
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => navigate("/despesas?novo=true")}>
-            <Plus className="h-4 w-4" /> Registrar Despesa
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => navigate("/clientes?novo=true")}>
-            <Plus className="h-4 w-4" /> Novo Cliente
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" className="hidden md:flex">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => navigate("/receitas?novo=true")}>
+              <TrendingUp className="h-4 w-4 mr-2" /> Registrar Receita
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/despesas?novo=true")}>
+              <TrendingDown className="h-4 w-4 mr-2" /> Registrar Despesa
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/clientes?novo=true")}>
+              <User className="h-4 w-4 mr-2" /> Novo Cliente
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Financial View Selector */}
