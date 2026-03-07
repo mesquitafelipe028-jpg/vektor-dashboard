@@ -32,6 +32,7 @@ export interface ReceitaExtended {
   data: string;
   forma_pagamento: string | null;
   cliente_id: string | null;
+  categoria: string | null;
   user_id: string;
   created_at: string;
   tipo_conta?: string;
