@@ -42,6 +42,7 @@ const mainItems = [
   { title: "Metas", url: "/metas", icon: Target },
   { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
   { title: "Calculadora", url: "/calculadora-investimentos", icon: Calculator },
+  { title: "Cartões", url: "/cartoes", icon: CreditCard },
 ];
 
 const configItems = [
