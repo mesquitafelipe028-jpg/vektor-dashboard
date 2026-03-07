@@ -372,8 +372,11 @@ export default function Investments() {
 
         <TabsContent value="carteira">
           <CarteiraTab
-            ativos={ativos.data ?? []}
+            ativos={ativosComCotacao}
             dividendos={dividendos.data ?? []}
+            quotesLoading={quotesLoading}
+            quotesLastUpdated={quotesLastUpdated}
+            onRefreshQuotes={handleRefreshQuotes}
             isLoading={ativos.isLoading}
             openDialog={openAtivo}
             setOpenDialog={setOpenAtivo}
