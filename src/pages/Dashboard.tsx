@@ -291,6 +291,17 @@ export default function Dashboard() {
         </ToggleGroup>
       </div>
 
+      {/* Key Financial Indicators */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+        </div>
+      ) : (
+        <KpiCards receitas={receitas} despesas={despesas} currentMonth={currentMonth} now={now} />
+      )}
+
       {/* Financial Alerts */}
       {!isLoading && financialAlerts.length > 0 && (
         <div className="space-y-2">
