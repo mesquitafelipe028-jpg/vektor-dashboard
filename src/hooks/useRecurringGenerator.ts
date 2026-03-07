@@ -61,10 +61,10 @@ async function generateNext(table: "receitas" | "despesas", userId: string) {
     if (p.data_fim && p.data_fim < today) continue;
 
     // Find the latest child (or parent itself)
-    const { data: children } = await supabase
+    const { data: children } = await (supabase
       .from(table)
-      .select("data")
-      .eq("transacao_pai_id" as any, p.id)
+      .select("data") as any)
+      .eq("transacao_pai_id", p.id)
       .order("data", { ascending: false })
       .limit(1);
 
@@ -76,10 +76,10 @@ async function generateNext(table: "receitas" | "despesas", userId: string) {
       if (p.data_fim && nextDate > p.data_fim) break;
 
       // Check if already exists for this date
-      const { data: existing } = await supabase
+      const { data: existing } = await (supabase
         .from(table)
-        .select("id")
-        .eq("transacao_pai_id" as any, p.id)
+        .select("id") as any)
+        .eq("transacao_pai_id", p.id)
         .eq("data", nextDate)
         .limit(1);
 
