@@ -30,6 +30,7 @@ type ReceitaForm = {
   data: string;
   forma_pagamento: string;
   cliente_id: string;
+  tipo_conta: string;
 };
 
 const emptyForm: ReceitaForm = {
@@ -38,6 +39,7 @@ const emptyForm: ReceitaForm = {
   data: new Date().toISOString().slice(0, 10),
   forma_pagamento: "",
   cliente_id: "",
+  tipo_conta: "mei",
 };
 
 export default function Revenues() {
@@ -126,6 +128,7 @@ export default function Revenues() {
         data: parsed.data.data,
         forma_pagamento: parsed.data.forma_pagamento || null,
         cliente_id: parsed.data.cliente_id || null,
+        tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
       };
       if (editingId) {
@@ -173,6 +176,7 @@ export default function Revenues() {
       data: r.data,
       forma_pagamento: r.forma_pagamento ?? "",
       cliente_id: r.cliente_id ?? "",
+      tipo_conta: (r as any).tipo_conta ?? "mei",
     });
     setOpen(true);
   };
@@ -407,6 +411,16 @@ export default function Revenues() {
                   <SelectItem value="Cartão">Cartão</SelectItem>
                   <SelectItem value="Transferência">Transferência</SelectItem>
                   <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de Conta</Label>
+              <Select value={form.tipo_conta} onValueChange={(v) => setForm({ ...form, tipo_conta: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mei">MEI</SelectItem>
+                  <SelectItem value="pessoal">Pessoal</SelectItem>
                 </SelectContent>
               </Select>
             </div>

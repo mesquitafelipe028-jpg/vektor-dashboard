@@ -24,8 +24,8 @@ const schema = z.object({
   categoria: z.string().optional(),
 });
 
-type DespesaForm = { descricao: string; valor: string; data: string; categoria: string };
-const emptyForm: DespesaForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" };
+type DespesaForm = { descricao: string; valor: string; data: string; categoria: string; tipo_conta: string };
+const emptyForm: DespesaForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "", tipo_conta: "mei" };
 
 export default function Expenses() {
   const { user } = useAuth();
@@ -96,6 +96,7 @@ export default function Expenses() {
         valor: parsed.data.valor,
         data: parsed.data.data,
         categoria: parsed.data.categoria || null,
+        tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
       };
       if (editingId) {
@@ -137,7 +138,7 @@ export default function Expenses() {
 
   const openEdit = (d: (typeof despesas)[0]) => {
     setEditingId(d.id);
-    setForm({ descricao: d.descricao, valor: String(d.valor), data: d.data, categoria: d.categoria ?? "" });
+    setForm({ descricao: d.descricao, valor: String(d.valor), data: d.data, categoria: d.categoria ?? "", tipo_conta: (d as any).tipo_conta ?? "mei" });
     setOpen(true);
   };
 
@@ -368,6 +369,16 @@ export default function Expenses() {
                 />
                 {errors.data && <p className="text-sm text-destructive">{errors.data}</p>}
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de Conta</Label>
+              <Select value={form.tipo_conta} onValueChange={(v) => setForm({ ...form, tipo_conta: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mei">MEI</SelectItem>
+                  <SelectItem value="pessoal">Pessoal</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

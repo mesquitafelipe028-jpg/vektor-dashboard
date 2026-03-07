@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   TrendingUp, TrendingDown, Wallet, Receipt,
   Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert, Target,
   FileText, ArrowUpRight, ArrowDownRight, Building2, X, Bell,
-  CheckCircle2, Clock, Flame,
+  CheckCircle2, Clock, Flame, User, Briefcase, Layers,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
@@ -99,6 +100,20 @@ export default function Dashboard() {
 
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
+  // Financial view filter
+  type FinancialView = "tudo" | "pessoal" | "mei";
+  const [financialView, setFinancialView] = useState<FinancialView>("tudo");
+
+  const filteredReceitas = useMemo(() => {
+    if (financialView === "tudo") return receitas;
+    return receitas.filter((r: any) => r.tipo_conta === financialView);
+  }, [receitas, financialView]);
+
+  const filteredDespesas = useMemo(() => {
+    if (financialView === "tudo") return despesas;
+    return despesas.filter((d: any) => d.tipo_conta === financialView);
+  }, [despesas, financialView]);
+
   const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
   const dismissAlert = useCallback((id: string) => {
     setHiddenAlerts((prev) => new Set(prev).add(id));
@@ -107,14 +122,14 @@ export default function Dashboard() {
   const now = new Date();
   const currentYear = now.getFullYear().toString();
   const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const receitasMes = receitas.filter((r) => r.data.startsWith(currentMonth));
-  const despesasMes = despesas.filter((d) => d.data.startsWith(currentMonth));
+  const receitasMes = filteredReceitas.filter((r) => r.data.startsWith(currentMonth));
+  const despesasMes = filteredDespesas.filter((d) => d.data.startsWith(currentMonth));
   const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
   const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
   const saldoMes = faturamentoMes - despesasMesTotal;
 
   const LIMITE_MEI = 81000;
-  const faturamentoAnual = receitas
+  const faturamentoAnual = filteredReceitas
     .filter((r) => r.data.startsWith(currentYear))
     .reduce((s, r) => s + r.valor, 0);
   const percentLimit = Math.min((faturamentoAnual / LIMITE_MEI) * 100, 100);
@@ -124,12 +139,12 @@ export default function Dashboard() {
     const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleDateString("pt-BR", { month: "long" });
-    const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    const desp = despesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const rec = filteredReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const desp = filteredDespesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
     const lucro = rec - desp;
     const varFat = rec > 0 && faturamentoMes > 0 ? ((faturamentoMes - rec) / rec) * 100 : 0;
     return { label, rec, desp, lucro, varFat };
-  }, [receitas, despesas, faturamentoMes]);
+  }, [filteredReceitas, filteredDespesas, faturamentoMes]);
 
   // Saúde Financeira
   const despesaPercent = faturamentoMes > 0 ? (despesasMesTotal / faturamentoMes) * 100 : 0;
@@ -140,7 +155,7 @@ export default function Dashboard() {
     critical: { label: "Crítico", icon: ShieldAlert, color: "text-red-600", bg: "bg-red-500/10", border: "border-red-500/30" },
   }[healthStatus];
 
-  const insights = useFinancialInsights(receitas, despesas);
+  const insights = useFinancialInsights(filteredReceitas, filteredDespesas);
 
   // Despesas por categoria (PieChart)
   const categoryData = useMemo(() => {
@@ -159,8 +174,8 @@ export default function Dashboard() {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-    const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    const desp = despesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const rec = filteredReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const desp = filteredDespesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
     return { month: label.charAt(0).toUpperCase() + label.slice(1), receitas: rec, despesas: desp };
   });
 
@@ -177,8 +192,8 @@ export default function Dashboard() {
     info: "text-blue-600",
   };
 
-  const latestReceitas = receitas.slice(0, 5);
-  const latestDespesas = despesas.slice(0, 5);
+  const latestReceitas = filteredReceitas.slice(0, 5);
+  const latestDespesas = filteredDespesas.slice(0, 5);
 
   // Smart Financial Alerts
   const financialAlerts = useMemo(() => {
@@ -250,6 +265,30 @@ export default function Dashboard() {
             <Plus className="h-4 w-4" /> Registrar Despesa
           </Button>
         </div>
+      </div>
+
+      {/* Financial View Selector */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-muted-foreground font-medium">Visualizar:</span>
+        <ToggleGroup
+          type="single"
+          value={financialView}
+          onValueChange={(v) => { if (v) setFinancialView(v as FinancialView); }}
+          className="bg-muted/50 rounded-lg p-1"
+        >
+          <ToggleGroupItem value="pessoal" aria-label="Pessoal" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+            <User className="h-3.5 w-3.5" />
+            Pessoal
+          </ToggleGroupItem>
+          <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+            <Briefcase className="h-3.5 w-3.5" />
+            MEI
+          </ToggleGroupItem>
+          <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+            <Layers className="h-3.5 w-3.5" />
+            Tudo
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {/* Financial Alerts */}
