@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/mockData";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell,
@@ -248,12 +250,12 @@ export default function Reports() {
                 {last3Months.map((m) => (
                   <div key={m.month} className="text-center p-4 rounded-lg border border-border">
                     <p className="font-heading text-lg font-semibold mb-2">{m.month}</p>
-                    <p className="text-primary font-bold text-xl">{formatCurrency(m.receitas)}</p>
+                    <p className={`font-bold text-xl ${transactionColors.receita.text}`}>{formatCurrency(m.receitas)}</p>
                     <p className="text-xs text-muted-foreground">receitas</p>
-                    <p className="text-destructive font-bold text-xl mt-2">{formatCurrency(m.despesas)}</p>
+                    <p className={`font-bold text-xl mt-2 ${transactionColors.despesa.text}`}>{formatCurrency(m.despesas)}</p>
                     <p className="text-xs text-muted-foreground">despesas</p>
                     <div className="border-t border-border mt-3 pt-3">
-                      <p className="font-bold text-lg">{formatCurrency(m.saldo)}</p>
+                      <p className={`font-bold text-lg ${m.saldo >= 0 ? transactionColors.receita.text : transactionColors.despesa.text}`}>{formatCurrency(m.saldo)}</p>
                       <p className="text-xs text-muted-foreground">saldo</p>
                     </div>
                   </div>

@@ -5,6 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/mockData";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, BarChart3, DollarSign, Percent, ShoppingCart } from "lucide-react";
 import { motion } from "framer-motion";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
@@ -266,10 +268,11 @@ export default function FinancialAnalysis() {
                   return (
                     <div key={cat} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
+                        <CategoryIcon category={cat} type="despesa" size={28} />
                         <span className="text-sm font-medium">{i + 1}. {cat}</span>
                         <Badge variant="secondary" className="text-xs">{pct.toFixed(0)}%</Badge>
                       </div>
-                      <span className="text-sm font-semibold text-destructive">{formatCurrency(val)}</span>
+                      <span className={`text-sm font-semibold ${transactionColors.despesa.text}`}>{formatCurrency(val)}</span>
                     </div>
                   );
                 })
