@@ -15,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, Plus, Pencil, Trash2, CheckCircle, Calendar, DollarSign } from "lucide-react";
 import { formatCurrency, formatDate, expenseCategories } from "@/lib/mockData";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
+import { banks, BankLogo } from "@/lib/banks";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -46,8 +49,8 @@ interface Fatura {
   data_pagamento: string | null;
 }
 
-type CardForm = { nome: string; limite_total: string; dia_fechamento: string; dia_vencimento: string; tipo_conta: string };
-const emptyCardForm: CardForm = { nome: "", limite_total: "", dia_fechamento: "1", dia_vencimento: "10", tipo_conta: "pessoal" };
+type CardForm = { nome: string; limite_total: string; dia_fechamento: string; dia_vencimento: string; tipo_conta: string; banco: string };
+const emptyCardForm: CardForm = { nome: "", limite_total: "", dia_fechamento: "1", dia_vencimento: "10", tipo_conta: "pessoal", banco: "" };
 
 type CompraForm = { descricao: string; valor: string; data: string; categoria: string; cartao_id: string };
 const emptyCompraForm: CompraForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "", cartao_id: "" };
@@ -181,6 +184,7 @@ export default function CreditCards() {
         dia_fechamento: parseInt(cardForm.dia_fechamento) || 1,
         dia_vencimento: parseInt(cardForm.dia_vencimento) || 10,
         tipo_conta: cardForm.tipo_conta,
+        banco: cardForm.banco || null,
         user_id: user!.id,
       };
       if (!payload.nome) throw new Error("Nome obrigatório");
@@ -329,6 +333,7 @@ export default function CreditCards() {
       dia_fechamento: String(c.dia_fechamento),
       dia_vencimento: String(c.dia_vencimento),
       tipo_conta: c.tipo_conta,
+      banco: (c as any).banco ?? "",
     });
     setCardDialogOpen(true);
   };
@@ -383,9 +388,14 @@ export default function CreditCards() {
                 className="border-b transition-colors hover:bg-muted/50"
               >
                 <TableCell>{formatDate(c.data)}</TableCell>
-                <TableCell className="font-medium">{c.descricao}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <CategoryIcon category={c.categoria} type="cartao" size={24} />
+                    <span className="font-medium">{c.descricao}</span>
+                  </div>
+                </TableCell>
                 <TableCell>{c.categoria ?? "—"}</TableCell>
-                <TableCell className="text-right font-semibold text-destructive">
+                <TableCell className={`text-right font-semibold ${transactionColors.cartao.text}`}>
                   {formatCurrency(c.valor)}
                 </TableCell>
                 {showActions && (
@@ -487,20 +497,23 @@ export default function CreditCards() {
       {/* Card selector (if multiple) */}
       {cartoes.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {cartoes.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedCardId(c.id)}
-              className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-                activeCard?.id === c.id
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:border-primary/50"
-              }`}
-            >
-              <CreditCard className="h-4 w-4" />
-              {c.nome}
-            </button>
-          ))}
+          {cartoes.map((c) => {
+            const bankInfo = banks.find(b => b.id === (c as any).banco);
+            return (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCardId(c.id)}
+                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                  activeCard?.id === c.id
+                    ? "border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300"
+                    : "border-border bg-card text-muted-foreground hover:border-purple-500/50"
+                }`}
+              >
+                {bankInfo ? <BankLogo bankId={bankInfo.id} size={24} /> : <CreditCard className="h-4 w-4" />}
+                {c.nome}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -510,8 +523,8 @@ export default function CreditCards() {
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <CreditCard className="h-6 w-6 text-primary" />
+                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${transactionColors.cartao.bg}`}>
+                  <CreditCard className={`h-6 w-6 ${transactionColors.cartao.text}`} />
                 </div>
                 <div>
                   <h2 className="font-heading text-lg font-bold">{activeCard.nome}</h2>
@@ -799,6 +812,27 @@ function CardFormDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Banco</Label>
+            <Select value={form.banco} onValueChange={(v) => {
+              const bank = banks.find(b => b.id === v);
+              setForm({ ...form, banco: v, nome: bank && !form.nome ? bank.name : form.nome });
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o banco" />
+              </SelectTrigger>
+              <SelectContent>
+                {banks.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    <div className="flex items-center gap-2">
+                      <BankLogo bankId={b.id} size={20} />
+                      <span>{b.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2">
             <Label>Nome do Cartão *</Label>
             <Input

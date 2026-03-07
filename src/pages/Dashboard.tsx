@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
 
 import { PiggyBank } from "lucide-react";
 
@@ -649,14 +651,12 @@ export default function Dashboard() {
               ) : (
                 latestReceitas.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                    </div>
+                    <CategoryIcon category={r.forma_pagamento} type="receita" size={36} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{r.descricao}</p>
                       <p className="text-xs text-muted-foreground">{r.forma_pagamento ?? "—"} • {formatDate(r.data)}</p>
                     </div>
-                    <span className="text-sm font-bold text-primary shrink-0">+{formatCurrency(r.valor)}</span>
+                    <span className={`text-sm font-bold shrink-0 ${transactionColors.receita.text}`}>+{formatCurrency(r.valor)}</span>
                   </div>
                 ))
               )}
@@ -674,14 +674,12 @@ export default function Dashboard() {
               ) : (
                 latestDespesas.map((d) => (
                   <div key={d.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-                      <TrendingDown className="h-4 w-4 text-destructive" />
-                    </div>
+                    <CategoryIcon category={d.categoria} type="despesa" size={36} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{d.descricao}</p>
                       <p className="text-xs text-muted-foreground">{d.categoria ?? "—"} • {formatDate(d.data)}</p>
                     </div>
-                    <span className="text-sm font-bold text-destructive shrink-0">-{formatCurrency(d.valor)}</span>
+                    <span className={`text-sm font-bold shrink-0 ${transactionColors.despesa.text}`}>-{formatCurrency(d.valor)}</span>
                   </div>
                 ))
               )}

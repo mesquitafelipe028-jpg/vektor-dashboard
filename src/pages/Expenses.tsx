@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, TrendingDown, Pencil, Trash2, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, expenseCategories, suggestCategory } from "@/lib/mockData";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { z } from "zod";
@@ -267,11 +269,16 @@ export default function Expenses() {
                     transition={{ delay: i * 0.03 }}
                     className="border-b transition-colors hover:bg-muted/50"
                   >
-                    <TableCell className="font-medium">{d.descricao}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <CategoryIcon category={d.categoria} type="despesa" size={28} />
+                        <span className="font-medium">{d.descricao}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>{d.categoria ?? "—"}</TableCell>
                     <TableCell>{formatDate(d.data)}</TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">
-                      {formatCurrency(d.valor)}
+                    <TableCell className={`text-right font-semibold ${transactionColors.despesa.text}`}>
+                      -{formatCurrency(d.valor)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(d)}>

@@ -12,6 +12,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingUp, Pencil, Trash2, Filter } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
+import { CategoryIcon } from "@/components/CategoryIcon";
+import { transactionColors } from "@/lib/categories";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { z } from "zod";
@@ -307,12 +309,17 @@ export default function Revenues() {
                     transition={{ delay: i * 0.03 }}
                     className="border-b transition-colors hover:bg-muted/50"
                   >
-                    <TableCell className="font-medium">{r.descricao}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <CategoryIcon category={r.forma_pagamento} type="receita" size={28} />
+                        <span className="font-medium">{r.descricao}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>{(r.clientes as any)?.nome ?? "—"}</TableCell>
                     <TableCell>{r.forma_pagamento ?? "—"}</TableCell>
                     <TableCell>{formatDate(r.data)}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary">
-                      {formatCurrency(r.valor)}
+                    <TableCell className={`text-right font-semibold ${transactionColors.receita.text}`}>
+                      +{formatCurrency(r.valor)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
