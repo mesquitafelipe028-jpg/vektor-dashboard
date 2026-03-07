@@ -386,9 +386,14 @@ export default function CreditCards() {
                 className="border-b transition-colors hover:bg-muted/50"
               >
                 <TableCell>{formatDate(c.data)}</TableCell>
-                <TableCell className="font-medium">{c.descricao}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <CategoryIcon category={c.categoria} type="cartao" size={24} />
+                    <span className="font-medium">{c.descricao}</span>
+                  </div>
+                </TableCell>
                 <TableCell>{c.categoria ?? "—"}</TableCell>
-                <TableCell className="text-right font-semibold text-destructive">
+                <TableCell className={`text-right font-semibold ${transactionColors.cartao.text}`}>
                   {formatCurrency(c.valor)}
                 </TableCell>
                 {showActions && (
