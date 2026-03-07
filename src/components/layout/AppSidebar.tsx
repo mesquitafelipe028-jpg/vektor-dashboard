@@ -60,12 +60,17 @@ const menuGroups = [
     ],
   },
   {
+    label: "Investimentos",
+    items: [
+      { title: "Investimentos", url: "/investimentos", icon: LineChart },
+    ],
+  },
+  {
     label: "Planejamento",
     items: [
       { title: "Metas", url: "/metas", icon: Target },
       { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
       { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
-      { title: "Calculadora", url: "/calculadora-investimentos", icon: Calculator },
     ],
   },
   {
