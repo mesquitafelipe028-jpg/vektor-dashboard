@@ -32,7 +32,7 @@ function calcCompoundInterest(
   const realAnnualRate = inflationRate > 0
     ? ((1 + annualRate / 100) / (1 + inflationRate / 100) - 1)
     : annualRate / 100;
-  const monthlyRate = realAnnualRate / 12;
+  const monthlyRate = Math.pow(1 + realAnnualRate, 1 / 12) - 1;
   const chartData: { ano: number; acumulado: number; investido: number }[] = [];
 
   let balance = initial;
