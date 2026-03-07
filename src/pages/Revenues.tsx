@@ -19,7 +19,6 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { z } from "zod";
 import type { ReceitaExtended, TipoTransacao, Frequencia } from "@/types/transactions";
-import { generateRecurringDates } from "@/types/transactions";
 
 const schema = z.object({
   descricao: z.string().trim().min(1, "Descrição obrigatória").max(200),
@@ -129,20 +128,13 @@ export default function Revenues() {
 
       const tipoTransacao = form.tipo_transacao;
 
-      // Recorrente: generate future entries
+      // Recorrente: insert only 1 record (lazy generation)
       if (tipoTransacao === "recorrente" && !editingId) {
         const freq = form.frequencia as Frequencia;
-        const dates = generateRecurringDates(
-          form.data_inicio || parsed.data.data,
-          freq,
-          form.data_fim || null,
-          12
-        );
-
-        const { data: parent, error: parentErr } = await supabase.from("receitas").insert({
+        const { error } = await supabase.from("receitas").insert({
           descricao: parsed.data.descricao,
           valor: parsed.data.valor,
-          data: dates[0],
+          data: form.data_inicio || parsed.data.data,
           forma_pagamento: parsed.data.forma_pagamento || null,
           cliente_id: parsed.data.cliente_id || null,
           tipo_conta: form.tipo_conta || "mei",
@@ -152,28 +144,8 @@ export default function Revenues() {
           data_inicio: form.data_inicio || parsed.data.data,
           data_fim: form.data_fim || null,
           status: "pendente",
-        } as any).select("id").single();
-        if (parentErr) throw parentErr;
-
-        if (dates.length > 1) {
-          const children = dates.slice(1).map((d) => ({
-            descricao: parsed.data.descricao,
-            valor: parsed.data.valor,
-            data: d,
-            forma_pagamento: parsed.data.forma_pagamento || null,
-            cliente_id: parsed.data.cliente_id || null,
-            tipo_conta: form.tipo_conta || "mei",
-            user_id: user!.id,
-            tipo_transacao: "recorrente",
-            frequencia: freq,
-            transacao_pai_id: parent.id,
-            data_inicio: form.data_inicio || parsed.data.data,
-            data_fim: form.data_fim || null,
-            status: "pendente",
-          } as any));
-          const { error } = await supabase.from("receitas").insert(children);
-          if (error) throw error;
-        }
+        } as any);
+        if (error) throw error;
         return;
       }
 

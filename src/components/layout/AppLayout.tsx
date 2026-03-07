@@ -4,9 +4,13 @@ import { AppSidebar } from "./AppSidebar";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LogoVektor } from "@/components/branding/LogoVektor";
+import { useRecurringGenerator } from "@/hooks/useRecurringGenerator";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AppLayout() {
+  const { user } = useAuth();
   const isMobile = useIsMobile();
+  useRecurringGenerator(user?.id);
 
   return (
     <SidebarProvider>
