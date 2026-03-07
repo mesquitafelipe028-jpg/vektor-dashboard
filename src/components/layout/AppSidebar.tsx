@@ -10,12 +10,12 @@ import {
   Users,
   Target,
   Activity,
-  Calculator,
   CreditCard,
   Wallet,
   Search,
   Plus,
   LucideIcon,
+  LineChart,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { LogoVektor } from "@/components/branding/LogoVektor";
