@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import {
-  Users, ArrowLeftRight, Receipt, BarChart3, Target, Activity, Settings, LogOut, Calculator,
+  Users, ArrowLeftRight, Receipt, BarChart3, Target, Activity, Settings, LogOut, Calculator, CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -12,6 +12,7 @@ const menuItems = [
   { label: "Metas", icon: Target, path: "/metas", color: "bg-chart-1/10 text-chart-1" },
   { label: "Análise", icon: Activity, path: "/analise-financeira", color: "bg-accent text-accent-foreground" },
   { label: "Calculadora", icon: Calculator, path: "/calculadora-investimentos", color: "bg-chart-2/10 text-chart-2" },
+  { label: "Cartões", icon: CreditCard, path: "/cartoes", color: "bg-chart-1/10 text-chart-1" },
   { label: "Configurações", icon: Settings, path: "/configuracoes", color: "bg-muted text-muted-foreground" },
 ];
 
