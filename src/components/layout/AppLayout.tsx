@@ -24,6 +24,7 @@ export default function AppLayout() {
             {!isMobile && <SidebarTrigger className="mr-3 sm:mr-4" />}
             <LogoVektor size="sm" textClassName="text-muted-foreground" />
           </header>
+          <MarketTicker />
           <main className="flex-1 overflow-x-hidden p-4 sm:p-6 pb-24 md:pb-6">
             <Outlet />
           </main>
