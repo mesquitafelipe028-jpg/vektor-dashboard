@@ -80,8 +80,13 @@ function KpiCards({
   const varPoup = taxaPoupanca - taxaPoupancaPrev;
 
   const cards = [
-    { title: "Faturamento MEI", value: formatCurrency(faturamentoMei), change: varFat, icon: Briefcase, prefix: "" },
-    { title: "Lucro MEI", value: formatCurrency(lucroMei), change: varLucro, icon: TrendingUp, prefix: "" },
+    ...(hasCnpj ? [
+      { title: "Faturamento MEI", value: formatCurrency(faturamentoMei), change: varFat, icon: Briefcase, prefix: "" },
+      { title: "Lucro MEI", value: formatCurrency(lucroMei), change: varLucro, icon: TrendingUp, prefix: "" },
+    ] : [
+      { title: "Receita Pessoal", value: formatCurrency(rendaPessoal), change: variation(rendaPessoal, rendaPessoalPrev), icon: Wallet, prefix: "" },
+      { title: "Despesa Pessoal", value: formatCurrency(despPessoal), change: variation(despPessoal, despPessoalPrev), icon: Receipt, prefix: "" },
+    ]),
     { title: "Taxa de Poupança", value: `${taxaPoupanca.toFixed(1)}%`, change: varPoup, icon: PiggyBank, prefix: "pp", isSavings: true },
   ];
 
