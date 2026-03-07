@@ -651,7 +651,7 @@ export default function Dashboard() {
               ) : (
                 latestReceitas.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
-                    <CategoryIcon category={r.forma_pagamento} type="receita" size={36} />
+                    <CategoryIcon category={r.descricao} type="receita" size={36} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{r.descricao}</p>
                       <p className="text-xs text-muted-foreground">{r.forma_pagamento ?? "—"} • {formatDate(r.data)}</p>
