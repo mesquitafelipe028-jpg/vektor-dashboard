@@ -194,9 +194,18 @@ export default function Dashboard() {
 
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
+  const hasCnpj = !!empresa?.cnpj;
+
   // Financial view filter
   type FinancialView = "tudo" | "pessoal" | "mei";
   const [financialView, setFinancialView] = useState<FinancialView>("tudo");
+
+  // Force "pessoal" view when no CNPJ
+  useEffect(() => {
+    if (!hasCnpj && financialView !== "pessoal") {
+      setFinancialView("pessoal");
+    }
+  }, [hasCnpj, financialView]);
 
   const filteredReceitas = useMemo(() => {
     if (financialView === "tudo") return receitas;
