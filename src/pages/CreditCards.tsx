@@ -495,20 +495,23 @@ export default function CreditCards() {
       {/* Card selector (if multiple) */}
       {cartoes.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {cartoes.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedCardId(c.id)}
-              className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-                activeCard?.id === c.id
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:border-primary/50"
-              }`}
-            >
-              <CreditCard className="h-4 w-4" />
-              {c.nome}
-            </button>
-          ))}
+          {cartoes.map((c) => {
+            const bankInfo = banks.find(b => b.id === (c as any).banco);
+            return (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCardId(c.id)}
+                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                  activeCard?.id === c.id
+                    ? "border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300"
+                    : "border-border bg-card text-muted-foreground hover:border-purple-500/50"
+                }`}
+              >
+                {bankInfo ? <BankLogo bankId={bankInfo.id} size={24} /> : <CreditCard className="h-4 w-4" />}
+                {c.nome}
+              </button>
+            );
+          })}
         </div>
       )}
 
