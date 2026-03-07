@@ -18,12 +18,28 @@ export function useStockQuotes() {
     if (!tickers.length) return;
 
     setIsLoading(true);
-    try {
+
+    const attempt = async () => {
       const { data, error } = await supabase.functions.invoke("fetch-quotes", {
         body: { tickers },
       });
-
       if (error) throw error;
+      return data;
+    };
+
+    try {
+      let data;
+      try {
+        data = await attempt();
+      } catch (firstErr: any) {
+        // Retry once for network errors
+        if (firstErr?.message?.includes("Failed to fetch") || firstErr?.name === "FunctionsFetchError") {
+          await new Promise((r) => setTimeout(r, 2000));
+          data = await attempt();
+        } else {
+          throw firstErr;
+        }
+      }
 
       if (data?.quotes) {
         setQuotes(data.quotes);
@@ -31,9 +47,12 @@ export function useStockQuotes() {
       }
     } catch (err: any) {
       console.error("Error fetching quotes:", err);
+      const isCors = err?.message?.includes("Failed to fetch") || err?.name === "FunctionsFetchError";
       toast({
         title: "Erro ao buscar cotações",
-        description: err?.message || "Verifique se a chave da BrAPI está configurada.",
+        description: isCors
+          ? "Não foi possível conectar à Edge Function. Verifique se ela está deployada e com Verify JWT desligado."
+          : err?.message || "Verifique se a chave da BrAPI está configurada.",
         variant: "destructive",
       });
     } finally {

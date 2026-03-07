@@ -36,7 +36,9 @@ export function MarketTicker() {
     return () => clearInterval(id);
   }, [fetchQuotes]);
 
-  const entries = Object.entries(quotes);
+  const entries = Object.entries(quotes).filter(
+    ([, q]) => q != null && typeof q.price === "number"
+  );
   const hasData = entries.length > 0;
 
   if (!isLoading && !hasData) return null;
