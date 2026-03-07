@@ -184,6 +184,7 @@ export default function CreditCards() {
         dia_fechamento: parseInt(cardForm.dia_fechamento) || 1,
         dia_vencimento: parseInt(cardForm.dia_vencimento) || 10,
         tipo_conta: cardForm.tipo_conta,
+        banco: cardForm.banco || null,
         user_id: user!.id,
       };
       if (!payload.nome) throw new Error("Nome obrigatório");
