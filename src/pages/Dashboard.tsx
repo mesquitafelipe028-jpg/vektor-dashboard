@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, lazy, Suspense } from "react";
+import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from "react";
 import { useQuery, useIsFetching } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,11 +41,13 @@ function KpiCards({
   despesas,
   currentMonth,
   now,
+  hasCnpj,
 }: {
   receitas: any[];
   despesas: any[];
   currentMonth: string;
   now: Date;
+  hasCnpj: boolean;
 }) {
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevKey = getMonthKey(prevDate);
@@ -78,8 +80,13 @@ function KpiCards({
   const varPoup = taxaPoupanca - taxaPoupancaPrev;
 
   const cards = [
-    { title: "Faturamento MEI", value: formatCurrency(faturamentoMei), change: varFat, icon: Briefcase, prefix: "" },
-    { title: "Lucro MEI", value: formatCurrency(lucroMei), change: varLucro, icon: TrendingUp, prefix: "" },
+    ...(hasCnpj ? [
+      { title: "Faturamento MEI", value: formatCurrency(faturamentoMei), change: varFat, icon: Briefcase, prefix: "" },
+      { title: "Lucro MEI", value: formatCurrency(lucroMei), change: varLucro, icon: TrendingUp, prefix: "" },
+    ] : [
+      { title: "Receita Pessoal", value: formatCurrency(rendaPessoal), change: variation(rendaPessoal, rendaPessoalPrev), icon: Wallet, prefix: "" },
+      { title: "Despesa Pessoal", value: formatCurrency(despPessoal), change: variation(despPessoal, despPessoalPrev), icon: Receipt, prefix: "" },
+    ]),
     { title: "Taxa de Poupança", value: `${taxaPoupanca.toFixed(1)}%`, change: varPoup, icon: PiggyBank, prefix: "pp", isSavings: true },
   ];
 
@@ -187,9 +194,18 @@ export default function Dashboard() {
 
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
+  const hasCnpj = !!empresa?.cnpj;
+
   // Financial view filter
   type FinancialView = "tudo" | "pessoal" | "mei";
   const [financialView, setFinancialView] = useState<FinancialView>("tudo");
+
+  // Force "pessoal" view when no CNPJ
+  useEffect(() => {
+    if (!hasCnpj && financialView !== "pessoal") {
+      setFinancialView("pessoal");
+    }
+  }, [hasCnpj, financialView]);
 
   const filteredReceitas = useMemo(() => {
     if (financialView === "tudo") return receitas;
@@ -287,15 +303,15 @@ export default function Dashboard() {
     type AlertItem = { id: string; icon: typeof AlertTriangle; message: string; type: "success" | "warning" | "danger" };
     const alerts: AlertItem[] = [];
 
-    // Alerta 1 — Limite MEI (thresholds: 70%, 90%)
-    if (percentLimit >= 90) {
+    // Alerta 1 — Limite MEI (thresholds: 70%, 90%) — only with CNPJ
+    if (hasCnpj && percentLimit >= 90) {
       alerts.push({ id: "mei-90", icon: ShieldAlert, type: "danger", message: `Atenção: você está próximo de ultrapassar o limite do MEI (${percentLimit.toFixed(1)}% utilizado).` });
-    } else if (percentLimit >= 70) {
+    } else if (hasCnpj && percentLimit >= 70) {
       alerts.push({ id: "mei-70", icon: AlertTriangle, type: "warning", message: `Você já utilizou ${percentLimit.toFixed(1)}% do limite anual do MEI.` });
     }
 
-    // Alerta 2 — DAS pendente ou próximo do vencimento
-    if (impostoPendente) {
+    // Alerta 2 — DAS pendente ou próximo do vencimento — only with CNPJ
+    if (hasCnpj && impostoPendente) {
       const vencDate = new Date(impostoPendente.vencimento + "T12:00:00");
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -326,7 +342,7 @@ export default function Dashboard() {
     }
 
     return alerts.filter((a) => !hiddenAlerts.has(a.id));
-  }, [percentLimit, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts]);
+  }, [percentLimit, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts, hasCnpj]);
 
   const alertStyles = {
     success: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-700 dark:text-emerald-400", iconColor: "text-emerald-600" },
@@ -367,14 +383,18 @@ export default function Dashboard() {
             <User className="h-3.5 w-3.5" />
             Pessoal
           </ToggleGroupItem>
-          <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-            <Briefcase className="h-3.5 w-3.5" />
-            MEI
-          </ToggleGroupItem>
-          <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-            <Layers className="h-3.5 w-3.5" />
-            Tudo
-          </ToggleGroupItem>
+          {hasCnpj && (
+            <>
+              <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+                <Briefcase className="h-3.5 w-3.5" />
+                MEI
+              </ToggleGroupItem>
+              <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+                <Layers className="h-3.5 w-3.5" />
+                Tudo
+              </ToggleGroupItem>
+            </>
+          )}
         </ToggleGroup>
       </div>
 
@@ -386,7 +406,7 @@ export default function Dashboard() {
           <Skeleton className="h-28 w-full rounded-lg" />
         </div>
       ) : (
-        <KpiCards receitas={receitas} despesas={despesas} currentMonth={currentMonth} now={now} />
+        <KpiCards receitas={receitas} despesas={despesas} currentMonth={currentMonth} now={now} hasCnpj={hasCnpj} />
       )}
 
       {/* Financial Alerts */}
@@ -419,8 +439,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Company Card */}
-      {empresa && (
+      {/* Company Card or CTA Banner */}
+      {hasCnpj ? (
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
           <CardContent className="p-5 flex items-center gap-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
@@ -442,6 +462,21 @@ export default function Dashboard() {
                 <span className="text-xs text-muted-foreground hidden sm:block max-w-48 truncate">{empresa.cnae_principal}</span>
               )}
             </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-dashed" onClick={() => navigate("/configuracoes")}>
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-heading font-semibold text-sm">Você é MEI?</p>
+              <p className="text-xs text-muted-foreground">Cadastre seu CNPJ nas Configurações para desbloquear o controle financeiro empresarial.</p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0">
+              Cadastrar CNPJ
+            </Button>
           </CardContent>
         </Card>
       )}
