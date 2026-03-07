@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft, Plus, DollarSign, Clock, Calendar, CheckCircle,
-  Pencil, Send, CreditCard, AlertTriangle,
+  Pencil, Send, CreditCard, AlertTriangle, CalendarClock,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatCurrency, formatDate } from "@/lib/mockData";
@@ -24,6 +25,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { z } from "zod";
 import type { ReceitaExtended } from "@/types/transactions";
+import { generateRecurringDates, frequenciaLabels } from "@/types/transactions";
+import { Badge } from "@/components/ui/badge";
 
 const clienteSchema = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório").max(100),
@@ -40,6 +43,7 @@ export default function ClientDetails() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [showAllProjections, setShowAllProjections] = useState(false);
   const [editForm, setEditForm] = useState({ nome: "", email: "", telefone: "" });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
@@ -88,6 +92,38 @@ export default function ClientDetails() {
     const pendentes = receitas.filter((r) => r.status === "pendente" || r.status === "atrasado");
     return { totalPago, totalAberto, ultimoPagamento, proximaCobranca, pendentes };
   }, [receitas]);
+
+  // --- Future projections for recurring charges ---
+  const projections = useMemo(() => {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const parentRecurrentes = receitas.filter(
+      (r) => r.tipo_transacao === "recorrente" && !r.transacao_pai_id && r.frequencia
+    );
+    if (parentRecurrentes.length === 0) return [];
+
+    const allProjections: { descricao: string; valor: number; data: string; frequencia: string }[] = [];
+
+    for (const r of parentRecurrentes) {
+      const dates = generateRecurringDates(r.data, r.frequencia!, r.data_fim, 12);
+      const existingDates = new Set(
+        receitas.filter((rx) => rx.transacao_pai_id === r.id || rx.id === r.id).map((rx) => rx.data)
+      );
+      for (const d of dates) {
+        if (d > hoje && !existingDates.has(d)) {
+          allProjections.push({
+            descricao: r.descricao,
+            valor: r.valor,
+            data: d,
+            frequencia: frequenciaLabels[r.frequencia!] || r.frequencia!,
+          });
+        }
+      }
+    }
+
+    return allProjections.sort((a, b) => a.data.localeCompare(b.data));
+  }, [receitas]);
+
+  const visibleProjections = showAllProjections ? projections : projections.slice(0, 6);
 
   // --- Mutations ---
   const updateCliente = useMutation({
@@ -273,6 +309,66 @@ export default function ClientDetails() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Future Projections — only shown if recurring charges exist */}
+      {projections.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              Próximas Cobranças
+              <Badge variant="secondary" className="ml-auto text-xs font-normal">
+                {projections.length} prevista{projections.length !== 1 ? "s" : ""}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              {visibleProjections.map((p, i) => (
+                <motion.div
+                  key={`${p.descricao}-${p.data}`}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="flex items-center justify-between rounded-lg border border-dashed border-border p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{p.descricao}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      <span>{formatDate(p.data)}</span>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-blue-500/30 text-blue-600 dark:text-blue-400">
+                        {p.frequencia}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-2 shrink-0">
+                    <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-300 border-0 text-[10px]">
+                      Prevista
+                    </Badge>
+                    <span className="font-heading font-bold text-sm text-muted-foreground">
+                      {formatCurrency(p.valor)}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+            {projections.length > 6 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-3 text-xs text-muted-foreground"
+                onClick={() => setShowAllProjections(!showAllProjections)}
+              >
+                {showAllProjections ? (
+                  <><ChevronUp className="h-3.5 w-3.5 mr-1" /> Mostrar menos</>
+                ) : (
+                  <><ChevronDown className="h-3.5 w-3.5 mr-1" /> Ver mais {projections.length - 6} cobranças</>
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Financial History */}
       <Card>
