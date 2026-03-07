@@ -41,11 +41,13 @@ function KpiCards({
   despesas,
   currentMonth,
   now,
+  hasCnpj,
 }: {
   receitas: any[];
   despesas: any[];
   currentMonth: string;
   now: Date;
+  hasCnpj: boolean;
 }) {
   const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevKey = getMonthKey(prevDate);
