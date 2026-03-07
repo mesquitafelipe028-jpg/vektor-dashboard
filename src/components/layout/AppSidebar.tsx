@@ -63,7 +63,7 @@ const menuGroups = [
   {
     label: "Investimentos",
     items: [
-      { title: "Investimentos", url: "/investimentos", icon: LineChart },
+      { title: "Simulador", url: "/calculadora-investimentos", icon: Calculator },
     ],
   },
   {
