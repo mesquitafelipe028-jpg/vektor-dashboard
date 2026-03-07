@@ -53,8 +53,12 @@ export default function Revenues() {
 
   useEffect(() => {
     if (searchParams.get("novo") === "true") {
+      const clienteParam = searchParams.get("cliente") || "";
+      setForm({ ...emptyForm, cliente_id: clienteParam });
+      setEditingId(null);
       setOpen(true);
       searchParams.delete("novo");
+      searchParams.delete("cliente");
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
