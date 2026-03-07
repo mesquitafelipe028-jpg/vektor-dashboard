@@ -22,6 +22,26 @@ import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
+import { useCategories, type CategoriaDB } from "@/hooks/useCategories";
+
+const colorNameToHsl: Record<string, string> = {
+  orange:  "hsl(25, 95%, 53%)",
+  violet:  "hsl(263, 70%, 50%)",
+  blue:    "hsl(217, 91%, 60%)",
+  rose:    "hsl(350, 89%, 60%)",
+  sky:     "hsl(199, 89%, 48%)",
+  pink:    "hsl(330, 81%, 60%)",
+  slate:   "hsl(215, 16%, 47%)",
+  indigo:  "hsl(239, 84%, 67%)",
+  cyan:    "hsl(188, 94%, 43%)",
+  fuchsia: "hsl(292, 84%, 61%)",
+  amber:   "hsl(38, 92%, 50%)",
+  red:     "hsl(0, 84%, 60%)",
+  purple:  "hsl(271, 91%, 65%)",
+  gray:    "hsl(220, 9%, 46%)",
+  emerald: "hsl(160, 84%, 39%)",
+  green:   "hsl(142, 71%, 45%)",
+};
 
 import { PiggyBank } from "lucide-react";
 
