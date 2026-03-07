@@ -570,30 +570,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Secondary Stats */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: "Faturamento do Mês", value: faturamentoMes, icon: TrendingUp, color: "text-primary" },
-            { label: "Despesas do Mês", value: despesasMesTotal, icon: TrendingDown, color: "text-destructive" },
-            { label: "Imposto MEI Pendente", value: impostoPendente?.valor ?? 0, icon: Receipt, color: "text-accent" },
-          ].map((s) => (
-            <Card key={s.label}>
-              <CardContent className="p-5">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{s.label}</span>
-                  <s.icon className={`h-5 w-5 ${s.color}`} />
-                </div>
-                <p className="font-heading text-2xl font-bold">{formatCurrency(s.value)}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
 
       {/* Financial Insights */}
       {!isLoading && insights.length > 0 && (
