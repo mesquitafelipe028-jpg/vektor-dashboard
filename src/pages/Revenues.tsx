@@ -311,7 +311,7 @@ export default function Revenues() {
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <CategoryIcon category={r.forma_pagamento} type="receita" size={28} />
+                        <CategoryIcon category={r.forma_pagamento ?? r.descricao} type="receita" size={28} />
                         <span className="font-medium">{r.descricao}</span>
                       </div>
                     </TableCell>
