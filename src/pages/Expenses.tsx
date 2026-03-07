@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingDown, Pencil, Trash2, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, expenseCategories, suggestCategory } from "@/lib/mockData";
+import { TransactionFormSheet, type TransactionFormData } from "@/components/transaction/TransactionFormSheet";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
@@ -29,20 +29,7 @@ const schema = z.object({
   categoria: z.string().optional(),
 });
 
-type DespesaForm = {
-  descricao: string;
-  valor: string;
-  data: string;
-  categoria: string;
-  tipo_conta: string;
-  tipo_transacao: TipoTransacao;
-  frequencia: string;
-  numero_parcelas: string;
-  data_inicio: string;
-  data_fim: string;
-};
-
-const emptyForm: DespesaForm = {
+const emptyForm: TransactionFormData = {
   descricao: "",
   valor: "",
   data: new Date().toISOString().slice(0, 10),
@@ -53,6 +40,7 @@ const emptyForm: DespesaForm = {
   numero_parcelas: "",
   data_inicio: new Date().toISOString().slice(0, 10),
   data_fim: "",
+  efetivada: false,
 };
 
 export default function Expenses() {
@@ -60,7 +48,7 @@ export default function Expenses() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<DespesaForm>(emptyForm);
+  const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Filters
@@ -121,13 +109,15 @@ export default function Expenses() {
       setErrors({});
 
       const tipoTransacao = form.tipo_transacao;
+      const status = form.efetivada
+        ? (tipoTransacao === "unica" ? "pago" : "pago")
+        : "pendente";
 
       // Parcelada: generate all installments
       if (tipoTransacao === "parcelada" && !editingId) {
-        const numParcelas = parseInt(form.numero_parcelas) || 1;
+        const numParcelas = parseInt(form.numero_parcelas || "1") || 1;
         const installments = generateInstallments(parsed.data.valor, numParcelas, parsed.data.data);
 
-        // Insert the parent first
         const { data: parent, error: parentErr } = await supabase.from("despesas").insert({
           descricao: parsed.data.descricao,
           valor: installments[0].valor,
@@ -142,7 +132,6 @@ export default function Expenses() {
         } as any).select("id").single();
         if (parentErr) throw parentErr;
 
-        // Insert remaining installments
         if (installments.length > 1) {
           const children = installments.slice(1).map((inst) => ({
             descricao: parsed.data.descricao,
@@ -177,7 +166,7 @@ export default function Expenses() {
           frequencia: freq,
           data_inicio: form.data_inicio || parsed.data.data,
           data_fim: form.data_fim || null,
-          status: "pendente",
+          status,
         } as any);
         if (error) throw error;
         return;
@@ -192,7 +181,7 @@ export default function Expenses() {
         tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
         tipo_transacao: tipoTransacao,
-        status: tipoTransacao === "unica" ? "pago" : "pendente",
+        status,
       };
       if (editingId) {
         const { error } = await supabase.from("despesas").update(payload).eq("id", editingId);
@@ -257,6 +246,7 @@ export default function Expenses() {
       numero_parcelas: d.numero_parcelas ? String(d.numero_parcelas) : "",
       data_inicio: d.data_inicio ?? "",
       data_fim: d.data_fim ?? "",
+      efetivada: d.status === "pago",
     });
     setOpen(true);
   };
@@ -454,174 +444,28 @@ export default function Expenses() {
         </CardContent>
       </Card>
 
-      {/* Form Dialog */}
-      <Dialog open={open} onOpenChange={(v) => { if (!v) closeDialog(); else setOpen(true); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-heading">
-              {editingId ? "Editar Despesa" : "Nova Despesa"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Transaction Type Selector */}
-            {!editingId && (
-              <div className="space-y-2">
-                <Label>Essa despesa é:</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { value: "unica" as const, label: "Única", desc: "Pagamento avulso" },
-                    { value: "recorrente" as const, label: "Recorrente", desc: "Se repete periodicamente" },
-                    { value: "parcelada" as const, label: "Parcelada", desc: "Dividida em parcelas" },
-                  ]).map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setForm({ ...form, tipo_transacao: opt.value })}
-                      className={`rounded-lg border-2 p-3 text-left transition-all ${
-                        form.tipo_transacao === opt.value
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/30"
-                      }`}
-                    >
-                      <p className="text-sm font-medium">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Descrição *</Label>
-              <Input
-                value={form.descricao}
-                onChange={(e) => {
-                  const desc = e.target.value;
-                  const updates: Partial<DespesaForm> = { descricao: desc };
-                  if (!editingId || !form.categoria) {
-                    const suggested = suggestCategory(desc);
-                    if (suggested) updates.categoria = suggested;
-                  }
-                  setForm((prev) => ({ ...prev, ...updates }));
-                }}
-                placeholder="Ex: Uber, Netflix, iFood..."
-                maxLength={200}
-              />
-              {errors.descricao && <p className="text-sm text-destructive">{errors.descricao}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Categoria {form.categoria && suggestCategory(form.descricao) === form.categoria && <Badge variant="secondary" className="ml-2 text-xs">Sugerida</Badge>}</Label>
-              <Select value={form.categoria} onValueChange={(v) => setForm({ ...form, categoria: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
-                <SelectContent>
-                  {expenseCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{form.tipo_transacao === "parcelada" ? "Valor Total (R$) *" : "Valor (R$) *"}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={form.valor}
-                  onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                  placeholder="0,00"
-                />
-                {errors.valor && <p className="text-sm text-destructive">{errors.valor}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>{form.tipo_transacao === "parcelada" ? "Data da 1ª Parcela *" : "Data *"}</Label>
-                <Input
-                  type="date"
-                  value={form.data}
-                  onChange={(e) => setForm({ ...form, data: e.target.value })}
-                />
-                {errors.data && <p className="text-sm text-destructive">{errors.data}</p>}
-              </div>
-            </div>
-
-            {/* Parcelada fields */}
-            {form.tipo_transacao === "parcelada" && !editingId && (
-              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm font-medium">Configuração do Parcelamento</p>
-                <div className="space-y-2">
-                  <Label>Número de Parcelas *</Label>
-                  <Input
-                    type="number"
-                    min="2"
-                    max="72"
-                    value={form.numero_parcelas}
-                    onChange={(e) => setForm({ ...form, numero_parcelas: e.target.value })}
-                    placeholder="Ex: 12"
-                  />
-                </div>
-                {form.valor && form.numero_parcelas && parseInt(form.numero_parcelas) > 1 && (
-                  <p className="text-xs text-muted-foreground">
-                    → {form.numero_parcelas}x de {formatCurrency(parseFloat(form.valor) / parseInt(form.numero_parcelas))}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Recorrente fields */}
-            {form.tipo_transacao === "recorrente" && !editingId && (
-              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm font-medium">Configuração da Recorrência</p>
-                <div className="space-y-2">
-                  <Label>Frequência *</Label>
-                  <Select value={form.frequencia} onValueChange={(v) => setForm({ ...form, frequencia: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="semanal">Semanal</SelectItem>
-                      <SelectItem value="quinzenal">Quinzenal</SelectItem>
-                      <SelectItem value="mensal">Mensal</SelectItem>
-                      <SelectItem value="anual">Anual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Data de Início</Label>
-                    <Input
-                      type="date"
-                      value={form.data_inicio}
-                      onChange={(e) => setForm({ ...form, data_inicio: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Data Final (opcional)</Label>
-                    <Input
-                      type="date"
-                      value={form.data_fim}
-                      onChange={(e) => setForm({ ...form, data_fim: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Tipo de Conta</Label>
-              <Select value={form.tipo_conta} onValueChange={(v) => setForm({ ...form, tipo_conta: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mei">MEI</SelectItem>
-                  <SelectItem value="pessoal">Pessoal</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={() => upsert.mutate()} disabled={upsert.isPending}>
-              {upsert.isPending ? "Salvando..." : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Form Sheet */}
+      <TransactionFormSheet
+        open={open}
+        onOpenChange={(v) => { if (!v) closeDialog(); else setOpen(true); }}
+        type="despesa"
+        form={form}
+        onFormChange={setForm}
+        onSave={() => upsert.mutate()}
+        isSaving={upsert.isPending}
+        isEditing={!!editingId}
+        errors={errors}
+        categories={expenseCategories}
+        suggestedCategory={suggestCategory(form.descricao)}
+        onDescriptionChange={(desc) => {
+          const updates: Partial<TransactionFormData> = { descricao: desc };
+          if (!editingId || !form.categoria) {
+            const suggested = suggestCategory(desc);
+            if (suggested) updates.categoria = suggested;
+          }
+          setForm((prev) => ({ ...prev, ...updates }));
+        }}
+      />
     </div>
   );
 }

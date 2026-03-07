@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingUp, Pencil, Trash2, Filter } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
+import { TransactionFormSheet, type TransactionFormData } from "@/components/transaction/TransactionFormSheet";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
@@ -28,20 +28,7 @@ const schema = z.object({
   cliente_id: z.string().optional(),
 });
 
-type ReceitaForm = {
-  descricao: string;
-  valor: string;
-  data: string;
-  forma_pagamento: string;
-  cliente_id: string;
-  tipo_conta: string;
-  tipo_transacao: TipoTransacao;
-  frequencia: string;
-  data_inicio: string;
-  data_fim: string;
-};
-
-const emptyForm: ReceitaForm = {
+const emptyForm: TransactionFormData = {
   descricao: "",
   valor: "",
   data: new Date().toISOString().slice(0, 10),
@@ -52,6 +39,7 @@ const emptyForm: ReceitaForm = {
   frequencia: "",
   data_inicio: new Date().toISOString().slice(0, 10),
   data_fim: "",
+  efetivada: false,
 };
 
 export default function Revenues() {
@@ -59,7 +47,7 @@ export default function Revenues() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<ReceitaForm>(emptyForm);
+  const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Filters
@@ -127,6 +115,7 @@ export default function Revenues() {
       setErrors({});
 
       const tipoTransacao = form.tipo_transacao;
+      const status = form.efetivada ? "recebido" : "pendente";
 
       // Recorrente: insert only 1 record (lazy generation)
       if (tipoTransacao === "recorrente" && !editingId) {
@@ -143,7 +132,7 @@ export default function Revenues() {
           frequencia: freq,
           data_inicio: form.data_inicio || parsed.data.data,
           data_fim: form.data_fim || null,
-          status: "pendente",
+          status,
         } as any);
         if (error) throw error;
         return;
@@ -159,7 +148,7 @@ export default function Revenues() {
         tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
         tipo_transacao: tipoTransacao,
-        status: tipoTransacao === "unica" ? "recebido" : "pendente",
+        status,
       };
       if (editingId) {
         const { error } = await supabase.from("receitas").update(payload).eq("id", editingId);
@@ -223,6 +212,7 @@ export default function Revenues() {
       frequencia: r.frequencia ?? "",
       data_inicio: r.data_inicio ?? "",
       data_fim: r.data_fim ?? "",
+      efetivada: r.status === "recebido",
     });
     setOpen(true);
   };
@@ -412,157 +402,19 @@ export default function Revenues() {
         </CardContent>
       </Card>
 
-      {/* Form Dialog */}
-      <Dialog open={open} onOpenChange={(v) => { if (!v) closeDialog(); else setOpen(true); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-heading">
-              {editingId ? "Editar Receita" : "Nova Receita"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Transaction Type Selector */}
-            {!editingId && (
-              <div className="space-y-2">
-                <Label>Essa receita é:</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {([
-                    { value: "unica" as const, label: "Única", desc: "Receita avulsa" },
-                    { value: "recorrente" as const, label: "Recorrente", desc: "Cliente fixo / mensalidade" },
-                  ]).map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setForm({ ...form, tipo_transacao: opt.value })}
-                      className={`rounded-lg border-2 p-3 text-left transition-all ${
-                        form.tipo_transacao === opt.value
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-muted-foreground/30"
-                      }`}
-                    >
-                      <p className="text-sm font-medium">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Cliente</Label>
-              <Select value={form.cliente_id} onValueChange={(v) => setForm({ ...form, cliente_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione um cliente (opcional)" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Descrição *</Label>
-              <Input
-                value={form.descricao}
-                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-                placeholder="Descrição da receita"
-                maxLength={200}
-              />
-              {errors.descricao && <p className="text-sm text-destructive">{errors.descricao}</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Valor (R$) *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={form.valor}
-                  onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                  placeholder="0,00"
-                />
-                {errors.valor && <p className="text-sm text-destructive">{errors.valor}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Data *</Label>
-                <Input
-                  type="date"
-                  value={form.data}
-                  onChange={(e) => setForm({ ...form, data: e.target.value })}
-                />
-                {errors.data && <p className="text-sm text-destructive">{errors.data}</p>}
-              </div>
-            </div>
-
-            {/* Recorrente fields */}
-            {form.tipo_transacao === "recorrente" && !editingId && (
-              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm font-medium">Configuração da Recorrência</p>
-                <div className="space-y-2">
-                  <Label>Frequência *</Label>
-                  <Select value={form.frequencia} onValueChange={(v) => setForm({ ...form, frequencia: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="semanal">Semanal</SelectItem>
-                      <SelectItem value="quinzenal">Quinzenal</SelectItem>
-                      <SelectItem value="mensal">Mensal</SelectItem>
-                      <SelectItem value="anual">Anual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Data de Início</Label>
-                    <Input
-                      type="date"
-                      value={form.data_inicio}
-                      onChange={(e) => setForm({ ...form, data_inicio: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Data Final (opcional)</Label>
-                    <Input
-                      type="date"
-                      value={form.data_fim}
-                      onChange={(e) => setForm({ ...form, data_fim: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Forma de Pagamento</Label>
-              <Select value={form.forma_pagamento} onValueChange={(v) => setForm({ ...form, forma_pagamento: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pix">Pix</SelectItem>
-                  <SelectItem value="Boleto">Boleto</SelectItem>
-                  <SelectItem value="Cartão">Cartão</SelectItem>
-                  <SelectItem value="Transferência">Transferência</SelectItem>
-                  <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tipo de Conta</Label>
-              <Select value={form.tipo_conta} onValueChange={(v) => setForm({ ...form, tipo_conta: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mei">MEI</SelectItem>
-                  <SelectItem value="pessoal">Pessoal</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={() => upsert.mutate()} disabled={upsert.isPending}>
-              {upsert.isPending ? "Salvando..." : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Form Sheet */}
+      <TransactionFormSheet
+        open={open}
+        onOpenChange={(v) => { if (!v) closeDialog(); else setOpen(true); }}
+        type="receita"
+        form={form}
+        onFormChange={setForm}
+        onSave={() => upsert.mutate()}
+        isSaving={upsert.isPending}
+        isEditing={!!editingId}
+        errors={errors}
+        clientes={clientes}
+      />
     </div>
   );
 }
