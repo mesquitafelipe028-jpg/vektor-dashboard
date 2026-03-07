@@ -56,8 +56,8 @@ function KpiCards({
   const prevKey = getMonthKey(prevDate);
 
   // MEI metrics
-  const faturamentoMei = receitas.filter((r) => r.tipo_conta === "mei" && r.data.startsWith(currentMonth)).reduce((s: number, r: any) => s + r.valor, 0);
-  const despesasMei = despesas.filter((d) => d.tipo_conta === "mei" && d.data.startsWith(currentMonth)).reduce((s: number, d: any) => s + d.valor, 0);
+  const faturamentoMei = receitas.filter((r: any) => r.tipo_conta === "mei" && r.data.startsWith(currentMonth) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
+  const despesasMei = despesas.filter((d: any) => d.tipo_conta === "mei" && d.data.startsWith(currentMonth) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
   const lucroMei = faturamentoMei - despesasMei;
 
   const faturamentoMeiPrev = receitas.filter((r) => r.tipo_conta === "mei" && r.data.startsWith(prevKey)).reduce((s: number, r: any) => s + r.valor, 0);
