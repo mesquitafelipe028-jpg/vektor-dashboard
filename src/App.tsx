@@ -26,6 +26,7 @@ const FinancialAnalysis = lazy(() => import("./pages/FinancialAnalysis"));
 const ClientDetails = lazy(() => import("./pages/ClientDetails"));
 const More = lazy(() => import("./pages/More"));
 const InvestmentCalculator = lazy(() => import("./pages/InvestmentCalculator"));
+const CreditCards = lazy(() => import("./pages/CreditCards"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
