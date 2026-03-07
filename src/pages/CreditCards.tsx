@@ -278,14 +278,14 @@ export default function CreditCards() {
         }).eq("id", existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("faturas_cartao").insert({
+        const { error } = await (supabase as any).from("faturas_cartao").insert({
           cartao_id: activeCard.id,
           mes_referencia: mesRef,
           valor_total: total,
           status: "paga",
           data_pagamento: new Date().toISOString().slice(0, 10),
           user_id: user!.id,
-        }) as any;
+        });
         if (error) throw error;
       }
 
