@@ -4,7 +4,7 @@ import { AppSidebar } from "./AppSidebar";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LogoVektor } from "@/components/branding/LogoVektor";
-import { MarketTicker } from "@/components/layout/MarketTicker";
+
 import { useRecurringGenerator } from "@/hooks/useRecurringGenerator";
 import { useAuth } from "@/contexts/AuthContext";
 
