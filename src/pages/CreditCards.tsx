@@ -813,6 +813,27 @@ function CardFormDialog({
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
+            <Label>Banco</Label>
+            <Select value={form.banco} onValueChange={(v) => {
+              const bank = banks.find(b => b.id === v);
+              setForm({ ...form, banco: v, nome: bank && !form.nome ? bank.name : form.nome });
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o banco" />
+              </SelectTrigger>
+              <SelectContent>
+                {banks.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    <div className="flex items-center gap-2">
+                      <BankLogo bankId={b.id} size={20} />
+                      <span>{b.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label>Nome do Cartão *</Label>
             <Input
               value={form.nome}
