@@ -406,7 +406,7 @@ export default function Dashboard() {
           <Skeleton className="h-28 w-full rounded-lg" />
         </div>
       ) : (
-        <KpiCards receitas={receitas} despesas={despesas} currentMonth={currentMonth} now={now} />
+        <KpiCards receitas={receitas} despesas={despesas} currentMonth={currentMonth} now={now} hasCnpj={hasCnpj} />
       )}
 
       {/* Financial Alerts */}
