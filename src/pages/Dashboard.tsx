@@ -100,6 +100,20 @@ export default function Dashboard() {
 
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
+  // Financial view filter
+  type FinancialView = "tudo" | "pessoal" | "mei";
+  const [financialView, setFinancialView] = useState<FinancialView>("tudo");
+
+  const filteredReceitas = useMemo(() => {
+    if (financialView === "tudo") return receitas;
+    return receitas.filter((r: any) => r.tipo_conta === financialView);
+  }, [receitas, financialView]);
+
+  const filteredDespesas = useMemo(() => {
+    if (financialView === "tudo") return despesas;
+    return despesas.filter((d: any) => d.tipo_conta === financialView);
+  }, [despesas, financialView]);
+
   const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
   const dismissAlert = useCallback((id: string) => {
     setHiddenAlerts((prev) => new Set(prev).add(id));
