@@ -342,7 +342,7 @@ export default function Dashboard() {
     }
 
     return alerts.filter((a) => !hiddenAlerts.has(a.id));
-  }, [percentLimit, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts]);
+  }, [percentLimit, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts, hasCnpj]);
 
   const alertStyles = {
     success: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-700 dark:text-emerald-400", iconColor: "text-emerald-600" },
