@@ -22,6 +22,26 @@ import { formatCurrency, formatDate } from "@/lib/mockData";
 import { useFinancialInsights } from "@/hooks/useFinancialInsights";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
+import { useCategories, type CategoriaDB } from "@/hooks/useCategories";
+
+const colorNameToHsl: Record<string, string> = {
+  orange:  "hsl(25, 95%, 53%)",
+  violet:  "hsl(263, 70%, 50%)",
+  blue:    "hsl(217, 91%, 60%)",
+  rose:    "hsl(350, 89%, 60%)",
+  sky:     "hsl(199, 89%, 48%)",
+  pink:    "hsl(330, 81%, 60%)",
+  slate:   "hsl(215, 16%, 47%)",
+  indigo:  "hsl(239, 84%, 67%)",
+  cyan:    "hsl(188, 94%, 43%)",
+  fuchsia: "hsl(292, 84%, 61%)",
+  amber:   "hsl(38, 92%, 50%)",
+  red:     "hsl(0, 84%, 60%)",
+  purple:  "hsl(271, 91%, 65%)",
+  gray:    "hsl(220, 9%, 46%)",
+  emerald: "hsl(160, 84%, 39%)",
+  green:   "hsl(142, 71%, 45%)",
+};
 
 import { PiggyBank } from "lucide-react";
 
@@ -263,6 +283,20 @@ export default function Dashboard() {
 
   const insights = useFinancialInsights(filteredReceitas, filteredDespesas);
 
+  const { categories: dbCategories } = useCategories("despesa");
+
+  // Flatten DB categories for color lookup
+  const catColorMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    dbCategories.forEach((c: CategoriaDB) => {
+      m[c.nome] = colorNameToHsl[c.cor] ?? "hsl(220, 9%, 46%)";
+      c.subcategorias?.forEach((sub) => {
+        m[sub.nome] = colorNameToHsl[sub.cor] ?? colorNameToHsl[c.cor] ?? "hsl(220, 9%, 46%)";
+      });
+    });
+    return m;
+  }, [dbCategories]);
+
   // Despesas por categoria (PieChart)
   const categoryData = useMemo(() => {
     const map: Record<string, number> = {};
@@ -271,9 +305,9 @@ export default function Dashboard() {
       map[cat] = (map[cat] || 0) + d.valor;
     });
     return Object.entries(map)
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value]) => ({ name, value, fill: catColorMap[name] ?? "hsl(220, 9%, 46%)" }))
       .sort((a, b) => b.value - a.value);
-  }, [despesasMes]);
+  }, [despesasMes, catColorMap]);
 
   // Monthly chart data (last 6 months)
   const monthlyData = Array.from({ length: 6 }, (_, i) => {
