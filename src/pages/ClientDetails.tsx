@@ -24,6 +24,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { z } from "zod";
 import type { ReceitaExtended } from "@/types/transactions";
+import { generateRecurringDates, frequenciaLabels } from "@/types/transactions";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronUp, CalendarClock } from "lucide-react";
 
 const clienteSchema = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório").max(100),
