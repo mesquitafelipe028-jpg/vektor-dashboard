@@ -49,8 +49,8 @@ interface Fatura {
   data_pagamento: string | null;
 }
 
-type CardForm = { nome: string; limite_total: string; dia_fechamento: string; dia_vencimento: string; tipo_conta: string };
-const emptyCardForm: CardForm = { nome: "", limite_total: "", dia_fechamento: "1", dia_vencimento: "10", tipo_conta: "pessoal" };
+type CardForm = { nome: string; limite_total: string; dia_fechamento: string; dia_vencimento: string; tipo_conta: string; banco: string };
+const emptyCardForm: CardForm = { nome: "", limite_total: "", dia_fechamento: "1", dia_vencimento: "10", tipo_conta: "pessoal", banco: "" };
 
 type CompraForm = { descricao: string; valor: string; data: string; categoria: string; cartao_id: string };
 const emptyCompraForm: CompraForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "", cartao_id: "" };
