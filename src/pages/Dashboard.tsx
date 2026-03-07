@@ -714,12 +714,19 @@ export default function Dashboard() {
               ) : latestDespesas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma despesa cadastrada.</p>
               ) : (
-                latestDespesas.map((d) => (
+                latestDespesas.map((d: any) => (
                   <div key={d.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
                     <CategoryIcon category={d.categoria} type="despesa" size={36} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{d.descricao}</p>
-                      <p className="text-xs text-muted-foreground">{d.categoria ?? "—"} • {formatDate(d.data)}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate">{d.descricao}</p>
+                        {d.tipo_transacao === "recorrente" && <Repeat className="h-3 w-3 text-amber-500 shrink-0" />}
+                        {d.tipo_transacao === "parcelada" && <CalendarIcon className="h-3 w-3 text-blue-500 shrink-0" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {d.categoria ?? "—"} • {formatDate(d.data)}
+                        {d.tipo_transacao === "parcelada" && d.parcela_atual && d.numero_parcelas && ` • ${d.parcela_atual}/${d.numero_parcelas}`}
+                      </p>
                     </div>
                     <span className={`text-sm font-bold shrink-0 ${transactionColors.despesa.text}`}>-{formatCurrency(d.valor)}</span>
                   </div>
