@@ -122,14 +122,14 @@ export default function Dashboard() {
   const now = new Date();
   const currentYear = now.getFullYear().toString();
   const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const receitasMes = receitas.filter((r) => r.data.startsWith(currentMonth));
-  const despesasMes = despesas.filter((d) => d.data.startsWith(currentMonth));
+  const receitasMes = filteredReceitas.filter((r) => r.data.startsWith(currentMonth));
+  const despesasMes = filteredDespesas.filter((d) => d.data.startsWith(currentMonth));
   const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
   const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
   const saldoMes = faturamentoMes - despesasMesTotal;
 
   const LIMITE_MEI = 81000;
-  const faturamentoAnual = receitas
+  const faturamentoAnual = filteredReceitas
     .filter((r) => r.data.startsWith(currentYear))
     .reduce((s, r) => s + r.valor, 0);
   const percentLimit = Math.min((faturamentoAnual / LIMITE_MEI) * 100, 100);
