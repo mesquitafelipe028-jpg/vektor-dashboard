@@ -186,7 +186,7 @@ function CategoryList({ tipo }: { tipo: "despesa" | "receita" }) {
               <span className="flex-1 text-sm font-medium text-foreground">{cat.nome}</span>
 
               {/* Actions */}
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 <button
                   type="button"
                   onClick={() => setEditModal({ open: true, parentId: cat.id })}
