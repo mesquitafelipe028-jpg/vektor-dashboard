@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus, MoreHorizontal,
+  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus, LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,7 +11,7 @@ const navItems = [
   { label: "Receitas", icon: TrendingUp, path: "/receitas" },
   { label: "Adicionar", icon: Plus, path: "", isFab: true },
   { label: "Despesas", icon: TrendingDown, path: "/despesas" },
-  { label: "Mais", icon: MoreHorizontal, path: "/mais" },
+  { label: "Investir", icon: LineChart, path: "/investimentos" },
 ];
 
 const quickActions = [

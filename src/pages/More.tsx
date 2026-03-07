@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, TrendingDown, ArrowLeftRight, Receipt, BarChart3,
-  Target, Activity, Settings, LogOut, Calculator, CreditCard, Users, Tag,
+  Target, Activity, Settings, LogOut, Calculator, CreditCard, Users, Tag, LineChart,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -29,6 +29,12 @@ const menuGroups = [
       { label: "Análise", icon: Activity, path: "/analise-financeira", color: "bg-accent text-accent-foreground" },
       { label: "Relatórios", icon: BarChart3, path: "/relatorios", color: "bg-chart-3/10 text-chart-3" },
       { label: "Calculadora", icon: Calculator, path: "/calculadora-investimentos", color: "bg-chart-2/10 text-chart-2" },
+    ],
+  },
+  {
+    label: "Investimentos",
+    items: [
+      { label: "Investimentos", icon: LineChart, path: "/investimentos", color: "bg-chart-2/10 text-chart-2" },
     ],
   },
   {
