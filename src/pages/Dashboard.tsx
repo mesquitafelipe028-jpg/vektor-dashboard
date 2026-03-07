@@ -651,14 +651,12 @@ export default function Dashboard() {
               ) : (
                 latestReceitas.map((r) => (
                   <div key={r.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                    </div>
+                    <CategoryIcon category={r.forma_pagamento} type="receita" size={36} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{r.descricao}</p>
                       <p className="text-xs text-muted-foreground">{r.forma_pagamento ?? "—"} • {formatDate(r.data)}</p>
                     </div>
-                    <span className="text-sm font-bold text-primary shrink-0">+{formatCurrency(r.valor)}</span>
+                    <span className={`text-sm font-bold shrink-0 ${transactionColors.receita.text}`}>+{formatCurrency(r.valor)}</span>
                   </div>
                 ))
               )}
