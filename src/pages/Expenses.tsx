@@ -15,9 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, expenseCategories, suggestCategory } from "@/lib/mockData";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
+import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { z } from "zod";
+import type { DespesaExtended, TipoTransacao, Frequencia } from "@/types/transactions";
+import { generateInstallments, generateRecurringDates } from "@/types/transactions";
 
 const schema = z.object({
   descricao: z.string().trim().min(1, "Descrição obrigatória").max(200),
@@ -26,8 +29,31 @@ const schema = z.object({
   categoria: z.string().optional(),
 });
 
-type DespesaForm = { descricao: string; valor: string; data: string; categoria: string; tipo_conta: string };
-const emptyForm: DespesaForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "", tipo_conta: "mei" };
+type DespesaForm = {
+  descricao: string;
+  valor: string;
+  data: string;
+  categoria: string;
+  tipo_conta: string;
+  tipo_transacao: TipoTransacao;
+  frequencia: string;
+  numero_parcelas: string;
+  data_inicio: string;
+  data_fim: string;
+};
+
+const emptyForm: DespesaForm = {
+  descricao: "",
+  valor: "",
+  data: new Date().toISOString().slice(0, 10),
+  categoria: "",
+  tipo_conta: "mei",
+  tipo_transacao: "unica",
+  frequencia: "",
+  numero_parcelas: "",
+  data_inicio: new Date().toISOString().slice(0, 10),
+  data_fim: "",
+};
 
 export default function Expenses() {
   const { user } = useAuth();
@@ -46,7 +72,7 @@ export default function Expenses() {
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as unknown as DespesaExtended[];
     },
     enabled: !!user,
   });
@@ -93,13 +119,108 @@ export default function Expenses() {
         throw new Error("validation");
       }
       setErrors({});
-      const payload = {
+
+      const tipoTransacao = form.tipo_transacao;
+
+      // Parcelada: generate all installments
+      if (tipoTransacao === "parcelada" && !editingId) {
+        const numParcelas = parseInt(form.numero_parcelas) || 1;
+        const installments = generateInstallments(parsed.data.valor, numParcelas, parsed.data.data);
+
+        // Insert the parent first
+        const { data: parent, error: parentErr } = await supabase.from("despesas").insert({
+          descricao: parsed.data.descricao,
+          valor: installments[0].valor,
+          data: installments[0].data,
+          categoria: parsed.data.categoria || null,
+          tipo_conta: form.tipo_conta || "mei",
+          user_id: user!.id,
+          tipo_transacao: "parcelada",
+          numero_parcelas: numParcelas,
+          parcela_atual: 1,
+          status: "pendente",
+        } as any).select("id").single();
+        if (parentErr) throw parentErr;
+
+        // Insert remaining installments
+        if (installments.length > 1) {
+          const children = installments.slice(1).map((inst) => ({
+            descricao: parsed.data.descricao,
+            valor: inst.valor,
+            data: inst.data,
+            categoria: parsed.data.categoria || null,
+            tipo_conta: form.tipo_conta || "mei",
+            user_id: user!.id,
+            tipo_transacao: "parcelada",
+            numero_parcelas: numParcelas,
+            parcela_atual: inst.parcela,
+            transacao_pai_id: parent.id,
+            status: "pendente",
+          } as any));
+          const { error } = await supabase.from("despesas").insert(children);
+          if (error) throw error;
+        }
+        return;
+      }
+
+      // Recorrente: generate future entries
+      if (tipoTransacao === "recorrente" && !editingId) {
+        const freq = form.frequencia as Frequencia;
+        const dates = generateRecurringDates(
+          form.data_inicio || parsed.data.data,
+          freq,
+          form.data_fim || null,
+          12
+        );
+
+        // Insert the parent
+        const { data: parent, error: parentErr } = await supabase.from("despesas").insert({
+          descricao: parsed.data.descricao,
+          valor: parsed.data.valor,
+          data: dates[0],
+          categoria: parsed.data.categoria || null,
+          tipo_conta: form.tipo_conta || "mei",
+          user_id: user!.id,
+          tipo_transacao: "recorrente",
+          frequencia: freq,
+          data_inicio: form.data_inicio || parsed.data.data,
+          data_fim: form.data_fim || null,
+          status: "pendente",
+        } as any).select("id").single();
+        if (parentErr) throw parentErr;
+
+        // Insert future occurrences
+        if (dates.length > 1) {
+          const children = dates.slice(1).map((d) => ({
+            descricao: parsed.data.descricao,
+            valor: parsed.data.valor,
+            data: d,
+            categoria: parsed.data.categoria || null,
+            tipo_conta: form.tipo_conta || "mei",
+            user_id: user!.id,
+            tipo_transacao: "recorrente",
+            frequencia: freq,
+            transacao_pai_id: parent.id,
+            data_inicio: form.data_inicio || parsed.data.data,
+            data_fim: form.data_fim || null,
+            status: "pendente",
+          } as any));
+          const { error } = await supabase.from("despesas").insert(children);
+          if (error) throw error;
+        }
+        return;
+      }
+
+      // Única or edit
+      const payload: any = {
         descricao: parsed.data.descricao,
         valor: parsed.data.valor,
         data: parsed.data.data,
         categoria: parsed.data.categoria || null,
         tipo_conta: form.tipo_conta || "mei",
         user_id: user!.id,
+        tipo_transacao: tipoTransacao,
+        status: tipoTransacao === "unica" ? "pago" : "pendente",
       };
       if (editingId) {
         const { error } = await supabase.from("despesas").update(payload).eq("id", editingId);
@@ -123,12 +244,25 @@ export default function Expenses() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("despesas").delete().eq("id", id);
       if (error) throw error;
+      // Also delete children
+      await (supabase.from("despesas") as any).delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["despesas"] });
       toast.success("Despesa excluída!");
     },
     onError: () => toast.error("Erro ao excluir despesa."),
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("despesas").update({ status } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["despesas"] });
+      toast.success("Status atualizado!");
+    },
   });
 
   const closeDialog = () => {
@@ -138,9 +272,20 @@ export default function Expenses() {
     setErrors({});
   };
 
-  const openEdit = (d: (typeof despesas)[0]) => {
+  const openEdit = (d: DespesaExtended) => {
     setEditingId(d.id);
-    setForm({ descricao: d.descricao, valor: String(d.valor), data: d.data, categoria: d.categoria ?? "", tipo_conta: (d as any).tipo_conta ?? "mei" });
+    setForm({
+      descricao: d.descricao,
+      valor: String(d.valor),
+      data: d.data,
+      categoria: d.categoria ?? "",
+      tipo_conta: d.tipo_conta ?? "mei",
+      tipo_transacao: d.tipo_transacao || "unica",
+      frequencia: d.frequencia ?? "",
+      numero_parcelas: d.numero_parcelas ? String(d.numero_parcelas) : "",
+      data_inicio: d.data_inicio ?? "",
+      data_fim: d.data_fim ?? "",
+    });
     setOpen(true);
   };
 
@@ -205,31 +350,20 @@ export default function Expenses() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Mês</Label>
-              <Input
-                type="month"
-                value={filterMonth}
-                onChange={(e) => setFilterMonth(e.target.value)}
-                className="w-44"
-              />
+              <Input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-44" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Categoria</Label>
               <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
+                <SelectTrigger className="w-48"><SelectValue placeholder="Todas" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {expenseCategories.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
+                  {expenseCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Limpar filtros
-              </Button>
+              <Button variant="ghost" size="sm" onClick={clearFilters}>Limpar filtros</Button>
             )}
           </div>
         </CardContent>
@@ -255,6 +389,8 @@ export default function Expenses() {
                 <TableRow>
                   <TableHead>Descrição</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -276,6 +412,33 @@ export default function Expenses() {
                       </div>
                     </TableCell>
                     <TableCell>{d.categoria ?? "—"}</TableCell>
+                    <TableCell>
+                      <TransactionTypeBadge
+                        tipo={d.tipo_transacao || "unica"}
+                        parcela_atual={d.parcela_atual}
+                        numero_parcelas={d.numero_parcelas}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {(d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") && (
+                        <Select
+                          value={d.status || "pendente"}
+                          onValueChange={(v) => updateStatus.mutate({ id: d.id, status: v })}
+                        >
+                          <SelectTrigger className="h-7 w-28 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente">Pendente</SelectItem>
+                            <SelectItem value="pago">Pago</SelectItem>
+                            <SelectItem value="atrasado">Atrasado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {(!d.tipo_transacao || d.tipo_transacao === "unica") && (
+                        <StatusBadge status={d.status || "pago"} type="despesa" />
+                      )}
+                    </TableCell>
                     <TableCell>{formatDate(d.data)}</TableCell>
                     <TableCell className={`text-right font-semibold ${transactionColors.despesa.text}`}>
                       -{formatCurrency(d.valor)}
@@ -295,6 +458,8 @@ export default function Expenses() {
                             <AlertDialogTitle>Excluir despesa?</AlertDialogTitle>
                             <AlertDialogDescription>
                               Essa ação não pode ser desfeita. A despesa "{d.descricao}" será removida permanentemente.
+                              {(d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") && !d.transacao_pai_id &&
+                                " Todas as ocorrências futuras também serão excluídas."}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -319,13 +484,41 @@ export default function Expenses() {
 
       {/* Form Dialog */}
       <Dialog open={open} onOpenChange={(v) => { if (!v) closeDialog(); else setOpen(true); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading">
               {editingId ? "Editar Despesa" : "Nova Despesa"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Transaction Type Selector */}
+            {!editingId && (
+              <div className="space-y-2">
+                <Label>Essa despesa é:</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: "unica" as const, label: "Única", desc: "Pagamento avulso" },
+                    { value: "recorrente" as const, label: "Recorrente", desc: "Se repete periodicamente" },
+                    { value: "parcelada" as const, label: "Parcelada", desc: "Dividida em parcelas" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, tipo_transacao: opt.value })}
+                      className={`rounded-lg border-2 p-3 text-left transition-all ${
+                        form.tipo_transacao === opt.value
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/30"
+                      }`}
+                    >
+                      <p className="text-sm font-medium">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Descrição *</Label>
               <Input
@@ -344,20 +537,20 @@ export default function Expenses() {
               />
               {errors.descricao && <p className="text-sm text-destructive">{errors.descricao}</p>}
             </div>
+
             <div className="space-y-2">
-              <Label>Categoria {form.categoria && suggestCategory(form.descricao) === form.categoria && <Badge variant="secondary" className="ml-2 text-xs">Sugerida automaticamente</Badge>}</Label>
+              <Label>Categoria {form.categoria && suggestCategory(form.descricao) === form.categoria && <Badge variant="secondary" className="ml-2 text-xs">Sugerida</Badge>}</Label>
               <Select value={form.categoria} onValueChange={(v) => setForm({ ...form, categoria: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
                 <SelectContent>
-                  {expenseCategories.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
+                  {expenseCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Valor (R$) *</Label>
+                <Label>{form.tipo_transacao === "parcelada" ? "Valor Total (R$) *" : "Valor (R$) *"}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -368,7 +561,7 @@ export default function Expenses() {
                 {errors.valor && <p className="text-sm text-destructive">{errors.valor}</p>}
               </div>
               <div className="space-y-2">
-                <Label>Data *</Label>
+                <Label>{form.tipo_transacao === "parcelada" ? "Data da 1ª Parcela *" : "Data *"}</Label>
                 <Input
                   type="date"
                   value={form.data}
@@ -377,6 +570,67 @@ export default function Expenses() {
                 {errors.data && <p className="text-sm text-destructive">{errors.data}</p>}
               </div>
             </div>
+
+            {/* Parcelada fields */}
+            {form.tipo_transacao === "parcelada" && !editingId && (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                <p className="text-sm font-medium">Configuração do Parcelamento</p>
+                <div className="space-y-2">
+                  <Label>Número de Parcelas *</Label>
+                  <Input
+                    type="number"
+                    min="2"
+                    max="72"
+                    value={form.numero_parcelas}
+                    onChange={(e) => setForm({ ...form, numero_parcelas: e.target.value })}
+                    placeholder="Ex: 12"
+                  />
+                </div>
+                {form.valor && form.numero_parcelas && parseInt(form.numero_parcelas) > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    → {form.numero_parcelas}x de {formatCurrency(parseFloat(form.valor) / parseInt(form.numero_parcelas))}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Recorrente fields */}
+            {form.tipo_transacao === "recorrente" && !editingId && (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                <p className="text-sm font-medium">Configuração da Recorrência</p>
+                <div className="space-y-2">
+                  <Label>Frequência *</Label>
+                  <Select value={form.frequencia} onValueChange={(v) => setForm({ ...form, frequencia: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="semanal">Semanal</SelectItem>
+                      <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                      <SelectItem value="mensal">Mensal</SelectItem>
+                      <SelectItem value="anual">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Data de Início</Label>
+                    <Input
+                      type="date"
+                      value={form.data_inicio}
+                      onChange={(e) => setForm({ ...form, data_inicio: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data Final (opcional)</Label>
+                    <Input
+                      type="date"
+                      value={form.data_fim}
+                      onChange={(e) => setForm({ ...form, data_fim: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Tipo de Conta</Label>
               <Select value={form.tipo_conta} onValueChange={(v) => setForm({ ...form, tipo_conta: v })}>

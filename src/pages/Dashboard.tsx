@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from "react";
+import { Repeat, Calendar as CalendarIcon } from "lucide-react";
 import { useQuery, useIsFetching } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -331,6 +332,44 @@ export default function Dashboard() {
       }
     }
 
+    // Alertas de cobranças recorrentes/parceladas
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const twoDaysLater = new Date();
+    twoDaysLater.setDate(twoDaysLater.getDate() + 2);
+    const twoDaysStr = twoDaysLater.toISOString().slice(0, 10);
+
+    // Receitas pendentes (cobranças)
+    const receitasPendentes = receitas.filter((r: any) => 
+      r.tipo_transacao === "recorrente" && r.status === "pendente"
+    );
+    const receitasVencidas = receitasPendentes.filter((r: any) => r.data < todayStr);
+    const receitasHoje = receitasPendentes.filter((r: any) => r.data === todayStr);
+    const receitasProximas = receitasPendentes.filter((r: any) => r.data > todayStr && r.data <= twoDaysStr);
+
+    if (receitasVencidas.length > 0) {
+      alerts.push({ id: "rec-vencidas", icon: ShieldAlert, type: "danger", message: `${receitasVencidas.length} cobrança${receitasVencidas.length > 1 ? "s" : ""} vencida${receitasVencidas.length > 1 ? "s" : ""} (${formatCurrency(receitasVencidas.reduce((s: number, r: any) => s + r.valor, 0))}).` });
+    }
+    if (receitasHoje.length > 0) {
+      alerts.push({ id: "rec-hoje", icon: Clock, type: "warning", message: `${receitasHoje.length} cobrança${receitasHoje.length > 1 ? "s" : ""} vence${receitasHoje.length > 1 ? "m" : ""} hoje (${formatCurrency(receitasHoje.reduce((s: number, r: any) => s + r.valor, 0))}).` });
+    }
+    if (receitasProximas.length > 0) {
+      alerts.push({ id: "rec-proximas", icon: Bell, type: "warning", message: `${receitasProximas.length} cobrança${receitasProximas.length > 1 ? "s" : ""} nos próximos 2 dias.` });
+    }
+
+    // Despesas pendentes
+    const despesasPendentes = despesas.filter((d: any) =>
+      (d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") && d.status === "pendente"
+    );
+    const despesasVencidas = despesasPendentes.filter((d: any) => d.data < todayStr);
+    const despesasHoje = despesasPendentes.filter((d: any) => d.data === todayStr);
+
+    if (despesasVencidas.length > 0) {
+      alerts.push({ id: "desp-vencidas", icon: ShieldAlert, type: "danger", message: `${despesasVencidas.length} despesa${despesasVencidas.length > 1 ? "s" : ""} pendente${despesasVencidas.length > 1 ? "s" : ""} vencida${despesasVencidas.length > 1 ? "s" : ""} (${formatCurrency(despesasVencidas.reduce((s: number, d: any) => s + d.valor, 0))}).` });
+    }
+    if (despesasHoje.length > 0) {
+      alerts.push({ id: "desp-hoje", icon: Clock, type: "warning", message: `${despesasHoje.length} despesa${despesasHoje.length > 1 ? "s" : ""} vence${despesasHoje.length > 1 ? "m" : ""} hoje.` });
+    }
+
     // Alerta 3 & 4 — Variação de faturamento
     if (prevMonth.rec > 0 && faturamentoMes > 0) {
       const variation = ((faturamentoMes - prevMonth.rec) / prevMonth.rec) * 100;
@@ -344,7 +383,7 @@ export default function Dashboard() {
     }
 
     return alerts.filter((a) => !hiddenAlerts.has(a.id));
-  }, [percentLimit, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts, hasCnpj]);
+  }, [percentLimit, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts, hasCnpj, receitas, despesas]);
 
   const alertStyles = {
     success: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-700 dark:text-emerald-400", iconColor: "text-emerald-600" },
@@ -649,11 +688,14 @@ export default function Dashboard() {
               ) : latestReceitas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma receita cadastrada.</p>
               ) : (
-                latestReceitas.map((r) => (
+                latestReceitas.map((r: any) => (
                   <div key={r.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
                     <CategoryIcon category={r.descricao} type="receita" size={36} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{r.descricao}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate">{r.descricao}</p>
+                        {r.tipo_transacao === "recorrente" && <Repeat className="h-3 w-3 text-amber-500 shrink-0" />}
+                      </div>
                       <p className="text-xs text-muted-foreground">{r.forma_pagamento ?? "—"} • {formatDate(r.data)}</p>
                     </div>
                     <span className={`text-sm font-bold shrink-0 ${transactionColors.receita.text}`}>+{formatCurrency(r.valor)}</span>
@@ -672,12 +714,19 @@ export default function Dashboard() {
               ) : latestDespesas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma despesa cadastrada.</p>
               ) : (
-                latestDespesas.map((d) => (
+                latestDespesas.map((d: any) => (
                   <div key={d.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
                     <CategoryIcon category={d.categoria} type="despesa" size={36} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{d.descricao}</p>
-                      <p className="text-xs text-muted-foreground">{d.categoria ?? "—"} • {formatDate(d.data)}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate">{d.descricao}</p>
+                        {d.tipo_transacao === "recorrente" && <Repeat className="h-3 w-3 text-amber-500 shrink-0" />}
+                        {d.tipo_transacao === "parcelada" && <CalendarIcon className="h-3 w-3 text-blue-500 shrink-0" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {d.categoria ?? "—"} • {formatDate(d.data)}
+                        {d.tipo_transacao === "parcelada" && d.parcela_atual && d.numero_parcelas && ` • ${d.parcela_atual}/${d.numero_parcelas}`}
+                      </p>
                     </div>
                     <span className={`text-sm font-bold shrink-0 ${transactionColors.despesa.text}`}>-{formatCurrency(d.valor)}</span>
                   </div>
