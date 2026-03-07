@@ -56,8 +56,8 @@ export default function DashboardCharts({ monthlyData, categoryData }: Dashboard
                     nameKey="name"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
-                    {categoryData.map((_, idx) => (
-                      <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                    {categoryData.map((item, idx) => (
+                      <Cell key={idx} fill={item.fill || FALLBACK_COLOR} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(v: number) => formatCurrency(v)} />
