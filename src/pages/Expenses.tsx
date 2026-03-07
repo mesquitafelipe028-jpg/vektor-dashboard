@@ -459,6 +459,7 @@ export default function Expenses() {
         isEditing={!!editingId}
         errors={errors}
         categories={expenseCategories}
+        customCategories={customCategories.length > 0 ? customCategories : undefined}
         suggestedCategory={suggestCategory(form.descricao)}
         onDescriptionChange={(desc) => {
           const updates: Partial<TransactionFormData> = { descricao: desc };

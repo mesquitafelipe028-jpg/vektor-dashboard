@@ -418,6 +418,7 @@ export default function Revenues() {
         isEditing={!!editingId}
         errors={errors}
         clientes={clientes}
+        customCategories={customCategories.length > 0 ? customCategories : undefined}
       />
     </div>
   );
