@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, TrendingDown, Pencil, Trash2, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, expenseCategories, suggestCategory } from "@/lib/mockData";
+import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
 import { TransactionFormSheet, type TransactionFormData } from "@/components/transaction/TransactionFormSheet";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
