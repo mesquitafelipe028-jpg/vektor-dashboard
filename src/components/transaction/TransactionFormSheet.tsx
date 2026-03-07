@@ -162,6 +162,7 @@ export function TransactionFormSheet({
   categories,
   suggestedCategory,
   onDescriptionChange,
+  customCategories,
 }: TransactionFormSheetProps) {
   const isMobile = useIsMobile();
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
