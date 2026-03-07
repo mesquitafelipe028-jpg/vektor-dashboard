@@ -28,20 +28,7 @@ const schema = z.object({
   cliente_id: z.string().optional(),
 });
 
-type ReceitaForm = {
-  descricao: string;
-  valor: string;
-  data: string;
-  forma_pagamento: string;
-  cliente_id: string;
-  tipo_conta: string;
-  tipo_transacao: TipoTransacao;
-  frequencia: string;
-  data_inicio: string;
-  data_fim: string;
-};
-
-const emptyForm: ReceitaForm = {
+const emptyForm: TransactionFormData = {
   descricao: "",
   valor: "",
   data: new Date().toISOString().slice(0, 10),
@@ -52,6 +39,7 @@ const emptyForm: ReceitaForm = {
   frequencia: "",
   data_inicio: new Date().toISOString().slice(0, 10),
   data_fim: "",
+  efetivada: false,
 };
 
 export default function Revenues() {
