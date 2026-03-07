@@ -688,11 +688,14 @@ export default function Dashboard() {
               ) : latestReceitas.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma receita cadastrada.</p>
               ) : (
-                latestReceitas.map((r) => (
+                latestReceitas.map((r: any) => (
                   <div key={r.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
                     <CategoryIcon category={r.descricao} type="receita" size={36} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{r.descricao}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium truncate">{r.descricao}</p>
+                        {r.tipo_transacao === "recorrente" && <Repeat className="h-3 w-3 text-amber-500 shrink-0" />}
+                      </div>
                       <p className="text-xs text-muted-foreground">{r.forma_pagamento ?? "—"} • {formatDate(r.data)}</p>
                     </div>
                     <span className={`text-sm font-bold shrink-0 ${transactionColors.receita.text}`}>+{formatCurrency(r.valor)}</span>
