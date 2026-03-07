@@ -155,7 +155,7 @@ export default function Dashboard() {
     critical: { label: "Crítico", icon: ShieldAlert, color: "text-red-600", bg: "bg-red-500/10", border: "border-red-500/30" },
   }[healthStatus];
 
-  const insights = useFinancialInsights(receitas, despesas);
+  const insights = useFinancialInsights(filteredReceitas, filteredDespesas);
 
   // Despesas por categoria (PieChart)
   const categoryData = useMemo(() => {
