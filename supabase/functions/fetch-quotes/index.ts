@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -28,65 +28,90 @@ serve(async (req) => {
       );
     }
 
-    // Separate crypto tickers from regular tickers
-    const cryptoTickers: string[] = [];
-    const regularTickers: string[] = [];
-
+    // Crypto map
     const CRYPTO_MAP: Record<string, string> = {
-      bitcoin: "BTC",
-      ethereum: "ETH",
-      solana: "SOL",
-      cardano: "ADA",
-      dogecoin: "DOGE",
-      bnb: "BNB",
-      xrp: "XRP",
-      polkadot: "DOT",
+      bitcoin: "BTC", ethereum: "ETH", solana: "SOL", cardano: "ADA",
+      dogecoin: "DOGE", bnb: "BNB", xrp: "XRP", polkadot: "DOT",
     };
+    const CRYPTO_IDS = new Set(Object.keys(CRYPTO_MAP));
 
-    const CRYPTO_REVERSE: Record<string, string> = {};
-    Object.entries(CRYPTO_MAP).forEach(([k, v]) => {
-      CRYPTO_REVERSE[v.toLowerCase()] = k;
-      CRYPTO_REVERSE[k.toLowerCase()] = k;
-    });
+    // Currency tickers use format "USD-BRL", "EUR-BRL"
+    const CURRENCY_REGEX = /^[A-Z]{3}-[A-Z]{3}$/;
+
+    const cryptoTickers: string[] = [];
+    const currencyTickers: string[] = [];
+    const stockTickers: string[] = [];
 
     tickers.forEach((t: string) => {
       const lower = t.toLowerCase();
-      if (CRYPTO_REVERSE[lower]) {
+      if (CRYPTO_IDS.has(lower)) {
         cryptoTickers.push(lower);
+      } else if (CURRENCY_REGEX.test(t)) {
+        currencyTickers.push(t);
       } else {
-        regularTickers.push(t.toUpperCase());
+        stockTickers.push(t);
       }
     });
 
     const results: Record<string, { price: number; change: number; name: string } | null> = {};
 
-    // Fetch regular tickers from BrAPI (batch up to 20)
-    if (regularTickers.length > 0) {
-      const tickerStr = regularTickers.join(",");
+    // 1) Stocks & FIIs via /api/quote
+    if (stockTickers.length > 0) {
+      const tickerStr = stockTickers.join(",");
       const url = `https://brapi.dev/api/quote/${tickerStr}?token=${BRAPI_TOKEN}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.results) {
-          for (const item of data.results) {
-            results[item.symbol] = {
-              price: item.regularMarketPrice ?? 0,
-              change: item.regularMarketChangePercent ?? 0,
-              name: item.longName || item.shortName || item.symbol,
-            };
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.results) {
+            for (const item of data.results) {
+              results[item.symbol] = {
+                price: item.regularMarketPrice ?? 0,
+                change: item.regularMarketChangePercent ?? 0,
+                name: item.longName || item.shortName || item.symbol,
+              };
+            }
           }
+        } else {
+          console.error("BrAPI stocks error:", res.status, await res.text());
         }
-      } else {
-        console.error("BrAPI error:", res.status, await res.text());
+      } catch (e) {
+        console.error("Stocks fetch error:", e);
       }
     }
 
-    // Fetch crypto from BrAPI crypto endpoint
+    // 2) Currencies via /api/v2/currency
+    if (currencyTickers.length > 0) {
+      for (const pair of currencyTickers) {
+        try {
+          const url = `https://brapi.dev/api/v2/currency?currency=${pair}&token=${BRAPI_TOKEN}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.currency && data.currency.length > 0) {
+              const c = data.currency[0];
+              const price = parseFloat(c.bidPrice) || 0;
+              const pctChange = parseFloat(c.bidVariation) || 0;
+              results[pair] = {
+                price,
+                change: pctChange,
+                name: c.name || pair,
+              };
+            }
+          } else {
+            console.error(`Currency error for ${pair}:`, res.status);
+          }
+        } catch (e) {
+          console.error(`Currency fetch error for ${pair}:`, e);
+        }
+      }
+    }
+
+    // 3) Crypto via /api/v2/crypto
     if (cryptoTickers.length > 0) {
       for (const ct of cryptoTickers) {
-        const coinId = CRYPTO_REVERSE[ct] || ct;
         try {
-          const url = `https://brapi.dev/api/v2/crypto?coin=${coinId}&currency=BRL&token=${BRAPI_TOKEN}`;
+          const url = `https://brapi.dev/api/v2/crypto?coin=${ct}&currency=BRL&token=${BRAPI_TOKEN}`;
           const res = await fetch(url);
           if (res.ok) {
             const data = await res.json();
@@ -95,12 +120,12 @@ serve(async (req) => {
               results[ct] = {
                 price: coin.regularMarketPrice ?? 0,
                 change: coin.regularMarketChangePercent ?? 0,
-                name: coin.coinName || coinId,
+                name: coin.coinName || ct,
               };
             }
           }
         } catch (e) {
-          console.error(`Crypto fetch error for ${coinId}:`, e);
+          console.error(`Crypto fetch error for ${ct}:`, e);
         }
       }
     }
