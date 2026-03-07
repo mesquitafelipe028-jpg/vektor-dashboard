@@ -185,7 +185,7 @@ export function TransactionFormSheet({
     : type === "receita" ? "Nova Receita" : "Nova Despesa";
 
   const formContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <button type="button" onClick={() => onOpenChange(false)} className="p-1">
@@ -203,7 +203,7 @@ export function TransactionFormSheet({
       </div>
 
       {/* Form Fields */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0 pb-[env(safe-area-inset-bottom)]">
         {/* Descrição */}
         <div className="px-4 py-3.5 flex items-center gap-3">
           <AlignLeft className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -501,7 +501,7 @@ export function TransactionFormSheet({
   if (isMobile) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="h-[92vh] p-0 rounded-t-2xl">
+        <SheetContent side="bottom" className="h-[92vh] p-0 rounded-t-2xl overflow-hidden flex flex-col">
           <SheetHeader className="sr-only">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
