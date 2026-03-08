@@ -119,7 +119,21 @@
 
 /* Garantir scroll interno em modais Radix com scroll lock ativo */
 [data-scroll-locked] .overflow-y-auto,
-[data-scroll-locked] .overscroll-contain {
+[data-scroll-locked] .overscroll-contain,
+[data-scroll-locked] [data-radix-scroll-area-viewport] {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+
+/* Prevenir que Radix scroll-lock bloqueie scroll interno de modais */
+[data-scroll-locked] [role="dialog"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+
+/* Select content touch-safe */
+[data-radix-popper-content-wrapper] {
+  touch-action: pan-y;
 }
