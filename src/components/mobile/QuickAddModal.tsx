@@ -140,7 +140,7 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle className="font-heading">Registro Rápido</DialogTitle>
         </DialogHeader>

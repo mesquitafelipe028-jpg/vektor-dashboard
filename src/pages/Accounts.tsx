@@ -128,7 +128,7 @@ export default function Accounts() {
               <Plus className="mr-1 h-4 w-4" /> Nova Conta
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Criar Conta Financeira</DialogTitle>
             </DialogHeader>
