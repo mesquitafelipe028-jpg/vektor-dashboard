@@ -32,21 +32,8 @@ const schema = z.object({
 
 export default function Revenues() {
   const { user } = useAuth();
-  const qc = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (searchParams.get("novo") === "true") {
-      const clienteParam = searchParams.get("cliente") || "";
-      setForm({ ...emptyForm, cliente_id: clienteParam });
-      setEditingId(null);
-      setOpen(true);
-      searchParams.delete("novo");
-      searchParams.delete("cliente");
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TransactionFormData>(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
