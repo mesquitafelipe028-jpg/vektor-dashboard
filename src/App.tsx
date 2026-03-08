@@ -86,6 +86,12 @@ const App = () => {
                     <Route path="/analise-financeira" element={<FinancialAnalysis />} />
                     <Route path="/calculadora-investimentos" element={<InvestmentCalculator />} />
                     
+                    <Route path="/receitas/nova" element={<TransactionForm />} />
+                    <Route path="/receitas/editar/:id" element={<TransactionForm />} />
+                    <Route path="/despesas/nova" element={<TransactionForm />} />
+                    <Route path="/despesas/editar/:id" element={<TransactionForm />} />
+                    <Route path="/clientes/novo" element={<ClientForm />} />
+                    <Route path="/clientes/editar/:id" element={<ClientForm />} />
                     <Route path="/cartoes" element={<CreditCards />} />
                     <Route path="/categorias" element={<Categories />} />
                     <Route path="/contas" element={<Accounts />} />
