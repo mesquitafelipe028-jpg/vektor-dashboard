@@ -29,20 +29,6 @@ const schema = z.object({
   cliente_id: z.string().optional(),
 });
 
-const emptyForm: TransactionFormData = {
-  descricao: "",
-  valor: "",
-  data: new Date().toISOString().slice(0, 10),
-  forma_pagamento: "",
-  cliente_id: "",
-  categoria: "",
-  tipo_conta: "mei",
-  tipo_transacao: "unica",
-  frequencia: "",
-  data_inicio: new Date().toISOString().slice(0, 10),
-  data_fim: "",
-  efetivada: false,
-};
 
 export default function Revenues() {
   const { user } = useAuth();
