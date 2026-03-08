@@ -31,6 +31,8 @@ const CreditCards = lazy(() => import("./pages/CreditCards"));
 const Categories = lazy(() => import("./pages/Categories"));
 const Accounts = lazy(() => import("./pages/Accounts"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const TransactionForm = lazy(() => import("./pages/TransactionForm"));
+const ClientForm = lazy(() => import("./pages/ClientForm"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
