@@ -11,7 +11,7 @@ const navItems = [
   { label: "Receitas", icon: TrendingUp, path: "/receitas" },
   { label: "Adicionar", icon: Plus, path: "", isFab: true },
   { label: "Despesas", icon: TrendingDown, path: "/despesas" },
-  { label: "Simulador", icon: LineChart, path: "/calculadora-investimentos" },
+  { label: "Mais", icon: MoreHorizontal, path: "/mais" },
 ];
 
 const quickActions = [
