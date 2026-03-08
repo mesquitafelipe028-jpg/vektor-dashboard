@@ -117,6 +117,11 @@
   animation: marquee 30s linear infinite;
 }
 
+/* Override Radix scroll-lock inline overflow:hidden on body */
+[data-scroll-locked] {
+  overflow: auto !important;
+}
+
 /* Garantir scroll interno em modais Radix com scroll lock ativo */
 [data-scroll-locked] .overflow-y-auto,
 [data-scroll-locked] .overscroll-contain,
