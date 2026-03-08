@@ -4,9 +4,7 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-const Select = ({ modal = false, ...props }: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root> & { modal?: boolean }) => (
-  <SelectPrimitive.Root modal={modal} {...props} />
-);
+const Select = SelectPrimitive.Root;
 
 const SelectGroup = SelectPrimitive.Group;
 
