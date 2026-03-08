@@ -34,12 +34,7 @@ export default function Revenues() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<TransactionFormData>(emptyForm);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const { categories: dbCategories } = useCategories("receita");
-  const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
-
+  const qc = useQueryClient();
   // Filters
   const [filterMonth, setFilterMonth] = useState("");
   const [filterClientId, setFilterClientId] = useState("");
