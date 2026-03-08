@@ -11,8 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingUp, Pencil, Trash2, Filter } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
-import { TransactionFormSheet, type TransactionFormData } from "@/components/transaction/TransactionFormSheet";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
