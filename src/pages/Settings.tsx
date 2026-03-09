@@ -66,60 +66,15 @@ const emptyEmpresa: EmpresaData = {
   data_abertura: "", cnae_principal: "", natureza_juridica: "",
 };
 
-// localStorage helpers
-function loadPref<T>(key: string, fallback: T): T {
-  try {
-    const v = localStorage.getItem(key);
-    return v ? JSON.parse(v) : fallback;
-  } catch { return fallback; }
-}
-function savePref(key: string, value: unknown) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
 export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { preferences, updatePreference } = useUserPreferences();
 
   // Profile
   const [nome, setNome] = useState("");
-
-  // Password
-  const [passwordOpen, setPasswordOpen] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
-  // Company
-  const [empresa, setEmpresa] = useState<EmpresaData>(emptyEmpresa);
-  const [cnpjInput, setCnpjInput] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [cnpjFound, setCnpjFound] = useState<boolean | null>(null);
-
-  // Notifications (localStorage)
-  const [notifVencimento, setNotifVencimento] = useState(() => loadPref("notif_vencimento", true));
-  const [notifRecebimento, setNotifRecebimento] = useState(() => loadPref("notif_recebimento", true));
-  const [notifLembrete, setNotifLembrete] = useState(() => loadPref("notif_lembrete", false));
-
-  // Financial (localStorage)
-  const [moeda, setMoeda] = useState(() => loadPref("moeda_padrao", "BRL"));
-  const [diaFechamento, setDiaFechamento] = useState(() => loadPref("dia_fechamento", "20"));
-
-  // Search
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Reset dialog
-  const [confirmText, setConfirmText] = useState("");
-  const [resetDialogOpen, setResetDialogOpen] = useState(false);
-
-  // Persist notification prefs
-  useEffect(() => { savePref("notif_vencimento", notifVencimento); }, [notifVencimento]);
-  useEffect(() => { savePref("notif_recebimento", notifRecebimento); }, [notifRecebimento]);
-  useEffect(() => { savePref("notif_lembrete", notifLembrete); }, [notifLembrete]);
-  useEffect(() => { savePref("moeda_padrao", moeda); }, [moeda]);
-  useEffect(() => { savePref("dia_fechamento", diaFechamento); }, [diaFechamento]);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
