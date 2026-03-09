@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Building2, Search, Loader2, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
+import { Building2, Search, Loader2, CheckCircle2, AlertCircle, Trash2, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme } from "next-themes";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
