@@ -176,7 +176,7 @@ export default function Taxes() {
         if (error) throw error;
       }
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei"] }); toast.success(editingId ? "Guia atualizada" : "Guia DAS adicionada"); setOpen(false); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei", user?.id] }); toast.success(editingId ? "Guia atualizada" : "Guia DAS adicionada"); setOpen(false); resetForm(); },
     onError: () => toast.error("Erro ao salvar guia"),
   });
 
