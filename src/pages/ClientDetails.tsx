@@ -546,6 +546,20 @@ export default function ClientDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Billing Reminder Sheet */}
+      {stats.pendentes.length > 0 && (
+        <BillingReminderSheet
+          open={reminderOpen}
+          onOpenChange={setReminderOpen}
+          clientName={cliente.nome}
+          clientPhone={cliente.telefone}
+          clientEmail={cliente.email}
+          description={stats.pendentes[0].descricao}
+          amount={stats.pendentes[0].valor}
+          dueDate={stats.pendentes[0].data}
+        />
+      )}
     </div>
   );
 }
