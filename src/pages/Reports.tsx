@@ -59,7 +59,7 @@ export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
 
   const { data: receitas = [] } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*");
       if (error) throw error;
