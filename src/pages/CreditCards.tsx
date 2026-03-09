@@ -245,7 +245,7 @@ export default function CreditCards() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["compras_cartao"] });
+      qc.invalidateQueries({ queryKey: ["compras_cartao", user?.id] });
       toast.success(editingCompraId ? "Compra atualizada!" : "Compra registrada!");
       closeCompraDialog();
     },
