@@ -123,7 +123,7 @@ export default function CreditCards() {
   });
 
   const { data: compras = [] } = useQuery({
-    queryKey: ["compras_cartao"],
+    queryKey: ["compras_cartao", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("compras_cartao").select("*").order("data", { ascending: false });
       if (error) throw error;
