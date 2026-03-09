@@ -42,12 +42,11 @@ export default function Receivables() {
       return (data as any[])
         .filter((r: any) => r.status === "pendente" || r.status === "atrasado")
         .map((r: any) => ({
-      return [] as ReceivableWithClient[]; // unreachable, handled above
-        ...r,
-        cliente_nome: r.clientes?.nome,
-        cliente_telefone: r.clientes?.telefone,
-        cliente_email: r.clientes?.email,
-      })) as ReceivableWithClient[];
+          ...r,
+          cliente_nome: r.clientes?.nome,
+          cliente_telefone: r.clientes?.telefone,
+          cliente_email: r.clientes?.email,
+        })) as ReceivableWithClient[];
     },
     enabled: !!user,
   });
