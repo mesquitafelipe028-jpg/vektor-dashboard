@@ -36,8 +36,12 @@ export default function Receivables() {
       const { data, error } = await supabase
         .from("receitas")
         .select("*, clientes(nome, telefone, email)")
-        .in("status", ["pendente", "atrasado"] as any)
         .order("data", { ascending: true });
+      if (error) throw error;
+      // Filter client-side to avoid deep type instantiation
+      return (data as any[])
+        .filter((r: any) => r.status === "pendente" || r.status === "atrasado")
+        .map((r: any) => ({
       if (error) throw error;
       return (data as any[]).map((r) => ({
         ...r,
