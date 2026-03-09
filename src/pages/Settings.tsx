@@ -402,7 +402,7 @@ export default function Settings() {
             icon={Bell}
             title="Recebimentos"
             description="Notificação ao registrar um recebimento"
-            rightComponent={<Switch checked={notifRecebimento} onCheckedChange={setNotifRecebimento} />}
+            rightComponent={<Switch checked={preferences.alerta_recebimentos} onCheckedChange={(v) => updatePreference("alerta_recebimentos", v)} />}
           />
           <SettingsItem
             icon={Bell}
