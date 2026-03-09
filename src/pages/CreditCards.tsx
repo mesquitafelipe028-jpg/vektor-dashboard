@@ -707,7 +707,7 @@ export default function CreditCards() {
                 )}
               </CardHeader>
               <CardContent>
-                {renderPurchaseList((currentCompras)}
+                {renderPurchaseList(currentCompras)}
               </CardContent>
             </Card>
           </TabsContent>
