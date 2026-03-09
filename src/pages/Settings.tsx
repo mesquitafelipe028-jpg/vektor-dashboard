@@ -63,6 +63,7 @@ const emptyEmpresa: EmpresaData = {
 };
 
 export default function Settings() {
+  const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [nome, setNome] = useState("");
