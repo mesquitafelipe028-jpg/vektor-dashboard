@@ -12,6 +12,7 @@ const menuGroups = [
     items: [
       { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", color: "bg-primary/10 text-primary" },
       { label: "Fluxo de Caixa", icon: ArrowLeftRight, path: "/fluxo-de-caixa", color: "bg-chart-2/10 text-chart-2" },
+      { label: "Timeline", icon: Clock, path: "/timeline", color: "bg-chart-3/10 text-chart-3" },
     ],
   },
   {
