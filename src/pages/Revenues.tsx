@@ -41,7 +41,7 @@ export default function Revenues() {
   });
 
   const { data: clientes = [] } = useQuery({
-    queryKey: ["clientes"],
+    queryKey: ["clientes", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("clientes").select("id, nome").order("nome");
       if (error) throw error;
