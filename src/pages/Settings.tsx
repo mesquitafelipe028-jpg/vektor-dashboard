@@ -418,7 +418,7 @@ export default function Settings() {
         <SettingsSection icon={BarChart3} title="Financeiro" index={sectionIdx++}>
           <SettingsItem icon={BarChart3} title="Moeda padrão" description="Moeda utilizada nos relatórios"
             rightComponent={
-              <Select value={moeda} onValueChange={setMoeda}>
+              <Select value={preferences.moeda} onValueChange={(v) => updatePreference("moeda", v)}>
                 <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BRL">BRL</SelectItem>
