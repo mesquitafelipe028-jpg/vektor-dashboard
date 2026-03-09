@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,64 +12,18 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingUp, Pencil, Trash2, Filter } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
-import { TransactionFormSheet, type TransactionFormData } from "@/components/transaction/TransactionFormSheet";
-import { useSearchParams } from "react-router-dom";
-import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { z } from "zod";
-import type { ReceitaExtended, TipoTransacao, Frequencia } from "@/types/transactions";
-
-const schema = z.object({
-  descricao: z.string().trim().min(1, "Descrição obrigatória").max(200),
-  valor: z.number().positive("Valor deve ser positivo"),
-  data: z.string().min(1, "Data obrigatória"),
-  forma_pagamento: z.string().optional(),
-  cliente_id: z.string().optional(),
-});
-
-const emptyForm: TransactionFormData = {
-  descricao: "",
-  valor: "",
-  data: new Date().toISOString().slice(0, 10),
-  forma_pagamento: "",
-  cliente_id: "",
-  categoria: "",
-  tipo_conta: "mei",
-  tipo_transacao: "unica",
-  frequencia: "",
-  data_inicio: new Date().toISOString().slice(0, 10),
-  data_fim: "",
-  efetivada: false,
-};
+import type { ReceitaExtended } from "@/types/transactions";
 
 export default function Revenues() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get("novo") === "true") {
-      const clienteParam = searchParams.get("cliente") || "";
-      setForm({ ...emptyForm, cliente_id: clienteParam });
-      setEditingId(null);
-      setOpen(true);
-      searchParams.delete("novo");
-      searchParams.delete("cliente");
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<TransactionFormData>(emptyForm);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const { categories: dbCategories } = useCategories("receita");
-  const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
-
-  // Filters
   const [filterMonth, setFilterMonth] = useState("");
   const [filterClientId, setFilterClientId] = useState("");
 
@@ -121,73 +76,6 @@ export default function Revenues() {
       });
   }, [receitas]);
 
-  const upsert = useMutation({
-    mutationFn: async () => {
-      const parsed = schema.safeParse({ ...form, valor: parseFloat(form.valor) });
-      if (!parsed.success) {
-        const fe: Record<string, string> = {};
-        parsed.error.issues.forEach((i) => (fe[String(i.path[0])] = i.message));
-        setErrors(fe);
-        throw new Error("validation");
-      }
-      setErrors({});
-
-      const tipoTransacao = form.tipo_transacao;
-      const status = form.efetivada ? "recebido" : "pendente";
-
-      // Recorrente: insert only 1 record (lazy generation)
-      if (tipoTransacao === "recorrente" && !editingId) {
-        const freq = form.frequencia as Frequencia;
-        const { error } = await supabase.from("receitas").insert({
-          descricao: parsed.data.descricao,
-          valor: parsed.data.valor,
-          data: form.data_inicio || parsed.data.data,
-          forma_pagamento: parsed.data.forma_pagamento || null,
-          cliente_id: parsed.data.cliente_id || null,
-          categoria: form.categoria || null,
-          tipo_conta: form.tipo_conta || "mei",
-          user_id: user!.id,
-          tipo_transacao: "recorrente",
-          frequencia: freq,
-          data_inicio: form.data_inicio || parsed.data.data,
-          data_fim: form.data_fim || null,
-          status,
-        } as any);
-        if (error) throw error;
-        return;
-      }
-
-      // Única or edit
-      const payload: any = {
-        descricao: parsed.data.descricao,
-        valor: parsed.data.valor,
-        data: parsed.data.data,
-        forma_pagamento: parsed.data.forma_pagamento || null,
-        cliente_id: parsed.data.cliente_id || null,
-        categoria: form.categoria || null,
-        tipo_conta: form.tipo_conta || "mei",
-        user_id: user!.id,
-        tipo_transacao: tipoTransacao,
-        status,
-      };
-      if (editingId) {
-        const { error } = await supabase.from("receitas").update(payload).eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("receitas").insert(payload);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["receitas"] });
-      toast.success(editingId ? "Receita atualizada!" : "Receita cadastrada!");
-      closeDialog();
-    },
-    onError: (e) => {
-      if (e.message !== "validation") toast.error("Erro ao salvar receita.");
-    },
-  });
-
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("receitas").delete().eq("id", id);
@@ -212,32 +100,6 @@ export default function Revenues() {
     },
   });
 
-  const closeDialog = () => {
-    setOpen(false);
-    setEditingId(null);
-    setForm(emptyForm);
-    setErrors({});
-  };
-
-  const openEdit = (r: ReceitaExtended) => {
-    setEditingId(r.id);
-    setForm({
-      descricao: r.descricao,
-      valor: String(r.valor),
-      data: r.data,
-      forma_pagamento: r.forma_pagamento ?? "",
-      cliente_id: r.cliente_id ?? "",
-      categoria: r.categoria ?? "",
-      tipo_conta: r.tipo_conta ?? "mei",
-      tipo_transacao: r.tipo_transacao || "unica",
-      frequencia: r.frequencia ?? "",
-      data_inicio: r.data_inicio ?? "",
-      data_fim: r.data_fim ?? "",
-      efetivada: r.status === "recebido",
-    });
-    setOpen(true);
-  };
-
   const clearFilters = () => {
     setFilterMonth("");
     setFilterClientId("");
@@ -252,12 +114,11 @@ export default function Revenues() {
           <h1 className="font-heading text-2xl font-bold">Receitas</h1>
           <p className="text-sm text-muted-foreground">Gerencie suas entradas financeiras</p>
         </div>
-        <Button onClick={() => { setForm(emptyForm); setEditingId(null); setOpen(true); }} className="w-full sm:w-auto">
+        <Button onClick={() => navigate("/receitas/nova")} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" /> Nova Receita
         </Button>
       </div>
 
-      {/* Summary Card */}
       <Card>
         <CardContent className="flex items-center gap-4 p-5">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
@@ -272,7 +133,6 @@ export default function Revenues() {
         </CardContent>
       </Card>
 
-      {/* Monthly Totals */}
       {monthlyTotals.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="font-heading text-lg">Total por Mês</CardTitle></CardHeader>
@@ -289,7 +149,6 @@ export default function Revenues() {
         </Card>
       )}
 
-      {/* Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap items-end gap-4">
@@ -318,7 +177,6 @@ export default function Revenues() {
         </CardContent>
       </Card>
 
-      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle className="font-heading text-lg">
@@ -388,7 +246,7 @@ export default function Revenues() {
                       +{formatCurrency(r.valor)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(r)}>
+                      <Button variant="ghost" size="icon" onClick={() => navigate(`/receitas/editar/${r.id}`)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
@@ -422,21 +280,6 @@ export default function Revenues() {
           )}
         </CardContent>
       </Card>
-
-      {/* Form Sheet */}
-      <TransactionFormSheet
-        open={open}
-        onOpenChange={(v) => { if (!v) closeDialog(); else setOpen(true); }}
-        type="receita"
-        form={form}
-        onFormChange={setForm}
-        onSave={() => upsert.mutate()}
-        isSaving={upsert.isPending}
-        isEditing={!!editingId}
-        errors={errors}
-        clientes={clientes}
-        customCategories={customCategories.length > 0 ? customCategories : undefined}
-      />
     </div>
   );
 }

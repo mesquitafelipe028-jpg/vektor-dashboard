@@ -31,6 +31,8 @@ const CreditCards = lazy(() => import("./pages/CreditCards"));
 const Categories = lazy(() => import("./pages/Categories"));
 const Accounts = lazy(() => import("./pages/Accounts"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const TransactionForm = lazy(() => import("./pages/TransactionForm"));
+const ClientForm = lazy(() => import("./pages/ClientForm"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -84,6 +86,12 @@ const App = () => {
                     <Route path="/analise-financeira" element={<FinancialAnalysis />} />
                     <Route path="/calculadora-investimentos" element={<InvestmentCalculator />} />
                     
+                    <Route path="/receitas/nova" element={<TransactionForm />} />
+                    <Route path="/receitas/editar/:id" element={<TransactionForm />} />
+                    <Route path="/despesas/nova" element={<TransactionForm />} />
+                    <Route path="/despesas/editar/:id" element={<TransactionForm />} />
+                    <Route path="/clientes/novo" element={<ClientForm />} />
+                    <Route path="/clientes/editar/:id" element={<ClientForm />} />
                     <Route path="/cartoes" element={<CreditCards />} />
                     <Route path="/categorias" element={<Categories />} />
                     <Route path="/contas" element={<Accounts />} />
