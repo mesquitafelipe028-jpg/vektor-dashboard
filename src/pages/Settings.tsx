@@ -396,7 +396,7 @@ export default function Settings() {
             icon={Bell}
             title="Alertas de vencimento"
             description="Receba avisos sobre contas a vencer"
-            rightComponent={<Switch checked={notifVencimento} onCheckedChange={setNotifVencimento} />}
+            rightComponent={<Switch checked={preferences.alerta_vencimento} onCheckedChange={(v) => updatePreference("alerta_vencimento", v)} />}
           />
           <SettingsItem
             icon={Bell}
