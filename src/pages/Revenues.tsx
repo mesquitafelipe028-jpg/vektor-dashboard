@@ -28,7 +28,7 @@ export default function Revenues() {
   const [filterClientId, setFilterClientId] = useState("");
 
   const { data: receitas = [], isLoading } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("receitas")
