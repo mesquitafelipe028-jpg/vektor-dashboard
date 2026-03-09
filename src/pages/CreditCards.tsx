@@ -13,11 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Plus, Pencil, Trash2, CheckCircle, Calendar, DollarSign } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { CreditCard, Plus, Pencil, Trash2, CheckCircle, Calendar, DollarSign, MoreVertical } from "lucide-react";
 import { formatCurrency, formatDate, expenseCategories } from "@/lib/mockData";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { banks, BankLogo } from "@/lib/banks";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
@@ -99,6 +101,7 @@ function formatMonthLabel(mesRef: string) {
 export default function CreditCards() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const isMobile = useIsMobile();
 
   // Dialog states
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
@@ -359,8 +362,78 @@ export default function CreditCards() {
   // ── Render helpers ──
   const isPeriodPaid = (mesRef: string) => cardFaturas.some((f) => f.mes_referencia === mesRef && f.status === "paga");
 
-  const renderPurchaseTable = (purchases: Compra[], showActions = true) => (
-    <div className="overflow-x-auto">
+  const renderPurchaseList = (purchases: Compra[], showActions = true) => {
+    if (purchases.length === 0) {
+      return <p className="py-8 text-center text-muted-foreground">Nenhuma compra registrada</p>;
+    }
+
+    if (isMobile) {
+      return (
+        <div className="space-y-2">
+          {purchases.map((c, i) => (
+            <motion.div
+              key={c.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.02 }}
+              className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
+            >
+              <CategoryIcon category={c.categoria} type="cartao" size={28} />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{c.descricao}</p>
+                <p className="text-[11px] text-muted-foreground">{c.categoria ?? "Sem categoria"}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[11px] text-muted-foreground">{formatDate(c.data)}</p>
+                <p className={`font-heading font-bold text-sm ${transactionColors.cartao.text}`}>
+                  {formatCurrency(c.valor)}
+                </p>
+              </div>
+              {showActions && (
+                <AlertDialog>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditCompra(c)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Editar
+                      </DropdownMenuItem>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir compra?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        A compra "{c.descricao}" será removida permanentemente.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteCompra.mutate(c.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
       <Table>
         <TableHeader>
           <TableRow>
@@ -372,70 +445,62 @@ export default function CreditCards() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {purchases.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={showActions ? 5 : 4} className="text-center text-muted-foreground py-8">
-                Nenhuma compra registrada
+          {purchases.map((c, i) => (
+            <motion.tr
+              key={c.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.03 }}
+              className="border-b transition-colors hover:bg-muted/50"
+            >
+              <TableCell>{formatDate(c.data)}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <CategoryIcon category={c.categoria} type="cartao" size={24} />
+                  <span className="font-medium">{c.descricao}</span>
+                </div>
               </TableCell>
-            </TableRow>
-          ) : (
-            purchases.map((c, i) => (
-              <motion.tr
-                key={c.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
-                className="border-b transition-colors hover:bg-muted/50"
-              >
-                <TableCell>{formatDate(c.data)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <CategoryIcon category={c.categoria} type="cartao" size={24} />
-                    <span className="font-medium">{c.descricao}</span>
-                  </div>
+              <TableCell>{c.categoria ?? "—"}</TableCell>
+              <TableCell className={`text-right font-semibold ${transactionColors.cartao.text}`}>
+                {formatCurrency(c.valor)}
+              </TableCell>
+              {showActions && (
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" onClick={() => openEditCompra(c)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir compra?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          A compra "{c.descricao}" será removida permanentemente.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteCompra.mutate(c.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </TableCell>
-                <TableCell>{c.categoria ?? "—"}</TableCell>
-                <TableCell className={`text-right font-semibold ${transactionColors.cartao.text}`}>
-                  {formatCurrency(c.valor)}
-                </TableCell>
-                {showActions && (
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => openEditCompra(c)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Excluir compra?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            A compra "{c.descricao}" será removida permanentemente.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteCompra.mutate(c.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
-                )}
-              </motion.tr>
-            ))
-          )}
+              )}
+            </motion.tr>
+          ))}
         </TableBody>
       </Table>
-    </div>
-  );
+    );
+  };
 
   // ── No cards state ──
   if (!loadingCards && cartoes.length === 0) {
@@ -642,7 +707,7 @@ export default function CreditCards() {
                 )}
               </CardHeader>
               <CardContent>
-                {renderPurchaseTable(currentCompras)}
+                {renderPurchaseList(currentCompras)}
               </CardContent>
             </Card>
           </TabsContent>
@@ -658,7 +723,7 @@ export default function CreditCards() {
                 </p>
               </CardHeader>
               <CardContent>
-                {renderPurchaseTable(nextCompras)}
+                {renderPurchaseList(nextCompras)}
               </CardContent>
             </Card>
           </TabsContent>
@@ -672,7 +737,24 @@ export default function CreditCards() {
                 {cardFaturas.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">Nenhuma fatura no histórico</p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  isMobile ? (
+                    <div className="space-y-2">
+                      {cardFaturas.map((f) => (
+                        <div key={f.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{formatMonthLabel(f.mes_referencia)}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {f.data_pagamento ? `Pago em ${formatDate(f.data_pagamento)}` : "Sem pagamento"}
+                            </p>
+                          </div>
+                          <Badge variant={f.status === "paga" ? "secondary" : "destructive"} className={f.status === "paga" ? "bg-secondary/10 text-secondary" : ""}>
+                            {f.status === "paga" ? "Pago" : f.status === "fechada" ? "Fechada" : "Pendente"}
+                          </Badge>
+                          <p className="font-heading font-bold text-sm shrink-0">{formatCurrency(f.valor_total)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -697,7 +779,7 @@ export default function CreditCards() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
+                  )
                 )}
               </CardContent>
             </Card>
