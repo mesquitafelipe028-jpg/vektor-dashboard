@@ -133,7 +133,7 @@ export default function CreditCards() {
   });
 
   const { data: faturas = [] } = useQuery({
-    queryKey: ["faturas_cartao"],
+    queryKey: ["faturas_cartao", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("faturas_cartao").select("*").order("mes_referencia", { ascending: false });
       if (error) throw error;
