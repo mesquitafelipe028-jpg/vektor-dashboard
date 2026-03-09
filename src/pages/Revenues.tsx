@@ -83,7 +83,7 @@ export default function Revenues() {
       await (supabase.from("receitas") as any).delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["receitas"] });
+      qc.invalidateQueries({ queryKey: ["receitas", user?.id] });
       toast.success("Receita excluída!");
     },
     onError: () => toast.error("Erro ao excluir receita."),
