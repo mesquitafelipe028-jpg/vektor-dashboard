@@ -234,7 +234,7 @@ export default function ClientDetails() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Button
             size="sm"
-            onClick={() => navigate(`/receitas?novo=true&cliente=${id}`)}
+            onClick={() => navigate(`/receitas/nova?cliente=${id}`)}
             className="gap-1.5"
           >
             <Plus className="h-4 w-4" /> Nova Cobrança
