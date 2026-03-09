@@ -29,6 +29,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { SettingsItem } from "@/components/settings/SettingsItem";
 import { SettingsSection } from "@/components/settings/SettingsSection";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 
 // CNPJ formatting & validation
 function formatCnpj(value: string): string {
