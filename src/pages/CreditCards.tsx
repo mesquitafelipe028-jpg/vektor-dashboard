@@ -101,6 +101,7 @@ function formatMonthLabel(mesRef: string) {
 export default function CreditCards() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const isMobile = useIsMobile();
 
   // Dialog states
   const [cardDialogOpen, setCardDialogOpen] = useState(false);
