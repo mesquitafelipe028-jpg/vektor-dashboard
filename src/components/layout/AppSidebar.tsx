@@ -50,6 +50,7 @@ const menuGroups = [
     items: [
       { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
       { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
+      { title: "Timeline", url: "/timeline", icon: Clock },
     ],
   },
   {
