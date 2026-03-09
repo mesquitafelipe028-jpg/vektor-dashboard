@@ -27,6 +27,7 @@ import { z } from "zod";
 import type { ReceitaExtended } from "@/types/transactions";
 import { generateRecurringDates, frequenciaLabels } from "@/types/transactions";
 import { Badge } from "@/components/ui/badge";
+import { BillingReminderSheet } from "@/components/billing/BillingReminderSheet";
 
 const clienteSchema = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório").max(100),
