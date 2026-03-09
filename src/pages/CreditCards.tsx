@@ -258,7 +258,7 @@ export default function CreditCards() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["compras_cartao"] });
+      qc.invalidateQueries({ queryKey: ["compras_cartao", user?.id] });
       toast.success("Compra excluída!");
     },
     onError: () => toast.error("Erro ao excluir compra"),
