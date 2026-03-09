@@ -82,7 +82,7 @@ export default function Goals() {
   const [txData, setTxData] = useState(new Date().toISOString().slice(0, 10));
 
   const { data: metas = [], isLoading } = useQuery({
-    queryKey: ["metas_financeiras"],
+    queryKey: ["metas_financeiras", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("metas_financeiras").select("*").order("prazo", { ascending: true });
