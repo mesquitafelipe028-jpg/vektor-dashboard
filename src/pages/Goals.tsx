@@ -127,8 +127,8 @@ export default function Goals() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
-      queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["depositos_meta", user?.id] });
       toast.success("Meta excluída.");
       setDeleteId(null);
     },
