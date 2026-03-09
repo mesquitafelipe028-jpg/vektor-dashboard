@@ -29,6 +29,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { SettingsItem } from "@/components/settings/SettingsItem";
 import { SettingsSection } from "@/components/settings/SettingsSection";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 
 // CNPJ formatting & validation
 function formatCnpj(value: string): string {
@@ -65,22 +66,12 @@ const emptyEmpresa: EmpresaData = {
   data_abertura: "", cnae_principal: "", natureza_juridica: "",
 };
 
-// localStorage helpers
-function loadPref<T>(key: string, fallback: T): T {
-  try {
-    const v = localStorage.getItem(key);
-    return v ? JSON.parse(v) : fallback;
-  } catch { return fallback; }
-}
-function savePref(key: string, value: unknown) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
 export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { user, signOut } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { preferences, updatePreference } = useUserPreferences();
 
   // Profile
   const [nome, setNome] = useState("");
@@ -97,28 +88,12 @@ export default function Settings() {
   const [searching, setSearching] = useState(false);
   const [cnpjFound, setCnpjFound] = useState<boolean | null>(null);
 
-  // Notifications (localStorage)
-  const [notifVencimento, setNotifVencimento] = useState(() => loadPref("notif_vencimento", true));
-  const [notifRecebimento, setNotifRecebimento] = useState(() => loadPref("notif_recebimento", true));
-  const [notifLembrete, setNotifLembrete] = useState(() => loadPref("notif_lembrete", false));
-
-  // Financial (localStorage)
-  const [moeda, setMoeda] = useState(() => loadPref("moeda_padrao", "BRL"));
-  const [diaFechamento, setDiaFechamento] = useState(() => loadPref("dia_fechamento", "20"));
-
   // Search
   const [searchQuery, setSearchQuery] = useState("");
 
   // Reset dialog
   const [confirmText, setConfirmText] = useState("");
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
-
-  // Persist notification prefs
-  useEffect(() => { savePref("notif_vencimento", notifVencimento); }, [notifVencimento]);
-  useEffect(() => { savePref("notif_recebimento", notifRecebimento); }, [notifRecebimento]);
-  useEffect(() => { savePref("notif_lembrete", notifLembrete); }, [notifLembrete]);
-  useEffect(() => { savePref("moeda_padrao", moeda); }, [moeda]);
-  useEffect(() => { savePref("dia_fechamento", diaFechamento); }, [diaFechamento]);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -421,19 +396,19 @@ export default function Settings() {
             icon={Bell}
             title="Alertas de vencimento"
             description="Receba avisos sobre contas a vencer"
-            rightComponent={<Switch checked={notifVencimento} onCheckedChange={setNotifVencimento} />}
+            rightComponent={<Switch checked={preferences.alerta_vencimento} onCheckedChange={(v) => updatePreference("alerta_vencimento", v)} />}
           />
           <SettingsItem
             icon={Bell}
             title="Recebimentos"
             description="Notificação ao registrar um recebimento"
-            rightComponent={<Switch checked={notifRecebimento} onCheckedChange={setNotifRecebimento} />}
+            rightComponent={<Switch checked={preferences.alerta_recebimentos} onCheckedChange={(v) => updatePreference("alerta_recebimentos", v)} />}
           />
           <SettingsItem
             icon={Bell}
             title="Lembretes"
             description="Lembretes periódicos sobre finanças"
-            rightComponent={<Switch checked={notifLembrete} onCheckedChange={setNotifLembrete} />}
+            rightComponent={<Switch checked={preferences.alerta_lembretes} onCheckedChange={(v) => updatePreference("alerta_lembretes", v)} />}
           />
         </SettingsSection>
       )}
@@ -443,7 +418,7 @@ export default function Settings() {
         <SettingsSection icon={BarChart3} title="Financeiro" index={sectionIdx++}>
           <SettingsItem icon={BarChart3} title="Moeda padrão" description="Moeda utilizada nos relatórios"
             rightComponent={
-              <Select value={moeda} onValueChange={setMoeda}>
+              <Select value={preferences.moeda} onValueChange={(v) => updatePreference("moeda", v)}>
                 <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BRL">BRL</SelectItem>
@@ -456,8 +431,8 @@ export default function Settings() {
           <SettingsItem icon={BarChart3} title="Dia de fechamento" description="Dia do mês para fechamento mensal"
             rightComponent={
               <Input
-                type="number" min="1" max="31" value={diaFechamento}
-                onChange={(e) => setDiaFechamento(e.target.value)}
+                type="number" min="1" max="31" value={preferences.dia_fechamento}
+                onChange={(e) => updatePreference("dia_fechamento", Number(e.target.value) || 1)}
                 className="w-16 h-8 text-center"
               />
             }
