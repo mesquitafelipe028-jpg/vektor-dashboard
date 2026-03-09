@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, TrendingDown, ArrowLeftRight, Receipt, BarChart3,
   Target, Activity, Settings, LogOut, Calculator, CreditCard, Users, Tag, LineChart,
+  ClipboardList, Clock,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -11,6 +12,7 @@ const menuGroups = [
     items: [
       { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", color: "bg-primary/10 text-primary" },
       { label: "Fluxo de Caixa", icon: ArrowLeftRight, path: "/fluxo-de-caixa", color: "bg-chart-2/10 text-chart-2" },
+      { label: "Timeline", icon: Clock, path: "/timeline", color: "bg-chart-3/10 text-chart-3" },
     ],
   },
   {
@@ -20,6 +22,7 @@ const menuGroups = [
       { label: "Despesas", icon: TrendingDown, path: "/despesas", color: "bg-destructive/10 text-destructive" },
       { label: "Cartões", icon: CreditCard, path: "/cartoes", color: "bg-chart-1/10 text-chart-1" },
       { label: "Clientes", icon: Users, path: "/clientes", color: "bg-chart-3/10 text-chart-3" },
+      { label: "Cobranças", icon: ClipboardList, path: "/contas-a-receber", color: "bg-chart-4/10 text-chart-4" },
     ],
   },
   {

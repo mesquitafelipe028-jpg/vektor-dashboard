@@ -27,6 +27,7 @@ import { z } from "zod";
 import type { ReceitaExtended } from "@/types/transactions";
 import { generateRecurringDates, frequenciaLabels } from "@/types/transactions";
 import { Badge } from "@/components/ui/badge";
+import { BillingReminderSheet } from "@/components/billing/BillingReminderSheet";
 
 const clienteSchema = z.object({
   nome: z.string().trim().min(1, "Nome é obrigatório").max(100),
@@ -43,6 +44,7 @@ export default function ClientDetails() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
   const [showAllProjections, setShowAllProjections] = useState(false);
   const [editForm, setEditForm] = useState({ nome: "", email: "", telefone: "" });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
@@ -186,10 +188,7 @@ export default function ClientDetails() {
       toast.info("Nenhuma cobrança pendente para este cliente.");
       return;
     }
-    const p = stats.pendentes[0];
-    const text = `Olá ${cliente?.nome}, este é um lembrete sobre a cobrança "${p.descricao}" no valor de ${formatCurrency(p.valor)} com vencimento em ${formatDate(p.data)}. Aguardamos seu pagamento!`;
-    navigator.clipboard.writeText(text);
-    toast.success("Texto de lembrete copiado para a área de transferência!");
+    setReminderOpen(true);
   };
 
   // --- Loading / Not Found ---
@@ -547,6 +546,20 @@ export default function ClientDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Billing Reminder Sheet */}
+      {stats.pendentes.length > 0 && (
+        <BillingReminderSheet
+          open={reminderOpen}
+          onOpenChange={setReminderOpen}
+          clientName={cliente.nome}
+          clientPhone={cliente.telefone}
+          clientEmail={cliente.email}
+          description={stats.pendentes[0].descricao}
+          amount={stats.pendentes[0].valor}
+          dueDate={stats.pendentes[0].data}
+        />
+      )}
     </div>
   );
 }

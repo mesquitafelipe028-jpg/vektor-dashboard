@@ -17,6 +17,8 @@ import {
   LucideIcon,
   LineChart,
   Calculator,
+  ClipboardList,
+  Clock,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { LogoVektor } from "@/components/branding/LogoVektor";
@@ -48,6 +50,7 @@ const menuGroups = [
     items: [
       { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
       { title: "Fluxo de Caixa", url: "/fluxo-de-caixa", icon: ArrowLeftRight },
+      { title: "Timeline", url: "/timeline", icon: Clock },
     ],
   },
   {
@@ -58,6 +61,7 @@ const menuGroups = [
       { title: "Contas", url: "/contas", icon: Wallet },
       { title: "Cartões", url: "/cartoes", icon: CreditCard },
       { title: "Clientes", url: "/clientes", icon: Users },
+      { title: "Cobranças", url: "/contas-a-receber", icon: ClipboardList },
     ],
   },
   {
