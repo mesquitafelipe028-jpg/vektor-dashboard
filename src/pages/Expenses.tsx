@@ -28,7 +28,7 @@ export default function Expenses() {
   const [filterCategoria, setFilterCategoria] = useState("");
 
   const { data: despesas = [], isLoading } = useQuery({
-    queryKey: ["despesas"],
+    queryKey: ["despesas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
       if (error) throw error;
