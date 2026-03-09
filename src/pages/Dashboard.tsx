@@ -153,7 +153,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const { data: receitas = [], isLoading: loadingReceitas } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*").order("data", { ascending: false });
       if (error) throw error;
