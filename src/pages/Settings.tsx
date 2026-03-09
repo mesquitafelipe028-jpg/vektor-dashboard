@@ -431,8 +431,8 @@ export default function Settings() {
           <SettingsItem icon={BarChart3} title="Dia de fechamento" description="Dia do mês para fechamento mensal"
             rightComponent={
               <Input
-                type="number" min="1" max="31" value={diaFechamento}
-                onChange={(e) => setDiaFechamento(e.target.value)}
+                type="number" min="1" max="31" value={preferences.dia_fechamento}
+                onChange={(e) => updatePreference("dia_fechamento", Number(e.target.value) || 1)}
                 className="w-16 h-8 text-center"
               />
             }
