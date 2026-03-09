@@ -76,6 +76,25 @@ export default function Settings() {
   // Profile
   const [nome, setNome] = useState("");
 
+  // Password
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Company
+  const [empresa, setEmpresa] = useState<EmpresaData>(emptyEmpresa);
+  const [cnpjInput, setCnpjInput] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [cnpjFound, setCnpjFound] = useState<boolean | null>(null);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Reset dialog
+  const [confirmText, setConfirmText] = useState("");
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
