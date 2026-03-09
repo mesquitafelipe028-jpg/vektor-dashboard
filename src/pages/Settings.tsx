@@ -408,7 +408,7 @@ export default function Settings() {
             icon={Bell}
             title="Lembretes"
             description="Lembretes periódicos sobre finanças"
-            rightComponent={<Switch checked={notifLembrete} onCheckedChange={setNotifLembrete} />}
+            rightComponent={<Switch checked={preferences.alerta_lembretes} onCheckedChange={(v) => updatePreference("alerta_lembretes", v)} />}
           />
         </SettingsSection>
       )}
