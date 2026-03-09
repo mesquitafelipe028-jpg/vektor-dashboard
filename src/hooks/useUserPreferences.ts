@@ -74,14 +74,23 @@ export function useUserPreferences() {
     },
   });
 
-  const updatePreference = <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
-    // Optimistic update
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  const updatePreference = useCallback(<K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
+    // Optimistic update (instant UI feedback)
     queryClient.setQueryData(["user_preferences", user?.id], (old: UserPreferences | undefined) => ({
       ...(old ?? defaults),
       [key]: value,
     }));
-    mutation.mutate({ [key]: value });
-  };
+
+    // Debounce the actual API call to avoid rapid-fire mutations
+    if (debounceTimers.current[key]) {
+      clearTimeout(debounceTimers.current[key]);
+    }
+    debounceTimers.current[key] = setTimeout(() => {
+      mutation.mutate({ [key]: value });
+    }, 500);
+  }, [user?.id, queryClient, mutation]);
 
   return {
     preferences: (query.data ?? defaults) as UserPreferences,
