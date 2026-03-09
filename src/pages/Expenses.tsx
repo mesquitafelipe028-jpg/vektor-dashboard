@@ -70,7 +70,7 @@ export default function Expenses() {
       await (supabase.from("despesas") as any).delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["despesas"] });
+      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
       toast.success("Despesa excluída!");
     },
     onError: () => toast.error("Erro ao excluir despesa."),
