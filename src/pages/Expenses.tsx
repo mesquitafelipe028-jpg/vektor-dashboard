@@ -10,11 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, TrendingDown, Pencil, Trash2, Filter } from "lucide-react";
+import { Plus, TrendingDown, Pencil, Trash2, Filter, Search } from "lucide-react";
 import { formatCurrency, formatDate, expenseCategories as expenseCategoryNames } from "@/lib/mockData";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
+import TransactionCard from "@/components/transaction/TransactionCard";
+import MonthNavigator, { getCurrentMonth } from "@/components/MonthNavigator";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import type { DespesaExtended } from "@/types/transactions";
@@ -23,9 +26,12 @@ export default function Expenses() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const isMobile = useIsMobile();
 
-  const [filterMonth, setFilterMonth] = useState("");
+  const [filterMonth, setFilterMonth] = useState(getCurrentMonth());
   const [filterCategoria, setFilterCategoria] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const { data: despesas = [], isLoading } = useQuery({
     queryKey: ["despesas", user?.id],
@@ -40,28 +46,15 @@ export default function Expenses() {
   const filtered = useMemo(() => {
     let list = despesas;
     if (filterMonth) list = list.filter((d) => d.data.startsWith(filterMonth));
-    if (filterCategoria) list = list.filter((d) => d.categoria === filterCategoria);
+    if (filterCategoria && filterCategoria !== "all") list = list.filter((d) => d.categoria === filterCategoria);
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase().trim();
+      list = list.filter((d) => d.descricao.toLowerCase().includes(q) || (d.categoria ?? "").toLowerCase().includes(q));
+    }
     return list;
-  }, [despesas, filterMonth, filterCategoria]);
+  }, [despesas, filterMonth, filterCategoria, searchText]);
 
   const total = filtered.reduce((s, d) => s + d.valor, 0);
-
-  const monthlyTotals = useMemo(() => {
-    const map: Record<string, number> = {};
-    despesas.forEach((d) => {
-      const key = d.data.slice(0, 7);
-      map[key] = (map[key] || 0) + d.valor;
-    });
-    return Object.entries(map)
-      .sort(([a], [b]) => b.localeCompare(a))
-      .slice(0, 6)
-      .map(([month, value]) => {
-        const [y, m] = month.split("-");
-        const d = new Date(parseInt(y), parseInt(m) - 1);
-        const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-        return { label: label.charAt(0).toUpperCase() + label.slice(1), value };
-      });
-  }, [despesas]);
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
@@ -87,98 +80,113 @@ export default function Expenses() {
     },
   });
 
-  const clearFilters = () => {
-    setFilterMonth("");
-    setFilterCategoria("");
-  };
-
-  const hasFilters = filterMonth || filterCategoria;
+  const hasFilters = (filterCategoria && filterCategoria !== "all") || searchText.trim();
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Despesas</h1>
-          <p className="text-sm text-muted-foreground">Gerencie suas saídas financeiras</p>
+          <p className="text-sm text-muted-foreground">
+            {hasFilters ? "Total (filtrado)" : "Total do mês"}{" "}
+            <span className="font-heading font-bold text-foreground">{formatCurrency(total)}</span>
+          </p>
         </div>
-        <Button onClick={() => navigate("/despesas/nova")} className="w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" /> Nova Despesa
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => setSearchOpen(!searchOpen)}>
+            <Search className="h-5 w-5" />
+          </Button>
+          {!isMobile && (
+            <Button onClick={() => navigate("/despesas/nova")}>
+              <Plus className="mr-2 h-4 w-4" /> Nova Despesa
+            </Button>
+          )}
+        </div>
       </div>
 
-      <Card>
-        <CardContent className="flex items-center gap-4 p-5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10">
-            <TrendingDown className="h-6 w-6 text-destructive" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {hasFilters ? "Total (filtrado)" : "Total de Despesas"}
-            </p>
-            <p className="font-heading text-2xl font-bold">{formatCurrency(total)}</p>
-          </div>
-        </CardContent>
-      </Card>
+      {searchOpen && (
+        <Input
+          placeholder="Buscar por descrição ou categoria..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          autoFocus
+        />
+      )}
 
-      {monthlyTotals.length > 0 && (
+      <MonthNavigator month={filterMonth} onChange={setFilterMonth} />
+
+      {!isMobile && (
         <Card>
-          <CardHeader><CardTitle className="font-heading text-lg">Total por Mês</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {monthlyTotals.map((m) => (
-                <div key={m.label} className="rounded-lg border border-border p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">{m.label}</p>
-                  <p className="font-heading font-bold text-destructive">{formatCurrency(m.value)}</p>
-                </div>
-              ))}
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Filter className="h-4 w-4" />
+                <span className="font-medium">Filtros</span>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Categoria</Label>
+                <Select value={filterCategoria} onValueChange={setFilterCategoria}>
+                  <SelectTrigger className="w-48"><SelectValue placeholder="Todas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {expenseCategoryNames.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {hasFilters && (
+                <Button variant="ghost" size="sm" onClick={() => { setFilterCategoria(""); setSearchText(""); }}>Limpar filtros</Button>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Filter className="h-4 w-4" />
-              <span className="font-medium">Filtros</span>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Mês</Label>
-              <Input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-44" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Categoria</Label>
-              <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-                <SelectTrigger className="w-48"><SelectValue placeholder="Todas" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {expenseCategoryNames.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>Limpar filtros</Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-lg">
-            Despesas {hasFilters && <span className="text-sm font-normal text-muted-foreground">({filtered.length} resultado{filtered.length !== 1 ? "s" : ""})</span>}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className="py-8 text-center text-muted-foreground">Carregando...</p>
-          ) : filtered.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">
-              {hasFilters ? "Nenhuma despesa encontrada com os filtros aplicados." : "Nenhuma despesa cadastrada."}
+      {isLoading ? (
+        <p className="py-8 text-center text-muted-foreground">Carregando...</p>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">
+              {hasFilters ? "Nenhuma despesa encontrada com os filtros aplicados." : "Nenhuma despesa neste mês."}
             </p>
-          ) : (
-            <div className="overflow-x-auto"><Table>
+          </CardContent>
+        </Card>
+      ) : isMobile ? (
+        <div className="space-y-2">
+          {filtered.map((d, i) => (
+            <TransactionCard
+              key={d.id}
+              id={d.id}
+              descricao={d.descricao}
+              valor={d.valor}
+              data={d.data}
+              categoria={d.categoria}
+              status={d.status}
+              tipo_transacao={d.tipo_transacao}
+              parcela_atual={d.parcela_atual}
+              numero_parcelas={d.numero_parcelas}
+              type="despesa"
+              index={i}
+              onEdit={(id) => navigate(`/despesas/editar/${id}`)}
+              onDelete={(id) => deleteMut.mutate(id)}
+              deleteWarning={
+                (d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") && !d.transacao_pai_id
+                  ? `"${d.descricao}" e todas as ocorrências futuras serão excluídas permanentemente.`
+                  : undefined
+              }
+            />
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading text-lg">
+              Despesas <span className="text-sm font-normal text-muted-foreground">({filtered.length})</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Descrição</TableHead>
@@ -214,7 +222,7 @@ export default function Expenses() {
                       />
                     </TableCell>
                     <TableCell>
-                      {(d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") && (
+                      {(d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") ? (
                         <Select
                           value={d.status || "pendente"}
                           onValueChange={(v) => updateStatus.mutate({ id: d.id, status: v })}
@@ -228,8 +236,7 @@ export default function Expenses() {
                             <SelectItem value="atrasado">Atrasado</SelectItem>
                           </SelectContent>
                         </Select>
-                      )}
-                      {(!d.tipo_transacao || d.tipo_transacao === "unica") && (
+                      ) : (
                         <StatusBadge status={d.status || "pago"} type="despesa" />
                       )}
                     </TableCell>
@@ -271,10 +278,19 @@ export default function Expenses() {
                   </motion.tr>
                 ))}
               </TableBody>
-            </Table></div>
-          )}
-        </CardContent>
-      </Card>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {isMobile && (
+        <button
+          onClick={() => navigate("/despesas/nova")}
+          className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-lg active:scale-95 transition-transform"
+        >
+          <Plus className="h-7 w-7" />
+        </button>
+      )}
     </div>
   );
 }
