@@ -13,11 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CreditCard, Plus, Pencil, Trash2, CheckCircle, Calendar, DollarSign } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { CreditCard, Plus, Pencil, Trash2, CheckCircle, Calendar, DollarSign, MoreVertical } from "lucide-react";
 import { formatCurrency, formatDate, expenseCategories } from "@/lib/mockData";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { banks, BankLogo } from "@/lib/banks";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
