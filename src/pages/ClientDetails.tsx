@@ -258,7 +258,7 @@ export default function ClientDetails() {
           <Button
             size="sm"
             variant="outline"
-            onClick={openEditDialog}
+            onClick={() => navigate(`/clientes/editar/${id}`)}
             className="gap-1.5"
           >
             <Pencil className="h-4 w-4" /> Editar
