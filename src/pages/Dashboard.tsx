@@ -173,7 +173,7 @@ export default function Dashboard() {
   });
 
   const { data: impostoPendente } = useQuery({
-    queryKey: ["impostos_mei_pendente"],
+    queryKey: ["impostos_mei_pendente", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("impostos_mei")
