@@ -30,6 +30,8 @@ const InvestmentCalculator = lazy(() => import("./pages/InvestmentCalculator"));
 
 const CreditCards = lazy(() => import("./pages/CreditCards"));
 const Categories = lazy(() => import("./pages/Categories"));
+const Receivables = lazy(() => import("./pages/Receivables"));
+const Timeline = lazy(() => import("./pages/Timeline"));
 const Accounts = lazy(() => import("./pages/Accounts"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TransactionForm = lazy(() => import("./pages/TransactionForm"));
