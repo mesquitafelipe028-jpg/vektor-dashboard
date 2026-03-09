@@ -182,7 +182,7 @@ export default function Taxes() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("impostos_mei").delete().eq("id", id); if (error) throw error; },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei"] }); toast.success("Guia excluída"); setDeleteId(null); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei", user?.id] }); toast.success("Guia excluída"); setDeleteId(null); },
     onError: () => toast.error("Erro ao excluir"),
   });
 
