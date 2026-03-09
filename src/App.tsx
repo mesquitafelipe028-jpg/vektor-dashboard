@@ -99,6 +99,8 @@ const App = () => {
                       <Route path="/cartoes" element={<CreditCards />} />
                       <Route path="/categorias" element={<Categories />} />
                       <Route path="/contas" element={<Accounts />} />
+                      <Route path="/contas-a-receber" element={<Receivables />} />
+                      <Route path="/timeline" element={<Timeline />} />
                       <Route path="/mais" element={<More />} />
                     </Route>
                   </Route>

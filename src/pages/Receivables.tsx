@@ -42,8 +42,7 @@ export default function Receivables() {
       return (data as any[])
         .filter((r: any) => r.status === "pendente" || r.status === "atrasado")
         .map((r: any) => ({
-      if (error) throw error;
-      return (data as any[]).map((r) => ({
+      return [] as ReceivableWithClient[]; // unreachable, handled above
         ...r,
         cliente_nome: r.clientes?.nome,
         cliente_telefone: r.clientes?.telefone,

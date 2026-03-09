@@ -85,7 +85,7 @@ export default function Timeline() {
     queryKey: ["timeline_compras_cartao"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("compras_cartao")
+        .from("compras_cartao" as any)
         .select("id, descricao, valor, data, categoria")
         .order("data", { ascending: false })
         .limit(200);

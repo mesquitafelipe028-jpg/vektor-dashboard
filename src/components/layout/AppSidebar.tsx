@@ -61,6 +61,7 @@ const menuGroups = [
       { title: "Contas", url: "/contas", icon: Wallet },
       { title: "Cartões", url: "/cartoes", icon: CreditCard },
       { title: "Clientes", url: "/clientes", icon: Users },
+      { title: "Cobranças", url: "/contas-a-receber", icon: ClipboardList },
     ],
   },
   {
