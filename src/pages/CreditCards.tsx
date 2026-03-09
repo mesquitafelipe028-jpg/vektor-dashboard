@@ -737,7 +737,24 @@ export default function CreditCards() {
                 {cardFaturas.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">Nenhuma fatura no histórico</p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  isMobile ? (
+                    <div className="space-y-2">
+                      {cardFaturas.map((f) => (
+                        <div key={f.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{formatMonthLabel(f.mes_referencia)}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {f.data_pagamento ? `Pago em ${formatDate(f.data_pagamento)}` : "Sem pagamento"}
+                            </p>
+                          </div>
+                          <Badge variant={f.status === "paga" ? "secondary" : "destructive"} className={f.status === "paga" ? "bg-secondary/10 text-secondary" : ""}>
+                            {f.status === "paga" ? "Pago" : f.status === "fechada" ? "Fechada" : "Pendente"}
+                          </Badge>
+                          <p className="font-heading font-bold text-sm shrink-0">{formatCurrency(f.valor_total)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -762,7 +779,7 @@ export default function CreditCards() {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
+                  )
                 )}
               </CardContent>
             </Card>
