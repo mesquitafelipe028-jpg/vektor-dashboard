@@ -26,7 +26,7 @@ export default function Clients() {
   const [search, setSearch] = useState("");
 
   const { data: clientes = [], isLoading } = useQuery({
-    queryKey: ["clientes"],
+    queryKey: ["clientes", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clientes")
