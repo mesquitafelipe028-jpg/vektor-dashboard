@@ -443,13 +443,13 @@ export default function Dashboard() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate("/receitas?novo=true")}>
+            <DropdownMenuItem onClick={() => navigate("/receitas/nova")}>
               <TrendingUp className="h-4 w-4 mr-2" /> Registrar Receita
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/despesas?novo=true")}>
+            <DropdownMenuItem onClick={() => navigate("/despesas/nova")}>
               <TrendingDown className="h-4 w-4 mr-2" /> Registrar Despesa
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/clientes?novo=true")}>
+            <DropdownMenuItem onClick={() => navigate("/clientes/novo")}>
               <User className="h-4 w-4 mr-2" /> Novo Cliente
             </DropdownMenuItem>
           </DropdownMenuContent>
