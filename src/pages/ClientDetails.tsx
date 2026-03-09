@@ -188,10 +188,7 @@ export default function ClientDetails() {
       toast.info("Nenhuma cobrança pendente para este cliente.");
       return;
     }
-    const p = stats.pendentes[0];
-    const text = `Olá ${cliente?.nome}, este é um lembrete sobre a cobrança "${p.descricao}" no valor de ${formatCurrency(p.valor)} com vencimento em ${formatDate(p.data)}. Aguardamos seu pagamento!`;
-    navigator.clipboard.writeText(text);
-    toast.success("Texto de lembrete copiado para a área de transferência!");
+    setReminderOpen(true);
   };
 
   // --- Loading / Not Found ---
