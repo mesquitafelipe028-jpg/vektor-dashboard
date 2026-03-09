@@ -197,7 +197,7 @@ export default function CreditCards() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["cartoes_credito"] });
+      qc.invalidateQueries({ queryKey: ["cartoes_credito", user?.id] });
       toast.success(editingCardId ? "Cartão atualizado!" : "Cartão cadastrado!");
       closeCardDialog();
     },
