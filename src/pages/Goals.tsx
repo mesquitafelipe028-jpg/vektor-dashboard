@@ -114,7 +114,7 @@ export default function Goals() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras", user?.id] });
       toast.success(editing ? "Meta atualizada!" : "Meta criada!");
       closeDialog();
     },
