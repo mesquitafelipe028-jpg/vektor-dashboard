@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Building2, Search, Loader2, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
+import { Building2, Search, Loader2, CheckCircle2, AlertCircle, Trash2, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme } from "next-themes";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -62,6 +63,7 @@ const emptyEmpresa: EmpresaData = {
 };
 
 export default function Settings() {
+  const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [nome, setNome] = useState("");
@@ -268,7 +270,29 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* Company / CNPJ Section */}
+      {/* Theme Selector */}
+      <Card>
+        <CardHeader><CardTitle className="font-heading text-lg">Aparência</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            {[
+              { value: "system", label: "Sistema", icon: Monitor },
+              { value: "light", label: "Claro", icon: Sun },
+              { value: "dark", label: "Escuro", icon: Moon },
+            ].map(({ value, label, icon: Icon }) => (
+              <Button
+                key={value}
+                variant={theme === value ? "default" : "outline"}
+                className="flex-1 gap-2"
+                onClick={() => setTheme(value)}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <Card>
           <CardHeader>
