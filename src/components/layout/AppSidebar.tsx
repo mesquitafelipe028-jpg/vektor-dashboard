@@ -37,9 +37,9 @@ import {
 } from "@/components/ui/sidebar";
 
 const quickActions = [
-  { title: "Nova Receita", url: "/receitas?novo=true", icon: TrendingUp },
-  { title: "Nova Despesa", url: "/despesas?novo=true", icon: TrendingDown },
-  { title: "Novo Cliente", url: "/clientes?novo=true", icon: Users },
+  { title: "Nova Receita", url: "/receitas/nova", icon: TrendingUp },
+  { title: "Nova Despesa", url: "/despesas/nova", icon: TrendingDown },
+  { title: "Novo Cliente", url: "/clientes/novo", icon: Users },
 ];
 
 const menuGroups = [

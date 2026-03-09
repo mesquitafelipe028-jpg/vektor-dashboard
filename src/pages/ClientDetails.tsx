@@ -384,7 +384,7 @@ export default function ClientDetails() {
           ) : receitas.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-muted-foreground mb-4">Nenhuma cobrança vinculada a este cliente.</p>
-              <Button variant="outline" onClick={() => navigate(`/receitas?novo=true&cliente=${id}`)}>
+              <Button variant="outline" onClick={() => navigate(`/receitas/nova?cliente=${id}`)}>
                 <Plus className="mr-2 h-4 w-4" /> Cadastrar Cobrança
               </Button>
             </div>

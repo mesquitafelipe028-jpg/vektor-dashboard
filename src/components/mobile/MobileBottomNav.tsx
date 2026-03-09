@@ -15,9 +15,9 @@ const navItems = [
 ];
 
 const quickActions = [
-  { label: "Nova Receita", icon: TrendingUp, path: "/receitas?novo=true", color: "text-primary" },
-  { label: "Nova Despesa", icon: Receipt, path: "/despesas?novo=true", color: "text-destructive" },
-  { label: "Novo Cliente", icon: UserPlus, path: "/clientes?novo=true", color: "text-chart-3" },
+  { label: "Nova Receita", icon: TrendingUp, path: "/receitas/nova", color: "text-primary" },
+  { label: "Nova Despesa", icon: Receipt, path: "/despesas/nova", color: "text-destructive" },
+  { label: "Novo Cliente", icon: UserPlus, path: "/clientes/novo", color: "text-chart-3" },
 ];
 
 export function MobileBottomNav() {
