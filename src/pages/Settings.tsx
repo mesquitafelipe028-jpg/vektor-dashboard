@@ -270,7 +270,29 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* Company / CNPJ Section */}
+      {/* Theme Selector */}
+      <Card>
+        <CardHeader><CardTitle className="font-heading text-lg">Aparência</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            {[
+              { value: "system", label: "Sistema", icon: Monitor },
+              { value: "light", label: "Claro", icon: Sun },
+              { value: "dark", label: "Escuro", icon: Moon },
+            ].map(({ value, label, icon: Icon }) => (
+              <Button
+                key={value}
+                variant={theme === value ? "default" : "outline"}
+                className="flex-1 gap-2"
+                onClick={() => setTheme(value)}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <Card>
           <CardHeader>
