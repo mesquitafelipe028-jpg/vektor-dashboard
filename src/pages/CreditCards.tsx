@@ -723,7 +723,7 @@ export default function CreditCards() {
                 </p>
               </CardHeader>
               <CardContent>
-                {renderPurchasList(tnextCompras)}
+                {renderPurchaseList(nextCompras)}
               </CardContent>
             </Card>
           </TabsContent>
