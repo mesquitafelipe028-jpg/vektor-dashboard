@@ -28,7 +28,7 @@ export default function Revenues() {
   const [filterClientId, setFilterClientId] = useState("");
 
   const { data: receitas = [], isLoading } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("receitas")
@@ -41,7 +41,7 @@ export default function Revenues() {
   });
 
   const { data: clientes = [] } = useQuery({
-    queryKey: ["clientes"],
+    queryKey: ["clientes", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("clientes").select("id, nome").order("nome");
       if (error) throw error;
@@ -83,7 +83,7 @@ export default function Revenues() {
       await (supabase.from("receitas") as any).delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["receitas"] });
+      qc.invalidateQueries({ queryKey: ["receitas", user?.id] });
       toast.success("Receita excluída!");
     },
     onError: () => toast.error("Erro ao excluir receita."),
@@ -95,7 +95,7 @@ export default function Revenues() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["receitas"] });
+      qc.invalidateQueries({ queryKey: ["receitas", user?.id] });
       toast.success("Status atualizado!");
     },
   });

@@ -59,7 +59,7 @@ export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
 
   const { data: receitas = [] } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*");
       if (error) throw error;
@@ -69,7 +69,7 @@ export default function Reports() {
   });
 
   const { data: despesas = [] } = useQuery({
-    queryKey: ["despesas"],
+    queryKey: ["despesas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*");
       if (error) throw error;

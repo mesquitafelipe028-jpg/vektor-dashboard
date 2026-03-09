@@ -82,7 +82,7 @@ export default function Goals() {
   const [txData, setTxData] = useState(new Date().toISOString().slice(0, 10));
 
   const { data: metas = [], isLoading } = useQuery({
-    queryKey: ["metas_financeiras"],
+    queryKey: ["metas_financeiras", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("metas_financeiras").select("*").order("prazo", { ascending: true });
@@ -93,7 +93,7 @@ export default function Goals() {
   });
 
   const { data: allDepositos = [] } = useQuery({
-    queryKey: ["depositos_meta"],
+    queryKey: ["depositos_meta", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("depositos_meta").select("*").order("data", { ascending: true });
@@ -114,7 +114,7 @@ export default function Goals() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras", user?.id] });
       toast.success(editing ? "Meta atualizada!" : "Meta criada!");
       closeDialog();
     },
@@ -127,8 +127,8 @@ export default function Goals() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
-      queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["depositos_meta", user?.id] });
       toast.success("Meta excluída.");
       setDeleteId(null);
     },
@@ -162,8 +162,8 @@ export default function Goals() {
       if (metaError) throw metaError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
-      queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["depositos_meta", user?.id] });
       toast.success("Depósito registrado!");
       setDepositMeta(null);
       resetTxForm();
@@ -195,8 +195,8 @@ export default function Goals() {
       if (metaError) throw metaError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
-      queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["depositos_meta", user?.id] });
       toast.success("Saque registrado!");
       setWithdrawMeta(null);
       resetTxForm();

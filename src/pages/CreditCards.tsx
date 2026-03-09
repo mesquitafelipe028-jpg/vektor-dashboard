@@ -113,7 +113,7 @@ export default function CreditCards() {
 
   // ── Queries ──
   const { data: cartoes = [], isLoading: loadingCards } = useQuery({
-    queryKey: ["cartoes_credito"],
+    queryKey: ["cartoes_credito", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("cartoes_credito").select("*").order("nome");
       if (error) throw error;
@@ -123,7 +123,7 @@ export default function CreditCards() {
   });
 
   const { data: compras = [] } = useQuery({
-    queryKey: ["compras_cartao"],
+    queryKey: ["compras_cartao", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("compras_cartao").select("*").order("data", { ascending: false });
       if (error) throw error;
@@ -133,7 +133,7 @@ export default function CreditCards() {
   });
 
   const { data: faturas = [] } = useQuery({
-    queryKey: ["faturas_cartao"],
+    queryKey: ["faturas_cartao", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("faturas_cartao").select("*").order("mes_referencia", { ascending: false });
       if (error) throw error;
@@ -197,7 +197,7 @@ export default function CreditCards() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["cartoes_credito"] });
+      qc.invalidateQueries({ queryKey: ["cartoes_credito", user?.id] });
       toast.success(editingCardId ? "Cartão atualizado!" : "Cartão cadastrado!");
       closeCardDialog();
     },
@@ -210,9 +210,9 @@ export default function CreditCards() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["cartoes_credito"] });
-      qc.invalidateQueries({ queryKey: ["compras_cartao"] });
-      qc.invalidateQueries({ queryKey: ["faturas_cartao"] });
+      qc.invalidateQueries({ queryKey: ["cartoes_credito", user?.id] });
+      qc.invalidateQueries({ queryKey: ["compras_cartao", user?.id] });
+      qc.invalidateQueries({ queryKey: ["faturas_cartao", user?.id] });
       toast.success("Cartão excluído!");
       setSelectedCardId(null);
     },
@@ -245,7 +245,7 @@ export default function CreditCards() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["compras_cartao"] });
+      qc.invalidateQueries({ queryKey: ["compras_cartao", user?.id] });
       toast.success(editingCompraId ? "Compra atualizada!" : "Compra registrada!");
       closeCompraDialog();
     },
@@ -258,7 +258,7 @@ export default function CreditCards() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["compras_cartao"] });
+      qc.invalidateQueries({ queryKey: ["compras_cartao", user?.id] });
       toast.success("Compra excluída!");
     },
     onError: () => toast.error("Erro ao excluir compra"),
@@ -304,8 +304,8 @@ export default function CreditCards() {
       if (expError) throw expError;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["faturas_cartao"] });
-      qc.invalidateQueries({ queryKey: ["despesas"] });
+      qc.invalidateQueries({ queryKey: ["faturas_cartao", user?.id] });
+      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("Fatura paga e despesa registrada!");
     },

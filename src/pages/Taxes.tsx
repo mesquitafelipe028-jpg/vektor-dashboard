@@ -59,7 +59,7 @@ export default function Taxes() {
   });
 
   const { data: impostos = [], isLoading } = useQuery({
-    queryKey: ["impostos_mei"],
+    queryKey: ["impostos_mei", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("impostos_mei")
@@ -72,7 +72,7 @@ export default function Taxes() {
   });
 
   const { data: receitas = [] } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*");
       if (error) throw error;
@@ -176,13 +176,13 @@ export default function Taxes() {
         if (error) throw error;
       }
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei"] }); toast.success(editingId ? "Guia atualizada" : "Guia DAS adicionada"); setOpen(false); resetForm(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei", user?.id] }); toast.success(editingId ? "Guia atualizada" : "Guia DAS adicionada"); setOpen(false); resetForm(); },
     onError: () => toast.error("Erro ao salvar guia"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("impostos_mei").delete().eq("id", id); if (error) throw error; },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei"] }); toast.success("Guia excluída"); setDeleteId(null); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei", user?.id] }); toast.success("Guia excluída"); setDeleteId(null); },
     onError: () => toast.error("Erro ao excluir"),
   });
 
@@ -192,7 +192,7 @@ export default function Taxes() {
       const { error } = await supabase.from("impostos_mei").update({ status: newStatus }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei"] }); toast.success("Status atualizado"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei", user?.id] }); toast.success("Status atualizado"); },
     onError: () => toast.error("Erro ao atualizar"),
   });
 

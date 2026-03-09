@@ -153,7 +153,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const { data: receitas = [], isLoading: loadingReceitas } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*").order("data", { ascending: false });
       if (error) throw error;
@@ -163,7 +163,7 @@ export default function Dashboard() {
   });
 
   const { data: despesas = [], isLoading: loadingDespesas } = useQuery({
-    queryKey: ["despesas"],
+    queryKey: ["despesas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
       if (error) throw error;
@@ -173,7 +173,7 @@ export default function Dashboard() {
   });
 
   const { data: impostoPendente } = useQuery({
-    queryKey: ["impostos_mei_pendente"],
+    queryKey: ["impostos_mei_pendente", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("impostos_mei")
@@ -190,7 +190,7 @@ export default function Dashboard() {
 
   // Metas financeiras
   const { data: metas = [] } = useQuery({
-    queryKey: ["metas_financeiras"],
+    queryKey: ["metas_financeiras", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("metas_financeiras")

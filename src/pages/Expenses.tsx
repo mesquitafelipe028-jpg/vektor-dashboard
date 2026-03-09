@@ -28,7 +28,7 @@ export default function Expenses() {
   const [filterCategoria, setFilterCategoria] = useState("");
 
   const { data: despesas = [], isLoading } = useQuery({
-    queryKey: ["despesas"],
+    queryKey: ["despesas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
       if (error) throw error;
@@ -70,7 +70,7 @@ export default function Expenses() {
       await (supabase.from("despesas") as any).delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["despesas"] });
+      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
       toast.success("Despesa excluída!");
     },
     onError: () => toast.error("Erro ao excluir despesa."),
@@ -82,7 +82,7 @@ export default function Expenses() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["despesas"] });
+      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
       toast.success("Status atualizado!");
     },
   });

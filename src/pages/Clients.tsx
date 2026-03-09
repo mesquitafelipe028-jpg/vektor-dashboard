@@ -26,7 +26,7 @@ export default function Clients() {
   const [search, setSearch] = useState("");
 
   const { data: clientes = [], isLoading } = useQuery({
-    queryKey: ["clientes"],
+    queryKey: ["clientes", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clientes")
@@ -39,7 +39,7 @@ export default function Clients() {
   });
 
   const { data: receitas = [] } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("receitas")
@@ -71,7 +71,7 @@ export default function Clients() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes", user?.id] });
       toast.success("Cliente excluído!");
     },
     onError: () => toast.error("Erro ao excluir cliente."),
