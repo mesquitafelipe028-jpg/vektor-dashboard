@@ -93,7 +93,7 @@ export default function Goals() {
   });
 
   const { data: allDepositos = [] } = useQuery({
-    queryKey: ["depositos_meta"],
+    queryKey: ["depositos_meta", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("depositos_meta").select("*").order("data", { ascending: true });
