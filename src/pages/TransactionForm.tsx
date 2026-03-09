@@ -354,9 +354,9 @@ export default function TransactionForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [table] });
-      if (type === "receita") qc.invalidateQueries({ queryKey: ["receitas"] });
-      else qc.invalidateQueries({ queryKey: ["despesas"] });
+      qc.invalidateQueries({ queryKey: [table, user?.id] });
+      if (type === "receita") qc.invalidateQueries({ queryKey: ["receitas", user?.id] });
+      else qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
       toast.success(isEditing
         ? `${type === "receita" ? "Receita" : "Despesa"} atualizada!`
         : `${type === "receita" ? "Receita" : "Despesa"} cadastrada!`
