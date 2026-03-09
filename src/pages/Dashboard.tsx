@@ -190,7 +190,7 @@ export default function Dashboard() {
 
   // Metas financeiras
   const { data: metas = [] } = useQuery({
-    queryKey: ["metas_financeiras"],
+    queryKey: ["metas_financeiras", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("metas_financeiras")

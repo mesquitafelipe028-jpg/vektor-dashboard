@@ -82,7 +82,7 @@ export default function Expenses() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["despesas"] });
+      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
       toast.success("Status atualizado!");
     },
   });

@@ -192,7 +192,7 @@ export default function Taxes() {
       const { error } = await supabase.from("impostos_mei").update({ status: newStatus }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei"] }); toast.success("Status atualizado"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["impostos_mei", user?.id] }); toast.success("Status atualizado"); },
     onError: () => toast.error("Erro ao atualizar"),
   });
 

@@ -95,7 +95,7 @@ export default function Revenues() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["receitas"] });
+      qc.invalidateQueries({ queryKey: ["receitas", user?.id] });
       toast.success("Status atualizado!");
     },
   });

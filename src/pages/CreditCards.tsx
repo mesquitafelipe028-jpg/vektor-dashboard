@@ -304,8 +304,8 @@ export default function CreditCards() {
       if (expError) throw expError;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["faturas_cartao"] });
-      qc.invalidateQueries({ queryKey: ["despesas"] });
+      qc.invalidateQueries({ queryKey: ["faturas_cartao", user?.id] });
+      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("Fatura paga e despesa registrada!");
     },

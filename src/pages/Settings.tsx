@@ -183,7 +183,24 @@ export default function Settings() {
 
   const clearData = useMutation({
     mutationFn: async () => {
-      const tables = ["receitas", "despesas", "clientes", "categorias", "impostos_mei", "empresas", "metas_financeiras"] as const;
+      // Order: child tables first to avoid FK violations
+      const tables = [
+        "compras_cartao",
+        "faturas_cartao",
+        "cartoes_credito",
+        "investimento_dividendos",
+        "investimento_ativos",
+        "depositos_meta",
+        "metas_financeiras",
+        "receitas",
+        "despesas",
+        "clientes",
+        "categorias",
+        "impostos_mei",
+        "empresas",
+        "contas_financeiras",
+        "user_preferences",
+      ] as const;
       for (const table of tables) {
         const { error } = await (supabase as any).from(table).delete().eq("user_id", user!.id);
         if (error) throw error;

@@ -195,8 +195,8 @@ export default function Goals() {
       if (metaError) throw metaError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["metas_financeiras"] });
-      queryClient.invalidateQueries({ queryKey: ["depositos_meta"] });
+      queryClient.invalidateQueries({ queryKey: ["metas_financeiras", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["depositos_meta", user?.id] });
       toast.success("Saque registrado!");
       setWithdrawMeta(null);
       resetTxForm();

@@ -69,7 +69,7 @@ export default function Reports() {
   });
 
   const { data: despesas = [] } = useQuery({
-    queryKey: ["despesas"],
+    queryKey: ["despesas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*");
       if (error) throw error;

@@ -71,7 +71,7 @@ export default function Clients() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes", user?.id] });
       toast.success("Cliente excluído!");
     },
     onError: () => toast.error("Erro ao excluir cliente."),
