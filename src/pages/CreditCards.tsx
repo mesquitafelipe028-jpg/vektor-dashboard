@@ -210,9 +210,9 @@ export default function CreditCards() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["cartoes_credito"] });
-      qc.invalidateQueries({ queryKey: ["compras_cartao"] });
-      qc.invalidateQueries({ queryKey: ["faturas_cartao"] });
+      qc.invalidateQueries({ queryKey: ["cartoes_credito", user?.id] });
+      qc.invalidateQueries({ queryKey: ["compras_cartao", user?.id] });
+      qc.invalidateQueries({ queryKey: ["faturas_cartao", user?.id] });
       toast.success("Cartão excluído!");
       setSelectedCardId(null);
     },
