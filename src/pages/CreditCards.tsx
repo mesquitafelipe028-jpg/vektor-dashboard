@@ -113,7 +113,7 @@ export default function CreditCards() {
 
   // ── Queries ──
   const { data: cartoes = [], isLoading: loadingCards } = useQuery({
-    queryKey: ["cartoes_credito"],
+    queryKey: ["cartoes_credito", user?.id],
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("cartoes_credito").select("*").order("nome");
       if (error) throw error;
