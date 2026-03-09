@@ -59,7 +59,7 @@ export default function Taxes() {
   });
 
   const { data: impostos = [], isLoading } = useQuery({
-    queryKey: ["impostos_mei"],
+    queryKey: ["impostos_mei", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("impostos_mei")
