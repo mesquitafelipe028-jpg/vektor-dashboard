@@ -19,8 +19,8 @@ export function useRecurringGenerator(userId: string | undefined) {
       try {
         await generateNext("receitas", userId);
         await generateNext("despesas", userId);
-        qc.invalidateQueries({ queryKey: ["receitas"] });
-        qc.invalidateQueries({ queryKey: ["despesas"] });
+        qc.invalidateQueries({ queryKey: ["receitas", userId] });
+        qc.invalidateQueries({ queryKey: ["despesas", userId] });
       } catch (e) {
         console.error("[RecurringGenerator]", e);
       }
