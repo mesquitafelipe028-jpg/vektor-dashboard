@@ -342,8 +342,61 @@ export default function Dashboard() {
 
   const isLoading = loadingReceitas || loadingDespesas;
 
-  return (
-    <div className="space-y-5 min-w-0 max-w-full">
+  // === NEW: Resumo do mês (auto-generated text) ===
+  const resumoTexto = useMemo(() => {
+    const lines: string[] = [];
+    lines.push(`Você faturou ${formatCurrency(faturamentoMes)} neste mês.`);
+    lines.push(`Suas despesas foram ${formatCurrency(despesasMesTotal)}.`);
+    if (saldoMes >= 0) {
+      lines.push(`Seu lucro atual é de ${formatCurrency(saldoMes)}.`);
+    } else {
+      lines.push(`Você está com um déficit de ${formatCurrency(Math.abs(saldoMes))}.`);
+    }
+    return lines;
+  }, [faturamentoMes, despesasMesTotal, saldoMes]);
+
+  // === NEW: Mini gráfico de fluxo (daily data for current month) ===
+  const flowChartData = useMemo(() => {
+    const today = now.getDate();
+    let accumulated = 0;
+    return Array.from({ length: today }, (_, i) => {
+      const day = i + 1;
+      const dayStr = `${currentMonth}-${String(day).padStart(2, "0")}`;
+      const rec = receitasMes.filter((r) => r.data === dayStr).reduce((s, r) => s + r.valor, 0);
+      const desp = despesasMes.filter((d) => d.data === dayStr).reduce((s, d) => s + d.valor, 0);
+      accumulated += rec - desp;
+      return { dia: day, receitas: rec, despesas: desp, saldo: accumulated };
+    });
+  }, [receitasMes, despesasMes, currentMonth]);
+
+  // === NEW: Insight financeiro (single smart insight) ===
+  const smartInsight = useMemo(() => {
+    const savingsRate = faturamentoMes > 0 ? ((faturamentoMes - despesasMesTotal) / faturamentoMes) * 100 : 0;
+
+    if (despesasMesTotal > faturamentoMes && faturamentoMes > 0) {
+      return { type: "danger" as const, icon: ShieldAlert, title: "Atenção ao déficit", description: "Suas despesas estão maiores que sua receita este mês. Priorize cobranças pendentes e adie gastos não essenciais." };
+    }
+    if (despesaPercent > 80) {
+      return { type: "warning" as const, icon: AlertTriangle, title: "Despesas elevadas", description: `Seus gastos representam ${despesaPercent.toFixed(0)}% da receita. Tente reduzir para manter uma margem saudável.` };
+    }
+    if (savingsRate > 20) {
+      return { type: "success" as const, icon: CheckCircle2, title: "Boa taxa de poupança!", description: `Você está poupando ${savingsRate.toFixed(0)}% da sua receita. Continue assim para fortalecer sua reserva.` };
+    }
+    if (prevMonth.varFat > 10) {
+      return { type: "success" as const, icon: Flame, title: "Faturamento em alta!", description: `Seu faturamento cresceu ${prevMonth.varFat.toFixed(0)}% em relação ao mês anterior. Ótimo ritmo!` };
+    }
+    return { type: "info" as const, icon: Lightbulb, title: "Dica financeira", description: "Registre todas as suas movimentações para ter uma visão completa e tomar melhores decisões." };
+  }, [faturamentoMes, despesasMesTotal, despesaPercent, prevMonth.varFat]);
+
+  const insightBadgeConfig = {
+    danger: { label: "Alerta", badgeClass: "bg-destructive/10 text-destructive border-destructive/30" },
+    warning: { label: "Atenção", badgeClass: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
+    success: { label: "Positivo", badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" },
+    info: { label: "Dica", badgeClass: "bg-blue-500/10 text-blue-700 border-blue-500/30" },
+  };
+
+    return (
+    <div className="space-y-6 min-w-0 max-w-full">
       {/* Header + CTAs */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
