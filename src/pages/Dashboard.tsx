@@ -692,26 +692,6 @@ export default function Dashboard() {
 
       <Separator />
 
-      {/* Financial Insights */}
-      {!isLoading && insights.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="font-heading text-lg font-semibold">Insights Financeiros</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {insights.map((insight) => (
-              <Card key={insight.title} className={`border-l-4 ${insightColors[insight.type]}`}>
-                <CardContent className="p-4 flex items-start gap-3">
-                  <insight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[insight.type]}`} />
-                  <div>
-                    <p className="text-sm font-semibold">{insight.title}</p>
-                    <p className="text-xs text-muted-foreground">{insight.description}</p>
-                    <p className="text-xs text-muted-foreground italic mt-1">💡 {insight.suggestion}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Charts — lazy-loaded */}
       <Suspense fallback={<ChartsFallback />}>
