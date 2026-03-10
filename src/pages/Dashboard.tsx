@@ -606,6 +606,24 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* NEW: INSIGHT FINANCEIRO */}
+      {!isLoading && (
+        <Card className={`border-l-4 ${insightColors[smartInsight.type]}`}>
+          <CardContent className="p-4 flex items-start gap-3">
+            <smartInsight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[smartInsight.type]}`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-semibold">{smartInsight.title}</p>
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${insightBadgeConfig[smartInsight.type].badgeClass}`}>
+                  {insightBadgeConfig[smartInsight.type].label}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">{smartInsight.description}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 4. SAÚDE FINANCEIRA — Compact */}
       {!isLoading && (
         <Card className={`border ${healthConfig.border}`}>
