@@ -350,8 +350,8 @@ export default function Dashboard() {
     return Array.from({ length: today }, (_, i) => {
       const day = i + 1;
       const dayStr = `${currentMonth}-${String(day).padStart(2, "0")}`;
-      const rec = receitasMes.filter((r) => r.data === dayStr).reduce((s, r) => s + r.valor, 0);
-      const desp = despesasMes.filter((d) => d.data === dayStr).reduce((s, d) => s + d.valor, 0);
+      const rec = receitasMes.filter((r) => r.data.startsWith(dayStr)).reduce((s, r) => s + r.valor, 0);
+      const desp = despesasMes.filter((d) => d.data.startsWith(dayStr)).reduce((s, d) => s + d.valor, 0);
       accumulated += rec - desp;
       return { dia: day, receitas: rec, despesas: desp, saldo: accumulated };
     });
