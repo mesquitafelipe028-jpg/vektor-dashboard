@@ -60,93 +60,6 @@ function getMonthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function KpiCards({
-  receitas,
-  despesas,
-  currentMonth,
-  now,
-  hasCnpj,
-}: {
-  receitas: any[];
-  despesas: any[];
-  currentMonth: string;
-  now: Date;
-  hasCnpj: boolean;
-}) {
-  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevKey = getMonthKey(prevDate);
-
-  // MEI metrics
-  const faturamentoMei = receitas.filter((r: any) => r.tipo_conta === "mei" && r.data.startsWith(currentMonth) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
-  const despesasMei = despesas.filter((d: any) => d.tipo_conta === "mei" && d.data.startsWith(currentMonth) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
-  const lucroMei = faturamentoMei - despesasMei;
-
-  const faturamentoMeiPrev = receitas.filter((r: any) => r.tipo_conta === "mei" && r.data.startsWith(prevKey) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
-  const despesasMeiPrev = despesas.filter((d: any) => d.tipo_conta === "mei" && d.data.startsWith(prevKey) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
-  const lucroMeiPrev = faturamentoMeiPrev - despesasMeiPrev;
-
-  // Personal savings
-  const rendaPessoal = receitas.filter((r: any) => r.tipo_conta === "pessoal" && r.data.startsWith(currentMonth) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
-  const despPessoal = despesas.filter((d: any) => d.tipo_conta === "pessoal" && d.data.startsWith(currentMonth) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
-  const taxaPoupanca = rendaPessoal > 0 ? ((rendaPessoal - despPessoal) / rendaPessoal) * 100 : 0;
-
-  const rendaPessoalPrev = receitas.filter((r: any) => r.tipo_conta === "pessoal" && r.data.startsWith(prevKey) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
-  const despPessoalPrev = despesas.filter((d: any) => d.tipo_conta === "pessoal" && d.data.startsWith(prevKey) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
-  const taxaPoupancaPrev = rendaPessoalPrev > 0 ? ((rendaPessoalPrev - despPessoalPrev) / rendaPessoalPrev) * 100 : 0;
-
-  function variation(cur: number, prev: number) {
-    if (prev === 0) return cur > 0 ? 100 : 0;
-    return ((cur - prev) / Math.abs(prev)) * 100;
-  }
-
-  const varFat = variation(faturamentoMei, faturamentoMeiPrev);
-  const varLucro = variation(lucroMei, lucroMeiPrev);
-  const varPoup = taxaPoupanca - taxaPoupancaPrev;
-
-  const cards = [
-    ...(hasCnpj ? [
-      { title: "Faturamento MEI", value: formatCurrency(faturamentoMei), change: varFat, icon: Briefcase, prefix: "" },
-      { title: "Lucro MEI", value: formatCurrency(lucroMei), change: varLucro, icon: TrendingUp, prefix: "" },
-    ] : [
-      { title: "Receita Pessoal", value: formatCurrency(rendaPessoal), change: variation(rendaPessoal, rendaPessoalPrev), icon: Wallet, prefix: "" },
-      { title: "Despesa Pessoal", value: formatCurrency(despPessoal), change: variation(despPessoal, despPessoalPrev), icon: Receipt, prefix: "" },
-    ]),
-    { title: "Taxa de Poupança", value: `${taxaPoupanca.toFixed(1)}%`, change: varPoup, icon: PiggyBank, prefix: "pp", isSavings: true },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      {cards.map((c) => {
-        const positive = c.change >= 0;
-        const Arrow = positive ? ArrowUpRight : ArrowDownRight;
-        const changeColor = c.isSavings
-          ? positive ? "text-emerald-600" : "text-destructive"
-          : positive ? "text-emerald-600" : "text-destructive";
-
-        return (
-          <Card key={c.title}>
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                  <c.icon className="h-4 w-4 text-primary" />
-                </div>
-                <span className="text-sm text-muted-foreground">{c.title}</span>
-              </div>
-              <p className="font-heading text-2xl font-bold">{c.value}</p>
-              <div className="flex items-center gap-1 mt-1">
-                <Arrow className={`h-3.5 w-3.5 ${changeColor}`} />
-                <span className={`text-xs font-medium ${changeColor}`}>
-                  {Math.abs(c.change).toFixed(1)}{c.prefix === "pp" ? "pp" : "%"}
-                </span>
-                <span className="text-xs text-muted-foreground">vs mês anterior</span>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -429,7 +342,7 @@ export default function Dashboard() {
   const isLoading = loadingReceitas || loadingDespesas;
 
   return (
-    <div className="space-y-6 min-w-0 max-w-full">
+    <div className="space-y-5 min-w-0 max-w-full">
       {/* Header + CTAs */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -484,18 +397,84 @@ export default function Dashboard() {
         </ToggleGroup>
       </div>
 
-      {/* Key Financial Indicators */}
+      {/* 1. SALDO DO MÊS — Hero card */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Skeleton className="h-28 w-full rounded-lg" />
-          <Skeleton className="h-28 w-full rounded-lg" />
-          <Skeleton className="h-28 w-full rounded-lg" />
-        </div>
+        <Skeleton className="h-32 w-full rounded-lg" />
       ) : (
-        <KpiCards receitas={receitas} despesas={despesas} currentMonth={currentMonth} now={now} hasCnpj={hasCnpj} />
+        <Card className={`border-2 ${saldoMes >= 0 ? "border-primary/20" : "border-destructive/20"}`}>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-2">
+              <Wallet className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium text-muted-foreground">Saldo do Mês</span>
+            </div>
+            <p className={`font-heading text-3xl sm:text-4xl font-bold ${saldoMes >= 0 ? "text-primary" : "text-destructive"}`}>
+              {formatCurrency(saldoMes)}
+            </p>
+            <div className="flex flex-wrap items-center gap-4 mt-3 text-sm">
+              <div className="flex items-center gap-1.5">
+                <ArrowUpRight className="h-4 w-4 text-emerald-600" />
+                <span className="text-muted-foreground">Receitas:</span>
+                <span className="font-semibold text-emerald-600">{formatCurrency(faturamentoMes)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <ArrowDownRight className="h-4 w-4 text-destructive" />
+                <span className="text-muted-foreground">Despesas:</span>
+                <span className="font-semibold text-destructive">{formatCurrency(despesasMesTotal)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Financial Alerts */}
+      {/* 2. MOVIMENTAÇÃO DO MÊS — Unified receitas + despesas */}
+      {isLoading ? (
+        <Skeleton className="h-24 w-full rounded-lg" />
+      ) : (() => {
+        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevKey = getMonthKey(prevDate);
+        const recPrev = filteredReceitas.filter((r) => r.data.startsWith(prevKey)).reduce((s, r) => s + r.valor, 0);
+        const despPrev = filteredDespesas.filter((d) => d.data.startsWith(prevKey)).reduce((s, d) => s + d.valor, 0);
+        const varRec = recPrev > 0 ? ((faturamentoMes - recPrev) / recPrev) * 100 : faturamentoMes > 0 ? 100 : 0;
+        const varDesp = despPrev > 0 ? ((despesasMesTotal - despPrev) / despPrev) * 100 : despesasMesTotal > 0 ? 100 : 0;
+        return (
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Movimentação do Mês</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingUp className="h-4 w-4 text-emerald-600" />
+                    <span className="text-sm text-muted-foreground">Receitas</span>
+                  </div>
+                  <p className="font-heading text-xl font-bold text-emerald-600">{formatCurrency(faturamentoMes)}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    {varRec >= 0 ? <ArrowUpRight className="h-3 w-3 text-emerald-600" /> : <ArrowDownRight className="h-3 w-3 text-destructive" />}
+                    <span className={`text-xs ${varRec >= 0 ? "text-emerald-600" : "text-destructive"}`}>{Math.abs(varRec).toFixed(0)}%</span>
+                    <span className="text-xs text-muted-foreground">vs anterior</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingDown className="h-4 w-4 text-destructive" />
+                    <span className="text-sm text-muted-foreground">Despesas</span>
+                  </div>
+                  <p className="font-heading text-xl font-bold text-destructive">{formatCurrency(despesasMesTotal)}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    {varDesp <= 0 ? <ArrowDownRight className="h-3 w-3 text-emerald-600" /> : <ArrowUpRight className="h-3 w-3 text-destructive" />}
+                    <span className={`text-xs ${varDesp <= 0 ? "text-emerald-600" : "text-destructive"}`}>{Math.abs(varDesp).toFixed(0)}%</span>
+                    <span className="text-xs text-muted-foreground">vs anterior</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* 3. ALERTAS FINANCEIROS */}
       {!isLoading && financialAlerts.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -525,11 +504,87 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Company Card or CTA Banner */}
-      {hasCnpj ? (
+      {/* 4. SAÚDE FINANCEIRA — Compact */}
+      {!isLoading && (
+        <Card className={`border ${healthConfig.border}`}>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${healthConfig.bg} shrink-0`}>
+              <healthConfig.icon className={`h-5 w-5 ${healthConfig.color}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm text-muted-foreground">Saúde Financeira</span>
+                <Badge variant="outline" className={`text-xs ${healthConfig.color} border-current`}>
+                  {healthConfig.label}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3">
+                <Progress value={Math.min(despesaPercent, 100)} className="h-2 flex-1" />
+                <span className="text-xs font-medium text-muted-foreground shrink-0">{despesaPercent.toFixed(0)}% gastos</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 5. TAXA DE POUPANÇA */}
+      {!isLoading && (() => {
+        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevKey = getMonthKey(prevDate);
+        const rendaPessoal = receitas.filter((r: any) => r.tipo_conta === "pessoal" && r.data.startsWith(currentMonth) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
+        const despPessoal = despesas.filter((d: any) => d.tipo_conta === "pessoal" && d.data.startsWith(currentMonth) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
+        const taxaPoupanca = rendaPessoal > 0 ? ((rendaPessoal - despPessoal) / rendaPessoal) * 100 : 0;
+        const rendaPrev = receitas.filter((r: any) => r.tipo_conta === "pessoal" && r.data.startsWith(prevKey) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
+        const despPrev = despesas.filter((d: any) => d.tipo_conta === "pessoal" && d.data.startsWith(prevKey) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
+        const taxaPrev = rendaPrev > 0 ? ((rendaPrev - despPrev) / rendaPrev) * 100 : 0;
+        const varPoup = taxaPoupanca - taxaPrev;
+        const positive = varPoup >= 0;
+        return (
+          <Card>
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                <PiggyBank className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-muted-foreground">Taxa de Poupança</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-heading text-xl font-bold">{taxaPoupanca.toFixed(1)}%</span>
+                  <div className="flex items-center gap-0.5">
+                    {positive ? <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" /> : <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />}
+                    <span className={`text-xs font-medium ${positive ? "text-emerald-600" : "text-destructive"}`}>
+                      {Math.abs(varPoup).toFixed(1)}pp
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* 6. BANNER MEI — Only if no CNPJ */}
+      {!hasCnpj && (
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-dashed" onClick={() => navigate("/configuracoes")}>
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-heading font-semibold text-sm">Você é MEI?</p>
+              <p className="text-xs text-muted-foreground">Cadastre seu CNPJ para desbloquear o controle empresarial.</p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0">
+              Cadastrar
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Company info — only if has CNPJ */}
+      {hasCnpj && (
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
               <Building2 className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
@@ -544,77 +599,12 @@ export default function Dashboard() {
                   {empresa.situacao_cadastral}
                 </Badge>
               )}
-              {empresa.cnae_principal && (
-                <span className="text-xs text-muted-foreground hidden sm:block max-w-48 truncate">{empresa.cnae_principal}</span>
-              )}
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-dashed" onClick={() => navigate("/configuracoes")}>
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-              <Building2 className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-heading font-semibold text-sm">Você é MEI?</p>
-              <p className="text-xs text-muted-foreground">Cadastre seu CNPJ nas Configurações para desbloquear o controle financeiro empresarial.</p>
-            </div>
-            <Button size="sm" variant="outline" className="shrink-0">
-              Cadastrar CNPJ
-            </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Saldo + Saúde Financeira */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Skeleton className="h-32 w-full rounded-lg" />
-          <Skeleton className="h-32 w-full rounded-lg" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="h-full">
-            <CardContent className="p-6 flex flex-col justify-center h-full">
-              <div className="flex items-center gap-2 mb-1">
-                <Wallet className="h-5 w-5 text-chart-3" />
-                <span className="text-sm text-muted-foreground">Saldo do Mês</span>
-              </div>
-              <p className={`font-heading text-2xl sm:text-4xl font-bold ${saldoMes >= 0 ? "text-primary" : "text-destructive"}`}>
-                {formatCurrency(saldoMes)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Receitas: {formatCurrency(faturamentoMes)} — Despesas: {formatCurrency(despesasMesTotal)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className={`h-full border ${healthConfig.border}`}>
-            <CardContent className="p-6 flex flex-col justify-center h-full">
-              <div className="flex items-center gap-2 mb-1">
-                <HeartPulse className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Saúde Financeira</span>
-              </div>
-              <div className="flex items-center gap-3 mb-2">
-                <healthConfig.icon className={`h-6 w-6 ${healthConfig.color}`} />
-                <span className={`font-heading text-xl font-bold ${healthConfig.color}`}>{healthConfig.label}</span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Despesas / Faturamento</span>
-                  <span>{despesaPercent.toFixed(0)}%</span>
-                </div>
-                <Progress value={Math.min(despesaPercent, 100)} className="h-2" />
-              </div>
-              <p className="text-sm font-medium mt-2">
-                Lucro: <span className={saldoMes >= 0 ? "text-primary" : "text-destructive"}>{formatCurrency(saldoMes)}</span>
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
+      <Separator />
 
       {/* Financial Insights */}
       {!isLoading && insights.length > 0 && (
@@ -637,14 +627,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      <Separator />
-
       {/* Charts — lazy-loaded */}
       <Suspense fallback={<ChartsFallback />}>
         <DashboardCharts monthlyData={monthlyData} categoryData={categoryData} />
       </Suspense>
 
-      {/* Meta Financeira + Resumo Mensal — side by side */}
+      {/* Meta Financeira + Resumo Mensal */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {metaAtual && (
           <Card className="border-accent/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/metas")}>
