@@ -21,7 +21,7 @@ import {
   CheckCircle2, Clock, Flame, User, Briefcase, Layers,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
-import { useFinancialInsights } from "@/hooks/useFinancialInsights";
+
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { useCategories, type CategoriaDB } from "@/hooks/useCategories";
