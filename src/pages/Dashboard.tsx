@@ -480,6 +480,29 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {/* NEW: RESUMO DO MÊS */}
+      {!isLoading && (
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Resumo do mês</span>
+            </div>
+            <div className="space-y-1">
+              {resumoTexto.map((line, i) => (
+                <p key={i} className="text-sm text-foreground">{line}</p>
+              ))}
+              {despesasMesTotal > faturamentoMes && faturamentoMes > 0 && (
+                <p className="text-sm text-destructive font-medium mt-2 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Suas despesas estão maiores que sua receita neste mês.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 2. MOVIMENTAÇÃO DO MÊS — Unified receitas + despesas */}
       {isLoading ? (
         <Skeleton className="h-24 w-full rounded-lg" />
