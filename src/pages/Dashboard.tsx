@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from "react";
-import { Repeat, Calendar as CalendarIcon } from "lucide-react";
+import { Repeat, Calendar as CalendarIcon, Lightbulb } from "lucide-react";
+import { AreaChart, Area, XAxis as AXAxis, YAxis as AYAxis, CartesianGrid as ACG, Tooltip as ATooltip, ResponsiveContainer as ARC } from "recharts";
 import { useQuery, useIsFetching } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
