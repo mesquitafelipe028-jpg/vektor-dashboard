@@ -342,18 +342,6 @@ export default function Dashboard() {
 
   const isLoading = loadingReceitas || loadingDespesas;
 
-  // === NEW: Resumo do mês (auto-generated text) ===
-  const resumoTexto = useMemo(() => {
-    const lines: string[] = [];
-    lines.push(`Você faturou ${formatCurrency(faturamentoMes)} neste mês.`);
-    lines.push(`Suas despesas foram ${formatCurrency(despesasMesTotal)}.`);
-    if (saldoMes >= 0) {
-      lines.push(`Seu lucro atual é de ${formatCurrency(saldoMes)}.`);
-    } else {
-      lines.push(`Você está com um déficit de ${formatCurrency(Math.abs(saldoMes))}.`);
-    }
-    return lines;
-  }, [faturamentoMes, despesasMesTotal, saldoMes]);
 
   // === NEW: Mini gráfico de fluxo (daily data for current month) ===
   const flowChartData = useMemo(() => {
