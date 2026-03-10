@@ -21,7 +21,7 @@ import {
   CheckCircle2, Clock, Flame, User, Briefcase, Layers,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/mockData";
-import { useFinancialInsights } from "@/hooks/useFinancialInsights";
+
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { useCategories, type CategoriaDB } from "@/hooks/useCategories";
@@ -196,7 +196,7 @@ export default function Dashboard() {
     critical: { label: "Crítico", icon: ShieldAlert, color: "text-red-600", bg: "bg-red-500/10", border: "border-red-500/30" },
   }[healthStatus];
 
-  const insights = useFinancialInsights(filteredReceitas, filteredDespesas);
+  
 
   const { categories: dbCategories } = useCategories("despesa");
 
@@ -342,18 +342,6 @@ export default function Dashboard() {
 
   const isLoading = loadingReceitas || loadingDespesas;
 
-  // === NEW: Resumo do mês (auto-generated text) ===
-  const resumoTexto = useMemo(() => {
-    const lines: string[] = [];
-    lines.push(`Você faturou ${formatCurrency(faturamentoMes)} neste mês.`);
-    lines.push(`Suas despesas foram ${formatCurrency(despesasMesTotal)}.`);
-    if (saldoMes >= 0) {
-      lines.push(`Seu lucro atual é de ${formatCurrency(saldoMes)}.`);
-    } else {
-      lines.push(`Você está com um déficit de ${formatCurrency(Math.abs(saldoMes))}.`);
-    }
-    return lines;
-  }, [faturamentoMes, despesasMesTotal, saldoMes]);
 
   // === NEW: Mini gráfico de fluxo (daily data for current month) ===
   const flowChartData = useMemo(() => {
@@ -362,8 +350,8 @@ export default function Dashboard() {
     return Array.from({ length: today }, (_, i) => {
       const day = i + 1;
       const dayStr = `${currentMonth}-${String(day).padStart(2, "0")}`;
-      const rec = receitasMes.filter((r) => r.data === dayStr).reduce((s, r) => s + r.valor, 0);
-      const desp = despesasMes.filter((d) => d.data === dayStr).reduce((s, d) => s + d.valor, 0);
+      const rec = receitasMes.filter((r) => r.data.startsWith(dayStr)).reduce((s, r) => s + r.valor, 0);
+      const desp = despesasMes.filter((d) => d.data.startsWith(dayStr)).reduce((s, d) => s + d.valor, 0);
       accumulated += rec - desp;
       return { dia: day, receitas: rec, despesas: desp, saldo: accumulated };
     });
@@ -480,28 +468,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* NEW: RESUMO DO MÊS */}
-      {!isLoading && (
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Resumo do mês</span>
-            </div>
-            <div className="space-y-1">
-              {resumoTexto.map((line, i) => (
-                <p key={i} className="text-sm text-foreground">{line}</p>
-              ))}
-              {despesasMesTotal > faturamentoMes && faturamentoMes > 0 && (
-                <p className="text-sm text-destructive font-medium mt-2 flex items-center gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Suas despesas estão maiores que sua receita neste mês.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* 2. MOVIMENTAÇÃO DO MÊS — Unified receitas + despesas */}
       {isLoading ? (
@@ -726,26 +692,6 @@ export default function Dashboard() {
 
       <Separator />
 
-      {/* Financial Insights */}
-      {!isLoading && insights.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="font-heading text-lg font-semibold">Insights Financeiros</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {insights.map((insight) => (
-              <Card key={insight.title} className={`border-l-4 ${insightColors[insight.type]}`}>
-                <CardContent className="p-4 flex items-start gap-3">
-                  <insight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[insight.type]}`} />
-                  <div>
-                    <p className="text-sm font-semibold">{insight.title}</p>
-                    <p className="text-xs text-muted-foreground">{insight.description}</p>
-                    <p className="text-xs text-muted-foreground italic mt-1">💡 {insight.suggestion}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Charts — lazy-loaded */}
       <Suspense fallback={<ChartsFallback />}>
