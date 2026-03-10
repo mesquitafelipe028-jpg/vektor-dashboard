@@ -551,6 +551,31 @@ export default function Dashboard() {
         );
       })()}
 
+      {/* NEW: MINI GRÁFICO DE FLUXO */}
+      {!isLoading && flowChartData.length > 1 && (
+        <Card>
+          <CardContent className="p-5 pb-2">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Fluxo do mês</span>
+            </div>
+            <div className="h-28">
+              <ARC width="100%" height="100%">
+                <AreaChart data={flowChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <ACG strokeDasharray="3 3" className="stroke-border" />
+                  <AXAxis dataKey="dia" tick={{ fontSize: 10 }} className="text-xs" />
+                  <AYAxis tick={{ fontSize: 10 }} className="text-xs" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <ATooltip formatter={(v: number) => formatCurrency(v)} labelFormatter={(l) => `Dia ${l}`} />
+                  <Area type="monotone" dataKey="receitas" name="Receitas" stroke="hsl(160, 60%, 38%)" fill="hsl(160, 60%, 38%)" fillOpacity={0.1} strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="despesas" name="Despesas" stroke="hsl(0, 72%, 51%)" fill="hsl(0, 72%, 51%)" fillOpacity={0.1} strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="saldo" name="Saldo" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.15} strokeWidth={2} />
+                </AreaChart>
+              </ARC>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 3. ALERTAS FINANCEIROS */}
       {!isLoading && financialAlerts.length > 0 && (
         <div className="space-y-2">
