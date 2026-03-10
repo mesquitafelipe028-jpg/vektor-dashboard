@@ -10,6 +10,7 @@ import { useTheme } from "next-themes";
 
 import { useRecurringGenerator } from "@/hooks/useRecurringGenerator";
 import { useAuth } from "@/contexts/AuthContext";
+import { AssistantWidget } from "@/components/AssistantWidget";
 
 export default function AppLayout() {
   const { user } = useAuth();
@@ -42,6 +43,7 @@ export default function AppLayout() {
         </div>
       </div>
       {isMobile && <MobileBottomNav />}
+      <AssistantWidget />
     </SidebarProvider>
   );
 }

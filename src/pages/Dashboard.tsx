@@ -26,6 +26,7 @@ import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { useCategories, type CategoriaDB } from "@/hooks/useCategories";
 import { InsightsFinanceiros } from "@/components/dashboard/InsightsFinanceiros";
+import { QuickEntry } from "@/components/dashboard/QuickEntry";
 
 const colorNameToHsl: Record<string, string> = {
   orange:  "hsl(25, 95%, 53%)",
@@ -386,6 +387,11 @@ export default function Dashboard() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+
+      {/* Quick Entry / Registro Rápido */}
+      <div className="w-full">
+        <QuickEntry financialView={financialView} />
       </div>
 
       {/* Financial View Selector */}

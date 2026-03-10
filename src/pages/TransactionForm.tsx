@@ -151,7 +151,19 @@ export default function TransactionForm() {
 
   const [form, setForm] = useState<FormData>(() => {
     const clienteParam = searchParams.get("cliente") || "";
-    return { ...emptyForm, cliente_id: clienteParam };
+    const descParam = searchParams.get("descricao") || "";
+    const valorParam = searchParams.get("valor") || "";
+    const catParam = searchParams.get("categoria") || "";
+    const contaParam = searchParams.get("tipo_conta") || "mei";
+    
+    return {
+      ...emptyForm,
+      cliente_id: clienteParam,
+      descricao: descParam,
+      valor: valorParam,
+      categoria: catParam,
+      tipo_conta: contaParam,
+    };
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);

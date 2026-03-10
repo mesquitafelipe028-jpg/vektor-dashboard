@@ -15,7 +15,6 @@ import {
   Search,
   Plus,
   LucideIcon,
-  LineChart,
   Calculator,
   ClipboardList,
   Clock,
