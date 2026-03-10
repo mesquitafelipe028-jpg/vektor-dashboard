@@ -2,7 +2,7 @@ export const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
 export const formatDate = (date: string) =>
-  new Intl.DateTimeFormat("pt-BR").format(new Date(date));
+  new Intl.DateTimeFormat("pt-BR").format(new Date(date + "T12:00:00"));
 
 export const revenueCategories = [
   "Prestação de Serviço",
