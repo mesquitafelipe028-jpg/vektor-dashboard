@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from "react";
-import { Repeat, Calendar as CalendarIcon } from "lucide-react";
+import { Repeat, Calendar as CalendarIcon, Lightbulb } from "lucide-react";
+import { AreaChart, Area, XAxis as AXAxis, YAxis as AYAxis, CartesianGrid as ACG, Tooltip as ATooltip, ResponsiveContainer as ARC } from "recharts";
 import { useQuery, useIsFetching } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -341,8 +342,61 @@ export default function Dashboard() {
 
   const isLoading = loadingReceitas || loadingDespesas;
 
-  return (
-    <div className="space-y-5 min-w-0 max-w-full">
+  // === NEW: Resumo do mês (auto-generated text) ===
+  const resumoTexto = useMemo(() => {
+    const lines: string[] = [];
+    lines.push(`Você faturou ${formatCurrency(faturamentoMes)} neste mês.`);
+    lines.push(`Suas despesas foram ${formatCurrency(despesasMesTotal)}.`);
+    if (saldoMes >= 0) {
+      lines.push(`Seu lucro atual é de ${formatCurrency(saldoMes)}.`);
+    } else {
+      lines.push(`Você está com um déficit de ${formatCurrency(Math.abs(saldoMes))}.`);
+    }
+    return lines;
+  }, [faturamentoMes, despesasMesTotal, saldoMes]);
+
+  // === NEW: Mini gráfico de fluxo (daily data for current month) ===
+  const flowChartData = useMemo(() => {
+    const today = now.getDate();
+    let accumulated = 0;
+    return Array.from({ length: today }, (_, i) => {
+      const day = i + 1;
+      const dayStr = `${currentMonth}-${String(day).padStart(2, "0")}`;
+      const rec = receitasMes.filter((r) => r.data === dayStr).reduce((s, r) => s + r.valor, 0);
+      const desp = despesasMes.filter((d) => d.data === dayStr).reduce((s, d) => s + d.valor, 0);
+      accumulated += rec - desp;
+      return { dia: day, receitas: rec, despesas: desp, saldo: accumulated };
+    });
+  }, [receitasMes, despesasMes, currentMonth]);
+
+  // === NEW: Insight financeiro (single smart insight) ===
+  const smartInsight = useMemo(() => {
+    const savingsRate = faturamentoMes > 0 ? ((faturamentoMes - despesasMesTotal) / faturamentoMes) * 100 : 0;
+
+    if (despesasMesTotal > faturamentoMes && faturamentoMes > 0) {
+      return { type: "danger" as const, icon: ShieldAlert, title: "Atenção ao déficit", description: "Suas despesas estão maiores que sua receita este mês. Priorize cobranças pendentes e adie gastos não essenciais." };
+    }
+    if (despesaPercent > 80) {
+      return { type: "warning" as const, icon: AlertTriangle, title: "Despesas elevadas", description: `Seus gastos representam ${despesaPercent.toFixed(0)}% da receita. Tente reduzir para manter uma margem saudável.` };
+    }
+    if (savingsRate > 20) {
+      return { type: "success" as const, icon: CheckCircle2, title: "Boa taxa de poupança!", description: `Você está poupando ${savingsRate.toFixed(0)}% da sua receita. Continue assim para fortalecer sua reserva.` };
+    }
+    if (prevMonth.varFat > 10) {
+      return { type: "success" as const, icon: Flame, title: "Faturamento em alta!", description: `Seu faturamento cresceu ${prevMonth.varFat.toFixed(0)}% em relação ao mês anterior. Ótimo ritmo!` };
+    }
+    return { type: "info" as const, icon: Lightbulb, title: "Dica financeira", description: "Registre todas as suas movimentações para ter uma visão completa e tomar melhores decisões." };
+  }, [faturamentoMes, despesasMesTotal, despesaPercent, prevMonth.varFat]);
+
+  const insightBadgeConfig = {
+    danger: { label: "Alerta", badgeClass: "bg-destructive/10 text-destructive border-destructive/30" },
+    warning: { label: "Atenção", badgeClass: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
+    success: { label: "Positivo", badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" },
+    info: { label: "Dica", badgeClass: "bg-blue-500/10 text-blue-700 border-blue-500/30" },
+  };
+
+    return (
+    <div className="space-y-6 min-w-0 max-w-full">
       {/* Header + CTAs */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -426,6 +480,29 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {/* NEW: RESUMO DO MÊS */}
+      {!isLoading && (
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Resumo do mês</span>
+            </div>
+            <div className="space-y-1">
+              {resumoTexto.map((line, i) => (
+                <p key={i} className="text-sm text-foreground">{line}</p>
+              ))}
+              {despesasMesTotal > faturamentoMes && faturamentoMes > 0 && (
+                <p className="text-sm text-destructive font-medium mt-2 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Suas despesas estão maiores que sua receita neste mês.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 2. MOVIMENTAÇÃO DO MÊS — Unified receitas + despesas */}
       {isLoading ? (
         <Skeleton className="h-24 w-full rounded-lg" />
@@ -474,6 +551,31 @@ export default function Dashboard() {
         );
       })()}
 
+      {/* NEW: MINI GRÁFICO DE FLUXO */}
+      {!isLoading && flowChartData.length > 1 && (
+        <Card>
+          <CardContent className="p-5 pb-2">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Fluxo do mês</span>
+            </div>
+            <div className="h-28">
+              <ARC width="100%" height="100%">
+                <AreaChart data={flowChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <ACG strokeDasharray="3 3" className="stroke-border" />
+                  <AXAxis dataKey="dia" tick={{ fontSize: 10 }} className="text-xs" />
+                  <AYAxis tick={{ fontSize: 10 }} className="text-xs" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <ATooltip formatter={(v: number) => formatCurrency(v)} labelFormatter={(l) => `Dia ${l}`} />
+                  <Area type="monotone" dataKey="receitas" name="Receitas" stroke="hsl(160, 60%, 38%)" fill="hsl(160, 60%, 38%)" fillOpacity={0.1} strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="despesas" name="Despesas" stroke="hsl(0, 72%, 51%)" fill="hsl(0, 72%, 51%)" fillOpacity={0.1} strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="saldo" name="Saldo" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.15} strokeWidth={2} />
+                </AreaChart>
+              </ARC>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 3. ALERTAS FINANCEIROS */}
       {!isLoading && financialAlerts.length > 0 && (
         <div className="space-y-2">
@@ -502,6 +604,24 @@ export default function Dashboard() {
             })}
           </div>
         </div>
+      )}
+
+      {/* NEW: INSIGHT FINANCEIRO */}
+      {!isLoading && (
+        <Card className={`border-l-4 ${insightColors[smartInsight.type]}`}>
+          <CardContent className="p-4 flex items-start gap-3">
+            <smartInsight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[smartInsight.type]}`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-semibold">{smartInsight.title}</p>
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${insightBadgeConfig[smartInsight.type].badgeClass}`}>
+                  {insightBadgeConfig[smartInsight.type].label}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">{smartInsight.description}</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* 4. SAÚDE FINANCEIRA — Compact */}
