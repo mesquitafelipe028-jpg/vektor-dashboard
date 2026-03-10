@@ -25,6 +25,7 @@ import { formatCurrency, formatDate } from "@/lib/mockData";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { useCategories, type CategoriaDB } from "@/hooks/useCategories";
+import { InsightsFinanceiros } from "@/components/dashboard/InsightsFinanceiros";
 
 const colorNameToHsl: Record<string, string> = {
   orange:  "hsl(25, 95%, 53%)",
@@ -357,31 +358,7 @@ export default function Dashboard() {
     });
   }, [receitasMes, despesasMes, currentMonth]);
 
-  // === NEW: Insight financeiro (single smart insight) ===
-  const smartInsight = useMemo(() => {
-    const savingsRate = faturamentoMes > 0 ? ((faturamentoMes - despesasMesTotal) / faturamentoMes) * 100 : 0;
-
-    if (despesasMesTotal > faturamentoMes && faturamentoMes > 0) {
-      return { type: "danger" as const, icon: ShieldAlert, title: "Atenção ao déficit", description: "Suas despesas estão maiores que sua receita este mês. Priorize cobranças pendentes e adie gastos não essenciais." };
-    }
-    if (despesaPercent > 80) {
-      return { type: "warning" as const, icon: AlertTriangle, title: "Despesas elevadas", description: `Seus gastos representam ${despesaPercent.toFixed(0)}% da receita. Tente reduzir para manter uma margem saudável.` };
-    }
-    if (savingsRate > 20) {
-      return { type: "success" as const, icon: CheckCircle2, title: "Boa taxa de poupança!", description: `Você está poupando ${savingsRate.toFixed(0)}% da sua receita. Continue assim para fortalecer sua reserva.` };
-    }
-    if (prevMonth.varFat > 10) {
-      return { type: "success" as const, icon: Flame, title: "Faturamento em alta!", description: `Seu faturamento cresceu ${prevMonth.varFat.toFixed(0)}% em relação ao mês anterior. Ótimo ritmo!` };
-    }
-    return { type: "info" as const, icon: Lightbulb, title: "Dica financeira", description: "Registre todas as suas movimentações para ter uma visão completa e tomar melhores decisões." };
-  }, [faturamentoMes, despesasMesTotal, despesaPercent, prevMonth.varFat]);
-
-  const insightBadgeConfig = {
-    danger: { label: "Alerta", badgeClass: "bg-destructive/10 text-destructive border-destructive/30" },
-    warning: { label: "Atenção", badgeClass: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
-    success: { label: "Positivo", badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" },
-    info: { label: "Dica", badgeClass: "bg-blue-500/10 text-blue-700 border-blue-500/30" },
-  };
+  // Extracted insight logic out to InsightsFinanceiros component
 
     return (
     <div className="space-y-6 min-w-0 max-w-full">
@@ -574,20 +551,14 @@ export default function Dashboard() {
 
       {/* NEW: INSIGHT FINANCEIRO */}
       {!isLoading && (
-        <Card className={`border-l-4 ${insightColors[smartInsight.type]}`}>
-          <CardContent className="p-4 flex items-start gap-3">
-            <smartInsight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[smartInsight.type]}`} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm font-semibold">{smartInsight.title}</p>
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${insightBadgeConfig[smartInsight.type].badgeClass}`}>
-                  {insightBadgeConfig[smartInsight.type].label}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">{smartInsight.description}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <InsightsFinanceiros
+          faturamentoMes={faturamentoMes}
+          despesasMesTotal={despesasMesTotal}
+          despesaPercent={despesaPercent}
+          savingsRate={faturamentoMes > 0 ? ((faturamentoMes - despesasMesTotal) / faturamentoMes) * 100 : 0}
+          varFaturamento={prevMonth.varFat}
+          categoryData={categoryData}
+        />
       )}
 
       {/* 4. SAÚDE FINANCEIRA — Compact */}
