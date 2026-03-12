@@ -1,9 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { z } from "zod";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
+import { useAccounts } from "@/hooks/useAccounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -16,11 +19,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { expenseCategories, revenueCategories, type CategoryMeta } from "@/lib/categories";
-import { suggestCategory } from "@/lib/mockData";
-import { toast } from "sonner";
-import { z } from "zod";
-import type { TipoTransacao, Frequencia, ReceitaExtended, DespesaExtended } from "@/types/transactions";
+import { suggestCategory } from "@/lib/utils";
 import { frequenciaLabels, generateInstallments } from "@/types/transactions";
+import { queryKeys } from "@/lib/queryKeys";
 
 type FormType = "receita" | "despesa";
 
@@ -33,11 +34,13 @@ interface FormData {
   data_inicio: string;
   data_fim: string;
   tipo_conta: string;
+  conta_id: string;
   efetivada: boolean;
   forma_pagamento?: string;
   cliente_id?: string;
   categoria?: string;
   numero_parcelas?: string;
+  tipo: "expense" | "investment";
 }
 
 const receitaSchema = z.object({
@@ -64,11 +67,13 @@ const emptyForm: FormData = {
   data_inicio: new Date().toISOString().slice(0, 10),
   data_fim: "",
   tipo_conta: "mei",
+  conta_id: "",
   efetivada: false,
   forma_pagamento: "",
   cliente_id: "",
   categoria: "",
   numero_parcelas: "",
+  tipo: "expense",
 };
 
 // --- Reusable sub-components ---
@@ -155,6 +160,7 @@ export default function TransactionForm() {
     const valorParam = searchParams.get("valor") || "";
     const catParam = searchParams.get("categoria") || "";
     const contaParam = searchParams.get("tipo_conta") || "mei";
+    const tipoParam = (searchParams.get("tipo") as "expense" | "investment") || "expense";
     
     return {
       ...emptyForm,
@@ -163,6 +169,7 @@ export default function TransactionForm() {
       valor: valorParam,
       categoria: catParam,
       tipo_conta: contaParam,
+      tipo: tipoParam,
     };
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -171,6 +178,19 @@ export default function TransactionForm() {
 
   const { categories: dbCategories } = useCategories(type);
   const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
+
+  const { accounts, isLoading: loadingAccounts } = useAccounts();
+
+  // Auto-select account if only one exists
+  useEffect(() => {
+    if (!isEditing && accounts.length === 1 && !form.conta_id) {
+      setForm(prev => ({ 
+        ...prev, 
+        conta_id: accounts[0].id,
+        tipo_conta: accounts[0].classificacao // Keep legacy field in sync
+      }));
+    }
+  }, [accounts, isEditing, form.conta_id]);
 
   // Fetch clientes for receita
   const { data: clientes = [] } = useQuery({
@@ -212,6 +232,7 @@ export default function TransactionForm() {
         cliente_id: rec.cliente_id ?? "",
         categoria: rec.categoria ?? "",
         numero_parcelas: rec.numero_parcelas ? String(rec.numero_parcelas) : "",
+        tipo: rec.tipo ?? "expense",
       });
     }
   }, [existing, id, type]);
@@ -261,6 +282,7 @@ export default function TransactionForm() {
             cliente_id: (parsed.data as any).cliente_id || null,
             categoria: form.categoria || null,
             tipo_conta: form.tipo_conta || "mei",
+            conta_id: form.conta_id || null,
             user_id: user!.id,
             tipo_transacao: "recorrente",
             frequencia: freq,
@@ -279,6 +301,7 @@ export default function TransactionForm() {
           cliente_id: (parsed.data as any).cliente_id || null,
           categoria: form.categoria || null,
           tipo_conta: form.tipo_conta || "mei",
+          conta_id: form.conta_id || null,
           user_id: user!.id,
           tipo_transacao: tipoTransacao,
           status,
@@ -302,11 +325,13 @@ export default function TransactionForm() {
             data: installments[0].data,
             categoria: (parsed.data as any).categoria || null,
             tipo_conta: form.tipo_conta || "mei",
+            conta_id: form.conta_id || null,
             user_id: user!.id,
             tipo_transacao: "parcelada",
             numero_parcelas: numParcelas,
             parcela_atual: 1,
             status: "pendente",
+            tipo: form.tipo,
           } as any).select("id").single();
           if (parentErr) throw parentErr;
           if (installments.length > 1) {
@@ -316,12 +341,14 @@ export default function TransactionForm() {
               data: inst.data,
               categoria: (parsed.data as any).categoria || null,
               tipo_conta: form.tipo_conta || "mei",
+              conta_id: form.conta_id || null,
               user_id: user!.id,
               tipo_transacao: "parcelada",
               numero_parcelas: numParcelas,
               parcela_atual: inst.parcela,
               transacao_pai_id: parent.id,
               status: "pendente",
+              tipo: form.tipo,
             } as any));
             const { error } = await supabase.from("despesas").insert(children);
             if (error) throw error;
@@ -336,12 +363,14 @@ export default function TransactionForm() {
             data: form.data_inicio || (parsed.data as any).data,
             categoria: (parsed.data as any).categoria || null,
             tipo_conta: form.tipo_conta || "mei",
+            conta_id: form.conta_id || null,
             user_id: user!.id,
             tipo_transacao: "recorrente",
             frequencia: freq,
             data_inicio: form.data_inicio || (parsed.data as any).data,
             data_fim: form.data_fim || null,
             status,
+            tipo: form.tipo,
           } as any);
           if (error) throw error;
           return;
@@ -352,9 +381,11 @@ export default function TransactionForm() {
           data: (parsed.data as any).data,
           categoria: (parsed.data as any).categoria || null,
           tipo_conta: form.tipo_conta || "mei",
+          conta_id: form.conta_id || null,
           user_id: user!.id,
           tipo_transacao: tipoTransacao,
           status,
+          tipo: form.tipo,
         };
         if (isEditing) {
           const { error } = await supabase.from("despesas").update(payload).eq("id", id!);
@@ -366,17 +397,22 @@ export default function TransactionForm() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [table, user?.id] });
-      if (type === "receita") qc.invalidateQueries({ queryKey: ["receitas", user?.id] });
-      else qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
+      qc.invalidateQueries({ queryKey: queryKeys.receitas() });
+      qc.invalidateQueries({ queryKey: queryKeys.despesas() });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard() });
       toast.success(isEditing
         ? `${type === "receita" ? "Receita" : "Despesa"} atualizada!`
         : `${type === "receita" ? "Receita" : "Despesa"} cadastrada!`
       );
       navigate(backPath);
     },
-    onError: (e) => {
-      if (e.message !== "validation") toast.error(`Erro ao salvar ${type}.`);
+    onError: (e: any) => {
+      if (e.message !== "validation") {
+        toast.error(`Erro ao salvar ${type}.`, {
+          description: e.message || "Erro desconhecido"
+        });
+        console.error("Erro ao salvar:", e);
+      }
     },
   });
 
@@ -387,8 +423,8 @@ export default function TransactionForm() {
     ? "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
     : "bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600";
   const title = isEditing
-    ? type === "receita" ? "Editar Receita" : "Editar Despesa"
-    : type === "receita" ? "Nova Receita" : "Nova Despesa";
+    ? type === "receita" ? "Editar Receita" : (form.tipo === "investment" ? "Editar Investimento" : "Editar Despesa")
+    : type === "receita" ? "Nova Receita" : (form.tipo === "investment" ? "Novo Investimento" : "Nova Despesa");
 
   const allCategories = customCategories.length > 0
     ? customCategories
@@ -553,9 +589,9 @@ export default function TransactionForm() {
         <div className="px-4 py-3.5 flex items-center gap-3">
           <CheckCircle2 className={`h-5 w-5 shrink-0 ${form.efetivada ? accentColor : "text-muted-foreground"}`} />
           <div className="flex-1">
-            <p className="text-sm font-medium">Efetivada</p>
-            <p className="text-xs text-muted-foreground">
-              {type === "receita" ? (form.efetivada ? "Recebido" : "Pendente") : (form.efetivada ? "Pago" : "Pendente")}
+            <p className="text-sm font-medium">Situação do Pagamento</p>
+            <p className="text-xs font-semibold">
+              {type === "receita" ? (form.efetivada ? <span className="text-emerald-600 dark:text-emerald-400">Pago (Recebido)</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>) : (form.efetivada ? <span className="text-emerald-600 dark:text-emerald-400">Pago</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>)}
             </p>
           </div>
           <Switch checked={form.efetivada} onCheckedChange={(v) => update({ efetivada: v })} />
@@ -643,18 +679,30 @@ export default function TransactionForm() {
         </AnimatePresence>
         <Separator />
 
-        {/* Tipo de Conta */}
+        {/* Conta Financeira */}
         <div className="px-4 py-3.5 flex items-center gap-3">
           <Building2 className="h-5 w-5 text-muted-foreground shrink-0" />
           <div className="flex-1">
-            <p className="text-xs text-muted-foreground mb-0.5">Tipo de Conta</p>
-            <Select value={form.tipo_conta} onValueChange={(v) => update({ tipo_conta: v })}>
+            <p className="text-xs text-muted-foreground mb-0.5">Conta / Origem</p>
+            <Select 
+              value={form.conta_id} 
+              onValueChange={(v) => {
+                const acc = accounts.find(a => a.id === v);
+                update({ conta_id: v, tipo_conta: acc?.classificacao || "pessoal" });
+              }}
+            >
               <SelectTrigger className="border-0 p-0 h-auto shadow-none focus:ring-0 text-sm font-medium bg-transparent">
-                <SelectValue placeholder="Selecionar" />
+                <SelectValue placeholder="Selecionar conta" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="mei">MEI</SelectItem>
-                <SelectItem value="pessoal">Pessoal</SelectItem>
+                {accounts.map((acc) => (
+                  <SelectItem key={acc.id} value={acc.id}>
+                    {acc.nome} {acc.classificacao === "mei" ? "(MEI)" : "(Pessoal)"}
+                  </SelectItem>
+                ))}
+                {accounts.length === 0 && (
+                  <SelectItem value="none" disabled>Nenhuma conta cadastrada</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>

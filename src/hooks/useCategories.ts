@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { expenseCategories, revenueCategories, type CategoryMeta } from "@/lib/categories";
 import { getColorClasses } from "@/lib/categoryColors";
+import { Tables, TablesInsert } from "@/integrations/supabase/types";
 import {
   Utensils, Car, Home, Heart, GraduationCap, Gamepad2,
   Monitor, Banknote, Users, Phone, Megaphone, FileText,
@@ -24,27 +25,18 @@ const iconMap: Record<string, LucideIcon> = {
   ArrowRightLeft, TrendingUp, RotateCcw, ShoppingCart,
 };
 
+export type CategoriaDB = Tables<"categorias"> & {
+  subcategorias?: CategoriaDB[];
+};
+
 export function toCategoryMeta(cat: CategoriaDB): CategoryMeta {
-  const colors = getColorClasses(cat.cor);
+  const colors = getColorClasses(cat.cor!);
   return {
     name: cat.nome,
-    icon: iconMap[cat.icone] ?? Package,
+    icon: iconMap[cat.icone!] ?? Package,
     color: colors.text,
     bg: colors.bg,
   };
-}
-
-export interface CategoriaDB {
-  id: string;
-  nome: string;
-  tipo: string;
-  icone: string;
-  cor: string;
-  categoria_pai_id: string | null;
-  ordem: number;
-  user_id: string;
-  created_at: string;
-  subcategorias?: CategoriaDB[];
 }
 
 const QUERY_KEY = "categorias-custom";
@@ -60,11 +52,11 @@ export function useCategories(tipo?: "despesa" | "receita") {
       const { data, error } = await supabase
         .from("categorias")
         .select("*")
-        .eq("user_id", user.id) as any;
+        .eq("user_id", user.id);
       if (error) throw error;
 
       // Filter by tipo if needed and sort by ordem
-      let rows = (data as any[]) as CategoriaDB[];
+      let rows = (data ?? []) as CategoriaDB[];
       if (tipo) rows = rows.filter((r) => r.tipo === tipo);
       rows.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
 
@@ -85,7 +77,7 @@ export function useCategories(tipo?: "despesa" | "receita") {
       // Delete existing categories for this user
       await supabase.from("categorias").delete().eq("user_id", user.id);
 
-      const rows: any[] = [];
+      const rows: TablesInsert<"categorias">[] = [];
       expenseCategories.forEach((c, i) => {
         // Extract color base name from the bg class e.g. "bg-orange-500/20" → "orange"
         const cor = c.bg.match(/bg-(\w+)-/)?.[1] ?? "gray";
@@ -112,7 +104,7 @@ export function useCategories(tipo?: "despesa" | "receita") {
         });
       });
 
-      const { error } = await supabase.from("categorias").insert(rows as any);
+      const { error } = await supabase.from("categorias").insert(rows);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [QUERY_KEY] }),

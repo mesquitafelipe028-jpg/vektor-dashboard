@@ -10,8 +10,6 @@ import { useTheme } from "next-themes";
 
 import { useRecurringGenerator } from "@/hooks/useRecurringGenerator";
 import { useAuth } from "@/contexts/AuthContext";
-import { AssistantWidget } from "@/components/AssistantWidget";
-
 export default function AppLayout() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -37,13 +35,17 @@ export default function AppLayout() {
             </div>
           </header>
           
-          <main className="flex-1 overflow-x-hidden p-4 sm:p-6 pb-24 md:pb-6">
+          <main 
+            className="flex-1 overflow-x-hidden p-4 sm:p-6 md:pb-6"
+            style={{ 
+              paddingBottom: isMobile ? "calc(var(--mobile-nav-height) + var(--safe-area-bottom) + 1rem)" : "1.5rem" 
+            }}
+          >
             <Outlet />
           </main>
         </div>
       </div>
       {isMobile && <MobileBottomNav />}
-      <AssistantWidget />
     </SidebarProvider>
   );
 }

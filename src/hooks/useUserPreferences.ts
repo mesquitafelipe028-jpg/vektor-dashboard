@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useRef, useCallback } from "react";
+import { Tables } from "@/integrations/supabase/types";
 
 export interface UserPreferences {
   alerta_vencimento: boolean;
@@ -27,7 +28,7 @@ export function useUserPreferences() {
   const query = useQuery({
     queryKey: ["user_preferences", user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("user_preferences")
         .select("*")
         .eq("user_id", user!.id)
@@ -47,22 +48,22 @@ export function useUserPreferences() {
 
   const mutation = useMutation({
     mutationFn: async (updates: Partial<UserPreferences>) => {
-      const { data: existing } = await (supabase as any)
+      const { data: existing } = await supabase
         .from("user_preferences")
         .select("id")
         .eq("user_id", user!.id)
         .maybeSingle();
 
       if (existing) {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from("user_preferences")
-          .update({ ...updates, updated_at: new Date().toISOString() })
+          .update({ ...updates, updated_at: new Date().toISOString() } as any)
           .eq("user_id", user!.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any)
+        const { error } = await supabase
           .from("user_preferences")
-          .insert({ user_id: user!.id, ...updates });
+          .insert({ user_id: user!.id, ...updates } as any);
         if (error) throw error;
       }
     },

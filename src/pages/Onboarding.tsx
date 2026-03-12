@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +15,14 @@ import {
   Sparkles, Wallet, Store, Users, ArrowRight, ArrowLeft,
   Banknote, CreditCard, Smartphone, PiggyBank,
   TrendingUp, TrendingDown, Check, CalendarCheck,
+  Upload, FileText, Zap, ShieldCheck, Star,
 } from "lucide-react";
 import { expenseCategories, revenueCategories } from "@/lib/categories";
+import { 
+  type ImportedTransaction, 
+  parseSpreadsheet, 
+  parsePDF 
+} from "@/lib/statement-parser";
 
 const TOTAL_STEPS = 5;
 
@@ -47,61 +53,72 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
 
-  // Step 1
+  // Step 1: Goal
   const [goal, setGoal] = useState<Goal | "">("");
 
-  // Step 2
+  // Step 2: Magic Import
+  const [importedTx, setImportedTx] = useState<ImportedTransaction[]>([]);
+  const [isParsing, setIsParsing] = useState(false);
+
+  // Step 3: Account
   const [accountName, setAccountName] = useState("");
   const [accountType, setAccountType] = useState("banco");
   const [initialBalance, setInitialBalance] = useState("");
 
-  // Step 3
-  const [txType, setTxType] = useState<"receita" | "despesa">("receita");
-  const [txValue, setTxValue] = useState("");
-  const [txCategory, setTxCategory] = useState("");
-
-  // Step 4
-  const [clientName, setClientName] = useState("");
-  const [clientPhone, setClientPhone] = useState("");
-  const [clientChargeType, setClientChargeType] = useState("mensal");
-  const [clientValue, setClientValue] = useState("");
+  // Step 4: Premium Strategy
+  const [isPro, setIsPro] = useState(false);
 
   const [saving, setSaving] = useState(false);
 
   const showClientStep = goal === "mei" || goal === "clientes";
-  const effectiveSteps = showClientStep ? TOTAL_STEPS : TOTAL_STEPS - 1;
-  const progressPercent = (step / effectiveSteps) * 100;
+  // We keep 5 steps: Welcome -> Import -> Account -> Premium -> Finish
+  const progressPercent = (step / TOTAL_STEPS) * 100;
 
-  const categories = useMemo(
-    () => (txType === "receita" ? revenueCategories : expenseCategories),
-    [txType]
-  );
+  const handleFileUpload = useCallback(async (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    setIsParsing(true);
+    try {
+      let parsed: ImportedTransaction[] = [];
+      if (ext === "csv" || ext === "txt" || ext === "xlsx" || ext === "xls") {
+        parsed = await parseSpreadsheet(file);
+      } else if (ext === "pdf") {
+        parsed = await parsePDF(file);
+      } else {
+        toast.error("Formato não suportado.");
+        return;
+      }
+
+      if (parsed.length > 0) {
+        setImportedTx(parsed);
+        // Sugerir nome da conta baseado no arquivo se possível
+        if (!accountName) setAccountName(file.name.split(".")[0]);
+        toast.success(`Mágica feita! ${parsed.length} transações encontradas.`);
+        goNext();
+      } else {
+        toast.error("Nenhuma transação encontrada no arquivo.");
+      }
+    } catch (err) {
+      toast.error("Erro ao ler arquivo.");
+    } finally {
+      setIsParsing(false);
+    }
+  }, [accountName]);
 
   const goNext = () => {
     setDirection(1);
-    // Skip step 4 if not business
-    if (step === 3 && !showClientStep) {
-      setStep(5);
-    } else {
-      setStep((s) => Math.min(s + 1, TOTAL_STEPS));
-    }
+    setStep((s) => Math.min(s + 1, TOTAL_STEPS));
   };
 
   const goBack = () => {
     setDirection(-1);
-    if (step === 5 && !showClientStep) {
-      setStep(3);
-    } else {
-      setStep((s) => Math.max(s - 1, 1));
-    }
+    setStep((s) => Math.max(s - 1, 1));
   };
 
   const canAdvance = () => {
     switch (step) {
       case 1: return goal !== "";
-      case 2: return accountName.trim().length > 0;
-      case 3: return txValue.trim().length > 0 && txCategory !== "";
-      case 4: return clientName.trim().length > 0;
+      case 2: return true; // Can skip import
+      case 3: return accountName.trim().length > 0;
       default: return true;
     }
   };
@@ -109,38 +126,56 @@ export default function Onboarding() {
   const handleFinish = async () => {
     if (!user) return;
     setSaving(true);
-
     try {
-      // Save first transaction
-      if (txValue && txCategory) {
-        const table = txType === "receita" ? "receitas" : "despesas";
-        const today = new Date().toISOString().slice(0, 10);
-        await supabase.from(table).insert({
+      // 1. Create Account
+      const { data: accData } = await supabase.from("contas_financeiras").insert({
+        user_id: user.id,
+        nome: accountName || "Conta Principal",
+        tipo: accountType,
+        saldo: parseFloat(initialBalance) || 0,
+        classificacao: goal === "mei" ? "pj" : "pf",
+      }).select().single();
+
+      // 2. Save Imported Transactions
+      if (accData && importedTx.length > 0) {
+        const receitas = importedTx.filter(t => t.tipo === "receita").map(t => ({
           user_id: user.id,
-          descricao: txCategory,
-          valor: parseFloat(txValue) || 0,
-          data: today,
-          categoria: txCategory,
-        } as any);
+          descricao: t.descricao,
+          valor: t.valor,
+          data: t.data,
+          categoria: t.categoria,
+          conta_id: accData.id,
+          status: "recebido"
+        }));
+        const despesas = importedTx.filter(t => t.tipo === "despesa").map(t => ({
+          user_id: user.id,
+          descricao: t.descricao,
+          valor: t.valor,
+          data: t.data,
+          categoria: t.categoria,
+          status: "pago"
+        }));
+
+        if (receitas.length > 0) await supabase.from("receitas").insert(receitas);
+        if (despesas.length > 0) await supabase.from("despesas").insert(despesas);
       }
 
-      // Save client if applicable
-      if (showClientStep && clientName.trim()) {
-        await supabase.from("clientes").insert({
+      // 3. Mark Premium if selected
+      if (isPro) {
+        await supabase.from("assinaturas").insert({
           user_id: user.id,
-          nome: clientName.trim(),
-          telefone: clientPhone.trim() || null,
+          plano: "pro_mensal",
+          status: "ativo"
         });
       }
 
-      // Mark onboarding done
       localStorage.setItem(`vektor_onboarding_done_${user.id}`, "true");
       localStorage.setItem(`vektor_goal_${user.id}`, goal);
-
       toast.success("Tudo pronto! Bem-vindo ao Vektor 🎉");
       navigate("/dashboard", { replace: true });
-    } catch {
-      toast.error("Erro ao salvar dados. Tente novamente.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar dados.");
     } finally {
       setSaving(false);
     }
@@ -149,33 +184,29 @@ export default function Onboarding() {
   const handleSkip = () => {
     if (!user) return;
     localStorage.setItem(`vektor_onboarding_done_${user.id}`, "true");
-    if (goal) localStorage.setItem(`vektor_goal_${user.id}`, goal);
     navigate("/dashboard", { replace: true });
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
       <header className="flex items-center justify-between px-4 sm:px-6 py-4">
         <LogoVektor size="sm" textClassName="text-muted-foreground" />
         <Button variant="ghost" size="sm" onClick={handleSkip} className="text-muted-foreground">
-          Pular
+          Pular Onboarding
         </Button>
       </header>
 
-      {/* Progress */}
       <div className="px-4 sm:px-6 max-w-lg mx-auto w-full">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-muted-foreground font-medium">
-            Passo {step} de {effectiveSteps}
+            Passo {step} de {TOTAL_STEPS}
           </span>
           <span className="text-xs text-muted-foreground">{Math.round(progressPercent)}%</span>
         </div>
         <Progress value={progressPercent} className="h-2" />
       </div>
 
-      {/* Content */}
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 py-6">
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 py-6 font-geist">
         <div className="w-full max-w-lg">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
@@ -187,10 +218,15 @@ export default function Onboarding() {
               exit="exit"
               transition={{ duration: 0.25, ease: "easeInOut" }}
             >
-              {step === 1 && (
-                <StepWelcome goal={goal} setGoal={setGoal} />
-              )}
+              {step === 1 && <StepWelcome goal={goal} setGoal={setGoal} />}
               {step === 2 && (
+                <StepMagicImport 
+                  onUpload={handleFileUpload} 
+                  isParsing={isParsing} 
+                  txCount={importedTx.length}
+                />
+              )}
+              {step === 3 && (
                 <StepAccount
                   accountName={accountName}
                   setAccountName={setAccountName}
@@ -200,38 +236,13 @@ export default function Onboarding() {
                   setInitialBalance={setInitialBalance}
                 />
               )}
-              {step === 3 && (
-                <StepTransaction
-                  txType={txType}
-                  setTxType={setTxType}
-                  txValue={txValue}
-                  setTxValue={setTxValue}
-                  txCategory={txCategory}
-                  setTxCategory={setTxCategory}
-                  categories={categories}
-                />
-              )}
-              {step === 4 && showClientStep && (
-                <StepClient
-                  clientName={clientName}
-                  setClientName={setClientName}
-                  clientPhone={clientPhone}
-                  setClientPhone={setClientPhone}
-                  clientChargeType={clientChargeType}
-                  setClientChargeType={setClientChargeType}
-                  clientValue={clientValue}
-                  setClientValue={setClientValue}
-                />
-              )}
-              {step === 5 && (
-                <StepFinish />
-              )}
+              {step === 4 && <StepPremium isPro={isPro} setIsPro={setIsPro} />}
+              {step === 5 && <StepFinish />}
             </motion.div>
           </AnimatePresence>
         </div>
       </div>
 
-      {/* Footer */}
       <footer className="px-4 sm:px-6 pb-6 pt-2 max-w-lg mx-auto w-full">
         <div className="flex gap-3">
           {step > 1 && (
@@ -240,12 +251,13 @@ export default function Onboarding() {
             </Button>
           )}
           {step < TOTAL_STEPS ? (
-            <Button onClick={goNext} disabled={!canAdvance()} className="flex-1">
-              Continuar <ArrowRight className="ml-1 h-4 w-4" />
+            <Button onClick={goNext} disabled={!canAdvance()} className="flex-1 bg-primary text-white hover:bg-primary/90">
+              {step === 2 && importedTx.length === 0 ? "Pular Importação" : "Continuar"} 
+              <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={handleFinish} disabled={saving} className="flex-1">
-              {saving ? "Salvando..." : "Ir para o Dashboard"} <Check className="ml-1 h-4 w-4" />
+            <Button onClick={handleFinish} disabled={saving} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+              {saving ? "Configurando tudo..." : "Começar Agora"} <Check className="ml-1 h-4 w-4" />
             </Button>
           )}
         </div>
@@ -302,6 +314,97 @@ function StepWelcome({ goal, setGoal }: { goal: string; setGoal: (g: Goal) => vo
   );
 }
 
+
+function StepMagicImport({ onUpload, isParsing, txCount }: { onUpload: (f: File) => void; isParsing: boolean; txCount: number }) {
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
+    else if (e.type === "dragleave") setDragActive(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) onUpload(e.dataTransfer.files[0]);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mx-auto mb-3">
+          <Zap className="h-7 w-7 text-primary" />
+        </div>
+        <h2 className="text-xl font-bold text-foreground">A Mágica do Vektor</h2>
+        <p className="text-sm text-muted-foreground">Importe seu extrato (PDF, CSV ou Excel) e nós organizamos tudo em segundos.</p>
+      </div>
+
+      <div
+        className={`relative border-2 border-dashed rounded-3xl p-10 transition-all text-center ${
+          dragActive ? "border-primary bg-primary/5 scale-[1.02]" : "border-border bg-card/50"
+        } ${txCount > 0 ? "border-emerald-500/50 bg-emerald-50/50" : ""}`}
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
+        onDrop={handleDrop}
+      >
+        {isParsing ? (
+          <div className="space-y-4 py-4">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
+            <p className="text-sm font-medium animate-pulse text-primary">Lendo seu arquivo...</p>
+          </div>
+        ) : txCount > 0 ? (
+          <div className="space-y-4 py-2">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+              <Check className="h-6 w-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-emerald-700">{txCount} Transações Encontradas!</p>
+              <p className="text-sm text-muted-foreground">Tudo pronto para seguir.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto group-hover:bg-primary/10 transition-colors">
+              <Upload className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Arraste seu arquivo aqui</p>
+              <p className="text-xs text-muted-foreground mt-1">Ou clique para selecionar</p>
+            </div>
+            <input
+              type="file"
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              onChange={(e) => e.target.files && onUpload(e.target.files[0])}
+              accept=".pdf,.csv,.xlsx,.xls,.txt"
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-50 border border-orange-100">
+          <FileText className="h-5 w-5 text-orange-600" />
+          <div className="text-[10px] leading-tight text-orange-800">
+            <p className="font-bold">PDF Bancário</p>
+            <p>Nubank, Itaú, Bradesco...</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 border border-blue-100">
+          <ShieldCheck className="h-5 w-5 text-blue-600" />
+          <div className="text-[10px] leading-tight text-blue-800">
+            <p className="font-bold">Privacidade Total</p>
+            <p>Seus dados são criptografados.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StepAccount({
   accountName, setAccountName, accountType, setAccountType, initialBalance, setInitialBalance,
 }: {
@@ -315,23 +418,24 @@ function StepAccount({
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-secondary/15 mx-auto mb-3">
           <Banknote className="h-7 w-7 text-secondary" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">Sua primeira conta</h2>
-        <p className="text-sm text-muted-foreground">Configure sua conta financeira principal</p>
+        <h2 className="text-xl font-bold text-foreground">Configurações Finais</h2>
+        <p className="text-sm text-muted-foreground">Dê um nome para sua conta e defina o saldo inicial.</p>
       </div>
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>Nome da conta</Label>
+          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Nome da conta</Label>
           <Input
             placeholder="Ex: Nubank, Carteira, Caixa MEI"
             value={accountName}
             onChange={(e) => setAccountName(e.target.value)}
             maxLength={50}
+            className="h-12 text-lg font-medium"
           />
         </div>
 
         <div className="space-y-2">
-          <Label>Tipo de conta</Label>
+          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tipo de conta</Label>
           <div className="grid grid-cols-2 gap-2">
             {accountTypes.map((t) => {
               const Icon = t.icon;
@@ -340,10 +444,10 @@ function StepAccount({
                 <button
                   key={t.value}
                   onClick={() => setAccountType(t.value)}
-                  className={`flex items-center gap-2 p-3 rounded-lg border-2 text-left transition-all text-sm ${
+                  className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all text-sm ${
                     selected
-                      ? "border-primary bg-primary/5 text-foreground"
-                      : "border-border text-muted-foreground hover:border-primary/40"
+                      ? "border-primary bg-primary/5 text-foreground ring-4 ring-primary/5"
+                      : "border-border text-muted-foreground hover:border-primary/20"
                   }`}
                 >
                   <Icon className={`h-4 w-4 ${selected ? "text-primary" : ""}`} />
@@ -355,7 +459,7 @@ function StepAccount({
         </div>
 
         <div className="space-y-2">
-          <Label>Saldo inicial (opcional)</Label>
+          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Saldo inicial (R$)</Label>
           <Input
             type="number"
             placeholder="0,00"
@@ -363,150 +467,69 @@ function StepAccount({
             onChange={(e) => setInitialBalance(e.target.value)}
             min="0"
             step="0.01"
+            className="h-12 text-lg font-medium"
           />
+          <p className="text-[10px] text-muted-foreground">O saldo será somado às transações importadas.</p>
         </div>
       </div>
     </div>
   );
 }
 
-function StepTransaction({
-  txType, setTxType, txValue, setTxValue, txCategory, setTxCategory, categories,
-}: {
-  txType: "receita" | "despesa"; setTxType: (v: "receita" | "despesa") => void;
-  txValue: string; setTxValue: (v: string) => void;
-  txCategory: string; setTxCategory: (v: string) => void;
-  categories: { name: string; icon: any; color: string; bg: string }[];
-}) {
+function StepPremium({ isPro, setIsPro }: { isPro: boolean; setIsPro: (v: boolean) => void }) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent/15 mx-auto mb-3">
-          <CalendarCheck className="h-7 w-7 text-accent" />
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-100 mx-auto mb-3">
+          <Star className="h-7 w-7 text-amber-600" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">Primeira movimentação</h2>
-        <p className="text-sm text-muted-foreground">Registre sua primeira receita ou despesa</p>
+        <h2 className="text-xl font-bold text-foreground font-geist">Vektor PRO</h2>
+        <p className="text-sm text-muted-foreground">Acelere seu crescimento com ferramentas profissionais.</p>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex gap-2">
-          <Button
-            variant={txType === "receita" ? "default" : "outline"}
-            className="flex-1"
-            onClick={() => { setTxType("receita"); setTxCategory(""); }}
-          >
-            <TrendingUp className="mr-1 h-4 w-4" /> Receita
-          </Button>
-          <Button
-            variant={txType === "despesa" ? "default" : "outline"}
-            className="flex-1"
-            onClick={() => { setTxType("despesa"); setTxCategory(""); }}
-          >
-            <TrendingDown className="mr-1 h-4 w-4" /> Despesa
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Valor (R$)</Label>
-          <Input
-            type="number"
-            placeholder="0,00"
-            value={txValue}
-            onChange={(e) => setTxValue(e.target.value)}
-            min="0.01"
-            step="0.01"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Categoria</Label>
-          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-            {categories.slice(0, 8).map((cat) => {
-              const Icon = cat.icon;
-              const selected = txCategory === cat.name;
-              return (
-                <button
-                  key={cat.name}
-                  onClick={() => setTxCategory(cat.name)}
-                  className={`flex items-center gap-2 p-2.5 rounded-lg border-2 text-left text-xs transition-all ${
-                    selected
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40"
-                  }`}
-                >
-                  <Icon className={`h-4 w-4 shrink-0 ${cat.color}`} />
-                  <span className="truncate text-foreground">{cat.name.split("/")[0]}</span>
-                </button>
-              );
-            })}
+      <div className="space-y-3">
+        {[
+          { icon: Zap, label: "Importação de PDF Ilimitada", desc: "Processamento ultra-rápido de extratos." },
+          { icon: FileText, label: "Relatórios para Contador (DRE)", desc: "Exportação em 1-clique para seu contador." },
+          { icon: Users, label: "Gestão de Clientes Avançada", desc: "Acompanhe cobranças e inadimplência." },
+        ].map((feat, i) => (
+          <div key={i} className="flex gap-4 p-4 rounded-2xl bg-card border border-border/50">
+            <div className="p-2 rounded-xl bg-primary/5 shrink-0 h-fit">
+              <feat.icon className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground leading-tight">{feat.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{feat.desc}</p>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StepClient({
-  clientName, setClientName, clientPhone, setClientPhone,
-  clientChargeType, setClientChargeType, clientValue, setClientValue,
-}: {
-  clientName: string; setClientName: (v: string) => void;
-  clientPhone: string; setClientPhone: (v: string) => void;
-  clientChargeType: string; setClientChargeType: (v: string) => void;
-  clientValue: string; setClientValue: (v: string) => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mx-auto mb-3">
-          <Users className="h-7 w-7 text-primary" />
-        </div>
-        <h2 className="text-xl font-bold text-foreground">Seu primeiro cliente</h2>
-        <p className="text-sm text-muted-foreground">Adicione um cliente para acompanhar cobranças</p>
+        ))}
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label>Nome do cliente</Label>
-          <Input
-            placeholder="Ex: João Silva"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            maxLength={100}
-          />
+      <Card 
+        className={`cursor-pointer transition-all border-2 overflow-hidden ${
+          isPro ? "border-amber-500 bg-amber-50 ring-4 ring-amber-500/10 shadow-lg" : "border-border hover:border-amber-400/50"
+        }`}
+        onClick={() => setIsPro(!isPro)}
+      >
+        <div className="bg-amber-500 py-1.5 px-3">
+          <p className="text-center text-[10px] uppercase font-black tracking-[0.2em] text-white">Oferta de Boas-Vindas</p>
         </div>
-        <div className="space-y-2">
-          <Label>Telefone (opcional)</Label>
-          <Input
-            placeholder="(11) 99999-9999"
-            value={clientPhone}
-            onChange={(e) => setClientPhone(e.target.value)}
-            maxLength={20}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Tipo de cobrança</Label>
-          <RadioGroup value={clientChargeType} onValueChange={setClientChargeType}>
-            {["mensal", "semanal", "avulso"].map((t) => (
-              <div key={t} className="flex items-center gap-2">
-                <RadioGroupItem value={t} id={`charge-${t}`} />
-                <Label htmlFor={`charge-${t}`} className="cursor-pointer capitalize">{t}</Label>
-              </div>
-            ))}
-          </RadioGroup>
-        </div>
-        <div className="space-y-2">
-          <Label>Valor da mensalidade (opcional)</Label>
-          <Input
-            type="number"
-            placeholder="0,00"
-            value={clientValue}
-            onChange={(e) => setClientValue(e.target.value)}
-            min="0"
-            step="0.01"
-          />
-        </div>
-      </div>
+        <CardContent className="p-5 flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-amber-900 leading-none">TESTAR GRÁTIS</h3>
+            <p className="text-xs text-amber-800/70 font-medium">14 dias de acesso total, sem compromisso.</p>
+          </div>
+          <div className="w-6 h-6 rounded-full border-2 border-amber-500 flex items-center justify-center">
+            {isPro && <div className="w-3 h-3 rounded-full bg-amber-500" />}
+          </div>
+        </CardContent>
+      </Card>
+      
+      {!isPro && (
+        <p className="text-center text-[10px] text-muted-foreground px-4">
+          Você pode continuar com a versão gratuita com limites básicos de importação.
+        </p>
+      )}
     </div>
   );
 }

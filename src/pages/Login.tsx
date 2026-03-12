@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { BrandHeader } from "@/components/branding/BrandHeader";
@@ -15,10 +15,12 @@ export default function Login() {
   const navigate = useNavigate();
   const { signIn, user } = useAuth();
 
-  if (user) {
-    navigate("/dashboard", { replace: true });
-    return null;
-  }
+  // Redirect already-logged-in users via effect (NOT during render)
+  useEffect(() => {
+    if (user) navigate("/dashboard", { replace: true });
+  }, [user, navigate]);
+
+  if (user) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

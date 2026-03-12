@@ -1,3 +1,5 @@
+import { Tables } from "@/integrations/supabase/types";
+
 // Extended types for transaction columns added via migration
 // (types.ts is auto-generated and read-only, so we extend here)
 
@@ -6,42 +8,17 @@ export type Frequencia = "semanal" | "quinzenal" | "mensal" | "anual";
 export type StatusReceita = "pendente" | "recebido" | "atrasado";
 export type StatusDespesa = "pendente" | "pago" | "atrasado";
 
-export interface DespesaExtended {
-  id: string;
-  descricao: string;
-  valor: number;
-  data: string;
-  categoria: string | null;
-  user_id: string;
-  created_at: string;
-  tipo_conta?: string;
-  tipo_transacao: TipoTransacao;
+export interface DespesaExtended extends Omit<Tables<"despesas">, "tipo" | "frequencia" | "status" | "tipo_transacao"> {
+  tipo?: "expense" | "investment";
   frequencia: Frequencia | null;
   status: StatusDespesa;
-  numero_parcelas: number | null;
-  parcela_atual: number | null;
-  transacao_pai_id: string | null;
-  data_inicio: string | null;
-  data_fim: string | null;
+  tipo_transacao: TipoTransacao;
 }
 
-export interface ReceitaExtended {
-  id: string;
-  descricao: string;
-  valor: number;
-  data: string;
-  forma_pagamento: string | null;
-  cliente_id: string | null;
-  categoria: string | null;
-  user_id: string;
-  created_at: string;
-  tipo_conta?: string;
-  tipo_transacao: TipoTransacao;
+export interface ReceitaExtended extends Omit<Tables<"receitas">, "frequencia" | "status" | "tipo_transacao"> {
   frequencia: Frequencia | null;
   status: StatusReceita;
-  data_inicio: string | null;
-  data_fim: string | null;
-  transacao_pai_id: string | null;
+  tipo_transacao: TipoTransacao;
   clientes?: { nome: string } | null;
 }
 

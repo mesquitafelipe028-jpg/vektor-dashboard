@@ -15,11 +15,11 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft, Plus, DollarSign, Clock, Calendar, CheckCircle,
-  Pencil, Send, CreditCard, AlertTriangle, CalendarClock,
+  Pencil, CalendarClock,
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { formatCurrency, formatDate } from "@/lib/mockData";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
@@ -42,9 +42,6 @@ export default function ClientDetails() {
   const qc = useQueryClient();
   const isMobile = useIsMobile();
 
-  const [editOpen, setEditOpen] = useState(false);
-  const [payOpen, setPayOpen] = useState(false);
-  const [reminderOpen, setReminderOpen] = useState(false);
   const [showAllProjections, setShowAllProjections] = useState(false);
   const [editForm, setEditForm] = useState({ nome: "", email: "", telefone: "" });
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
@@ -88,11 +85,18 @@ export default function ClientDetails() {
       .reduce((s, r) => s + r.valor, 0);
     const ultimoPagamento = receitas.find((r) => r.status === "recebido")?.data ?? null;
     const hoje = new Date().toISOString().slice(0, 10);
-    const proximaCobranca = receitas
+    const pendentes = receitas.filter((r) => r.status === "pendente" || r.status === "atrasado");
+    
+    // Get actual next charge from pending or from projections
+    const nextPending = receitas
       .filter((r) => r.status === "pendente" && r.data >= hoje)
       .sort((a, b) => a.data.localeCompare(b.data))[0]?.data ?? null;
-    const pendentes = receitas.filter((r) => r.status === "pendente" || r.status === "atrasado");
-    return { totalPago, totalAberto, ultimoPagamento, proximaCobranca, pendentes };
+      
+    // Since projections are reactive but not calculated yet in this memo (they are in another), 
+    // let's briefly calculate the first one here too if needed, or better, join them.
+    // For now, let's keep it simple: nextPending
+    
+    return { totalPago, totalAberto, ultimoPagamento, proximaCobranca: nextPending, pendentes };
   }, [receitas]);
 
   // --- Future projections for recurring charges ---
@@ -103,22 +107,30 @@ export default function ClientDetails() {
     );
     if (parentRecurrentes.length === 0) return [];
 
-    const allProjections: { descricao: string; valor: number; data: string; frequencia: string }[] = [];
+    const allProjections: { id: string; descricao: string; valor: number; data: string; frequencia: string }[] = [];
 
     for (const r of parentRecurrentes) {
-      const dates = generateRecurringDates(r.data, r.frequencia!, r.data_fim, 12);
       const existingDates = new Set(
         receitas.filter((rx) => rx.transacao_pai_id === r.id || rx.id === r.id).map((rx) => rx.data)
       );
-      for (const d of dates) {
-        if (d > hoje && !existingDates.has(d)) {
+      let currentD = new Date(r.data + "T00:00:00");
+      for (let i = 0; i < 60; i++) {
+        const dStr = currentD.toISOString().slice(0, 10);
+        if (dStr > hoje && !existingDates.has(dStr)) {
           allProjections.push({
+            id: r.id,
             descricao: r.descricao,
             valor: r.valor,
-            data: d,
+            data: dStr,
             frequencia: frequenciaLabels[r.frequencia!] || r.frequencia!,
           });
         }
+        if (allProjections.length >= 12) break;
+
+        if (r.frequencia === "semanal") currentD.setDate(currentD.getDate() + 7);
+        else if (r.frequencia === "quinzenal") currentD.setDate(currentD.getDate() + 15);
+        else if (r.frequencia === "mensal") currentD.setMonth(currentD.getMonth() + 1);
+        else currentD.setFullYear(currentD.getFullYear() + 1);
       }
     }
 
@@ -171,26 +183,29 @@ export default function ClientDetails() {
     },
   });
 
+  const payProjection = useMutation({
+    mutationFn: async (projection: any) => {
+      if (!user?.id) throw new Error("Sem usuário");
+      const { error } = await supabase.from("receitas").insert({
+        user_id: user.id,
+        cliente_id: id,
+        descricao: projection.descricao,
+        valor: projection.valor,
+        data: projection.data,
+        status: "recebido",
+        tipo_transacao: "unica",
+        transacao_pai_id: projection.id, // ID da mãe
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["receitas_cliente", id] });
+      qc.invalidateQueries({ queryKey: ["receitas"] });
+      toast.success("Recebimento de recorrência registrado com sucesso!");
+    },
+  });
+
   // --- Handlers ---
-  const openEditDialog = () => {
-    if (!cliente) return;
-    setEditForm({
-      nome: cliente.nome,
-      email: cliente.email ?? "",
-      telefone: cliente.telefone ?? "",
-    });
-    setEditErrors({});
-    setEditOpen(true);
-  };
-
-  const handleReminder = () => {
-    if (stats.pendentes.length === 0) {
-      toast.info("Nenhuma cobrança pendente para este cliente.");
-      return;
-    }
-    setReminderOpen(true);
-  };
-
   // --- Loading / Not Found ---
   if (loadingCliente) {
     return <p className="py-12 text-center text-muted-foreground">Carregando...</p>;
@@ -208,9 +223,8 @@ export default function ClientDetails() {
 
   const kpis = [
     { label: "Total Pago", value: formatCurrency(stats.totalPago), icon: CheckCircle, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10" },
-    { label: "Total em Aberto", value: formatCurrency(stats.totalAberto), icon: AlertTriangle, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10" },
     { label: "Último Pagamento", value: stats.ultimoPagamento ? formatDate(stats.ultimoPagamento) : "—", icon: Calendar, color: "text-primary", bg: "bg-primary/10" },
-    { label: "Próxima Cobrança", value: stats.proximaCobranca ? formatDate(stats.proximaCobranca) : "—", icon: Clock, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
+    { label: "Próxima Cobrança", value: stats.proximaCobranca ? formatDate(stats.proximaCobranca) : (projections[0]?.data ? formatDate(projections[0].data) : "—"), icon: Clock, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
   ];
 
   return (
@@ -230,29 +244,13 @@ export default function ClientDetails() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <Button
             size="sm"
             onClick={() => navigate(`/receitas/nova?cliente=${id}`)}
             className="gap-1.5"
           >
             <Plus className="h-4 w-4" /> Nova Cobrança
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setPayOpen(true)}
-            className="gap-1.5"
-          >
-            <CreditCard className="h-4 w-4" /> Registrar Pgto
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleReminder}
-            className="gap-1.5"
-          >
-            <Send className="h-4 w-4" /> Lembrete
           </Button>
           <Button
             size="sm"
@@ -266,7 +264,7 @@ export default function ClientDetails() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {kpis.map((k, i) => (
           <motion.div
             key={k.label}
@@ -347,6 +345,25 @@ export default function ClientDetails() {
                     <span className="font-heading font-bold text-sm text-muted-foreground">
                       {formatCurrency(p.valor)}
                     </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      title="Registrar Pagamento"
+                      onClick={() => payProjection.mutate(p)}
+                      disabled={payProjection.isPending}
+                      className="h-7 w-7 p-0 ml-1 rounded-full border-emerald-500/30 text-emerald-600 hover:bg-emerald-50"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      title="Analisar e Editar"
+                      onClick={() => navigate(`/receitas/nova?cliente=${id}&tipo=unica&descricao=${encodeURIComponent(p.descricao)}&valor=${p.valor}&data=${p.data}&transacao_pai_id=${p.id}`)}
+                      className="h-7 w-7 p-0 ml-1 rounded-full"
+                    >
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                    </Button>
                   </div>
                 </motion.div>
               ))}
@@ -456,110 +473,6 @@ export default function ClientDetails() {
         </CardContent>
       </Card>
 
-      {/* Edit Client Dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-heading">Editar Cliente</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="edit-nome">Nome *</Label>
-              <Input
-                id="edit-nome"
-                value={editForm.nome}
-                onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })}
-                maxLength={100}
-              />
-              {editErrors.nome && <p className="text-sm text-destructive">{editErrors.nome}</p>}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-email">E-mail</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  maxLength={255}
-                />
-                {editErrors.email && <p className="text-sm text-destructive">{editErrors.email}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-telefone">Telefone</Label>
-                <Input
-                  id="edit-telefone"
-                  value={editForm.telefone}
-                  onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })}
-                  maxLength={20}
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
-            <Button onClick={() => updateCliente.mutate()} disabled={updateCliente.isPending}>
-              {updateCliente.isPending ? "Salvando..." : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Register Payment Dialog */}
-      <Dialog open={payOpen} onOpenChange={setPayOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-heading">Registrar Pagamento</DialogTitle>
-          </DialogHeader>
-          {stats.pendentes.length === 0 ? (
-            <p className="py-6 text-center text-muted-foreground">
-              Nenhuma cobrança pendente para este cliente.
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {stats.pendentes.map((r) => (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between rounded-lg border border-border p-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{r.descricao}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(r.data)} • {formatCurrency(r.valor)}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => markPaid.mutate(r.id)}
-                    disabled={markPaid.isPending}
-                    className="ml-2 shrink-0 gap-1 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
-                  >
-                    <CheckCircle className="h-3.5 w-3.5" /> Pago
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPayOpen(false)}>Fechar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Billing Reminder Sheet */}
-      {stats.pendentes.length > 0 && (
-        <BillingReminderSheet
-          open={reminderOpen}
-          onOpenChange={setReminderOpen}
-          clientName={cliente.nome}
-          clientPhone={cliente.telefone}
-          clientEmail={cliente.email}
-          description={stats.pendentes[0].descricao}
-          amount={stats.pendentes[0].valor}
-          dueDate={stats.pendentes[0].data}
-        />
-      )}
     </div>
   );
 }

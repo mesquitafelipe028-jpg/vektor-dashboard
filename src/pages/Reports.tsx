@@ -1,6 +1,8 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useRef, useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+import * as XLSX from "xlsx";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/utils";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import {
@@ -23,6 +25,7 @@ import {
   Download, Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { queryKeys } from "@/lib/queryKeys";
 
 const PIE_COLORS = [
   "hsl(160, 60%, 38%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)",
@@ -59,7 +62,7 @@ export default function Reports() {
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
 
   const { data: receitas = [] } = useQuery({
-    queryKey: ["receitas", user?.id],
+    queryKey: queryKeys.receitas(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*");
       if (error) throw error;
@@ -69,7 +72,7 @@ export default function Reports() {
   });
 
   const { data: despesas = [] } = useQuery({
-    queryKey: ["despesas", user?.id],
+    queryKey: queryKeys.despesas(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*");
       if (error) throw error;
@@ -125,10 +128,50 @@ export default function Reports() {
     const varDespesas = despAnterior > 0 ? ((totalDespesas - despAnterior) / despAnterior) * 100 : 0;
     const varLucro = lucroAnterior !== 0 ? ((lucro - lucroAnterior) / Math.abs(lucroAnterior)) * 100 : 0;
 
-    return {
+    const reportData = {
       faturamento, totalDespesas, lucro, categorias, maiorCategoria,
       fatAnterior, despAnterior, lucroAnterior,
       varFaturamento, varDespesas, varLucro,
+    };
+
+    const impostos = reportData.categorias.find(c => c.name === "Impostos")?.value || 0;
+    const recLiquida = faturamento - impostos;
+    
+    const variaveisTags = ["Marketing", "Transporte", "Material de Escritório", "Serviços Bancários"];
+    const fixasTags = ["Aluguel", "Internet/Telefone", "Software/Assinaturas"];
+    
+    const custosVariaveis = reportData.categorias
+      .filter(c => variaveisTags.includes(c.name))
+      .reduce((sum, c) => sum + c.value, 0);
+      
+    const margem = recLiquida - custosVariaveis;
+    
+    const despesasFixas = reportData.categorias
+      .filter(c => fixasTags.includes(c.name))
+      .reduce((sum, c) => sum + c.value, 0);
+      
+    const outras = reportData.categorias
+      .filter(c => !variaveisTags.includes(c.name) && !fixasTags.includes(c.name) && c.name !== "Impostos")
+      .reduce((sum, c) => sum + c.value, 0);
+      
+    const ebitda = margem - despesasFixas;
+    const lucroLiquido = ebitda - outras;
+    
+    const dre = { 
+      rec: faturamento, 
+      impostos, 
+      recLiquida, 
+      custosVariaveis, 
+      margem, 
+      despesasFixas, 
+      ebitda, 
+      outras, 
+      lucroLiquido 
+    };
+
+    return {
+      ...reportData,
+      dre,
       despesaPercent: faturamento > 0 ? (totalDespesas / faturamento) * 100 : 0,
     };
   }, [receitas, despesas, selectedMonth]);
@@ -161,6 +204,33 @@ export default function Reports() {
 
   const [selY, selM] = selectedMonth.split("-").map(Number);
   const monthLabel = getMonthLabel(selY, selM - 1);
+
+  const handleExportExcel = useCallback(() => {
+    const data = [
+      ["DEMONSTRATIVO DE RESULTADO (DRE)", "", monthLabel],
+      ["", "", ""],
+      ["1. RECEITA OPERACIONAL BRUTA", "", report.dre.rec],
+      ["(-) Tributos sobre Vendas", "", -report.dre.impostos],
+      ["(=) RECEITA OPERACIONAL LÍQUIDA", "", report.dre.recLiquida],
+      ["", "", ""],
+      ["(-) Custos Variáveis", "", -report.dre.custosVariaveis],
+      ["(=) MARGEM DE CONTRIBUIÇÃO", "", report.dre.margem],
+      ["", "", ""],
+      ["(-) Despesas Fixas Operacionais", "", -report.dre.despesasFixas],
+      ["(=) LUCRO OPERACIONAL (EBITDA)", "", report.dre.ebitda],
+      ["", "", ""],
+      ["(-) Outras Despesas/Receitas", "", -report.dre.outras],
+      ["(=) LUCRO LÍQUIDO DO EXERCÍCIO", "", report.dre.lucroLiquido],
+      ["", "", ""],
+      ["Percentual de Despesa/Rec: ", "", `${report.despesaPercent.toFixed(2)}%`]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "DRE");
+    XLSX.writeFile(wb, `DRE-${selectedMonth}.xlsx`);
+    toast({ title: "Excel (DRE) exportado com sucesso!" });
+  }, [report, monthLabel, selectedMonth, toast]);
 
   const handleExportPDF = useCallback(async () => {
     if (!reportRef.current) return;
@@ -209,10 +279,16 @@ export default function Reports() {
           <h1 className="font-heading text-2xl font-bold">Relatórios</h1>
           <p className="text-muted-foreground text-sm">Análise financeira completa</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting}>
-          {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-          Exportar PDF
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportExcel}>
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Excel (Contador)
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={exporting}>
+            {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Exportar PDF
+          </Button>
+        </div>
       </div>
 
       <div ref={reportRef}>
@@ -220,6 +296,7 @@ export default function Reports() {
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="visao-geral" className="flex-1 sm:flex-initial">Visão Geral</TabsTrigger>
           <TabsTrigger value="analise-mensal" className="flex-1 sm:flex-initial">Análise Mensal</TabsTrigger>
+          <TabsTrigger value="dre" className="flex-1 sm:flex-initial">DRE Profissional</TabsTrigger>
         </TabsList>
 
         {/* ===== TAB: Visão Geral ===== */}
@@ -413,8 +490,115 @@ export default function Reports() {
             </div>
           </div>
         </TabsContent>
+
+        {/* ===== TAB: DRE Profissional ===== */}
+        <TabsContent value="dre" className="space-y-6">
+          <div className="flex justify-end">
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableMonths.map((m) => {
+                  const [y, mo] = m.split("-").map(Number);
+                  return <SelectItem key={m} value={m}>{getMonthLabel(y, mo - 1)}</SelectItem>;
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="font-heading text-xl">Demonstrativo de Resultado (DRE)</CardTitle>
+                <p className="text-sm text-muted-foreground">{monthLabel}</p>
+              </div>
+              <Badge variant="secondary">Visão Contábil</Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-2">
+                  <DRELine label="1. RECEITA OPERACIONAL BRUTA" value={report.dre.rec} primary />
+                  <DRELine label="(-) Tributos sobre Vendas" value={-report.dre.impostos} indent />
+                  <Separator className="my-1" />
+                  <DRELine label="(=) RECEITA OPERACIONAL LÍQUIDA" value={report.dre.recLiquida} bold />
+                  
+                  <div className="h-4" />
+                  
+                  <DRELine label="(-) Custos Variáveis" value={-report.dre.custosVariaveis} indent />
+                  <DRELine label="(Marketing, Transporte, Insumos)" value={null} subtext indent />
+                  <Separator className="my-1" />
+                  <DRELine label="(=) MARGEM DE CONTRIBUIÇÃO" value={report.dre.margem} bold />
+                  <DRELine label={`Margem rel. à rec. líquida: ${(report.dre.recLiquida > 0 ? (report.dre.margem / report.dre.recLiquida) * 100 : 0).toFixed(1)}%`} value={null} subtext />
+
+                  <div className="h-4" />
+
+                  <DRELine label="(-) Despesas Fixas Operacionais" value={-report.dre.despesasFixas} indent />
+                  <DRELine label="(Aluguel, Software, Comunicação)" value={null} subtext indent />
+                  <Separator className="my-1" />
+                  <DRELine label="(=) LUCRO OPERACIONAL (EBITDA)" value={report.dre.ebitda} bold />
+
+                  <div className="h-4" />
+
+                  <DRELine label="(-) Outras Despesas/Receitas" value={-report.dre.outras} indent />
+                  <Separator className="my-2 h-[2px] bg-foreground/10" />
+                  <DRELine label="(=) LUCRO LÍQUIDO DO EXERCÍCIO" value={report.dre.lucroLiquido} primary bold highlight />
+                </div>
+              </div>
+
+              <div className="mt-8 p-4 bg-muted/50 rounded-lg border border-dashed border-border">
+                <p className="text-xs text-muted-foreground text-center">
+                  Este relatório agrupa automaticamente suas categorias de despesas entre fixas e variáveis para facilitar a gestão.
+                  Consulte seu contador para validação oficial.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
       </div>
+    </div>
+  );
+}
+
+function DRELine({ 
+  label, 
+  value, 
+  indent = false, 
+  bold = false, 
+  primary = false, 
+  subtext = false,
+  highlight = false
+}: { 
+  label: string; 
+  value: number | null; 
+  indent?: boolean; 
+  bold?: boolean; 
+  primary?: boolean;
+  subtext?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between py-1.5 ${highlight ? "bg-primary/5 px-2 rounded -mx-2" : ""}`}>
+      <span className={cn(
+        "text-sm",
+        indent && "pl-8",
+        bold && "font-bold",
+        primary && "text-primary font-bold text-base",
+        subtext && "text-xs text-muted-foreground italic -mt-1"
+      )}>
+        {label}
+      </span>
+      {value !== null && (
+        <span className={cn(
+          "font-mono text-sm",
+          bold && "font-bold",
+          primary && "text-primary font-bold text-base",
+          value < 0 && !primary && "text-destructive"
+        )}>
+          {formatCurrency(value)}
+        </span>
+      )}
     </div>
   );
 }

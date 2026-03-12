@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,8 +57,80 @@ function getIconComponent(iconName: string): LucideIcon {
 
 export default function Accounts() {
   const { user } = useAuth();
-  const { accounts, isLoading, createAccount, deleteAccount } = useAccounts();
+  const queryClient = useQueryClient();
+  const { accounts, isLoading, createAccount, updateAccount, deleteAccount } = useAccounts();
   const [open, setOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [shouldUpdateBalance, setShouldUpdateBalance] = useState(true);
+
+  // Fetch transactions without account link
+  const { data: orphanedData } = useQuery({
+    queryKey: ["orphaned_transactions", user?.id],
+    queryFn: async () => {
+      const { data: recs } = await supabase.from("receitas").select("valor, status").is("conta_id", null);
+      const { data: desps } = await supabase.from("despesas").select("valor, status").is("conta_id", null);
+      
+      const balance = (recs?.filter(r => r.status === "recebido").reduce((s, r) => s + r.valor, 0) || 0) -
+                      (desps?.filter(d => d.status === "pago").reduce((s, d) => s + d.valor, 0) || 0);
+      
+      return { count: (recs?.length || 0) + (desps?.length || 0), balance };
+    },
+    enabled: !!user,
+  });
+
+  const handleSyncTransactions = async (accountId: string) => {
+    if (!user) return;
+    setIsSyncing(true);
+    try {
+      // 1. Update all orphaned transactions to this account
+      const { error: err1 } = await supabase
+        .from("receitas")
+        .update({ conta_id: accountId } as any)
+        .eq("user_id", user.id)
+        .is("conta_id", null);
+      
+      const { error: err2 } = await supabase
+        .from("despesas")
+        .update({ conta_id: accountId } as any)
+        .eq("user_id", user.id)
+        .is("conta_id", null);
+      
+      if (err1 || err2) {
+        const error = err1 || err2;
+        if (error.message?.includes("column \"conta_id\" does not exist")) {
+           throw new Error("A coluna 'conta_id' não existe. Rode o SQL do Walkthrough!");
+        }
+        throw error;
+      }
+
+      // 2. Update the account balance in the database ONLY IF requested
+      if (shouldUpdateBalance) {
+        const account = accounts.find(a => a.id === accountId);
+        if (account) {
+          const newSaldo = (account.saldo || 0) + (orphanedData?.balance || 0);
+          const { error: err3 } = await supabase
+            .from("contas_financeiras" as any)
+            .update({ saldo: newSaldo } as any)
+            .eq("id", accountId)
+            .eq("user_id", user.id);
+          
+          if (err3) throw err3;
+        }
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ["contas_financeiras"] });
+      queryClient.invalidateQueries({ queryKey: ["receitas"] });
+      queryClient.invalidateQueries({ queryKey: ["despesas"] });
+      queryClient.invalidateQueries({ queryKey: ["orphaned_transactions"] });
+      
+      toast.success("Transações vinculadas e saldo atualizado!");
+    } catch (err: any) {
+      toast.error("Erro na sincronização: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Form state
   const [nome, setNome] = useState("");
@@ -77,12 +151,25 @@ export default function Accounts() {
     setCor(colorOptions[0]);
     setIcone("wallet");
     setClassificacao("pessoal");
+    setEditingAccount(null);
   };
 
-  const handleCreate = async () => {
+  const handleEditOpen = (account: any) => {
+    setEditingAccount(account);
+    setNome(account.nome);
+    setTipo(account.tipo);
+    setBancoId(account.banco_id || "");
+    setSaldo(String(account.saldo));
+    setCor(account.cor);
+    setIcone(account.icone);
+    setClassificacao(account.classificacao);
+    setOpen(true);
+  };
+
+  const handleSave = async () => {
     if (!user || !nome.trim()) return;
 
-    const payload: ContaFinanceiraInsert = {
+    const payload = {
       user_id: user.id,
       nome: nome.trim(),
       tipo,
@@ -94,12 +181,17 @@ export default function Accounts() {
     };
 
     try {
-      await createAccount.mutateAsync(payload);
-      toast.success("Conta criada com sucesso!");
+      if (editingAccount) {
+        await updateAccount.mutateAsync({ id: editingAccount.id, ...payload });
+        toast.success("Conta atualizada!");
+      } else {
+        await createAccount.mutateAsync(payload as ContaFinanceiraInsert);
+        toast.success("Conta criada com sucesso!");
+      }
       resetForm();
       setOpen(false);
     } catch {
-      toast.error("Erro ao criar conta. Verifique se a tabela existe no Supabase.");
+      toast.error(editingAccount ? "Erro ao atualizar conta." : "Erro ao criar conta.");
     }
   };
 
@@ -130,7 +222,7 @@ export default function Accounts() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Criar Conta Financeira</DialogTitle>
+              <DialogTitle>{editingAccount ? "Editar Conta" : "Criar Conta Financeira"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-5 pt-2">
               {/* Nome */}
@@ -267,11 +359,11 @@ export default function Accounts() {
               </div>
 
               <Button
-                onClick={handleCreate}
-                disabled={!nome.trim() || createAccount.isPending}
+                onClick={handleSave}
+                disabled={!nome.trim() || createAccount.isPending || updateAccount.isPending}
                 className="w-full"
               >
-                {createAccount.isPending ? "Salvando..." : "Criar Conta"}
+                {createAccount.isPending || updateAccount.isPending ? "Salvando..." : (editingAccount ? "Salvar Alterações" : "Criar Conta")}
               </Button>
             </div>
           </DialogContent>
@@ -299,7 +391,52 @@ export default function Accounts() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-6">
+          {orphanedData && orphanedData.count > 0 && (
+            <Card className="border-amber-500/50 bg-amber-500/5">
+              <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                    <TrendingUp className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-200">Sincronizar histórico</h4>
+                    <p className="text-xs text-amber-700/80 dark:text-amber-400/80">
+                      Vincule {orphanedData.count} transações passadas ({new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(orphanedData.balance)}) a uma conta.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                   <div className="flex items-center gap-2 bg-background/50 px-2 py-1 rounded-md border border-amber-200">
+                      <input 
+                        type="checkbox" 
+                        id="sync-balance" 
+                        checked={shouldUpdateBalance} 
+                        onChange={(e) => setShouldUpdateBalance(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <label htmlFor="sync-balance" className="text-[10px] text-amber-800 font-medium cursor-pointer">
+                        Somar ao saldo atual
+                      </label>
+                   </div>
+
+                   <Select onValueChange={handleSyncTransactions} disabled={isSyncing}>
+                      <SelectTrigger className="w-full md:w-[200px] h-9 bg-background">
+                        <SelectValue placeholder="Escolha a conta..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                   </Select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account) => {
             const Icon = getIconComponent(account.icone);
             const typeLabel = accountTypeOptions.find((t) => t.value === account.tipo)?.label ?? account.tipo;
@@ -326,12 +463,22 @@ export default function Accounts() {
                       </span>
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleDelete(account.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleEditOpen(account)}
+                      className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                      title="Editar conta"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(account.id)}
+                      className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                      title="Excluir conta"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold text-foreground">
@@ -342,7 +489,8 @@ export default function Accounts() {
             );
           })}
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 }

@@ -1,7 +1,7 @@
 import { CheckCircle, Clock, AlertTriangle, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatDate } from "@/lib/mockData";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { TransactionTypeBadge } from "@/components/transaction/TransactionBadge";
 import {
   DropdownMenu,

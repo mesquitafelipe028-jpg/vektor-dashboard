@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus, MoreHorizontal,
+  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus, MoreHorizontal, LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,6 +17,7 @@ const navItems = [
 const quickActions = [
   { label: "Nova Receita", icon: TrendingUp, path: "/receitas/nova", color: "text-primary" },
   { label: "Nova Despesa", icon: Receipt, path: "/despesas/nova", color: "text-destructive" },
+  { label: "+ Investimento", icon: LineChart, path: "/despesas/nova?tipo=investment", color: "text-sky-500" },
   { label: "Novo Cliente", icon: UserPlus, path: "/clientes/novo", color: "text-chart-3" },
 ];
 
@@ -56,7 +57,13 @@ export function MobileBottomNav() {
         )}
       </AnimatePresence>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-[997] bg-card border-t border-border md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <nav 
+        className="fixed bottom-0 left-0 right-0 z-[997] bg-card/80 backdrop-blur-lg border-t border-border md:hidden" 
+        style={{ 
+          paddingBottom: "var(--safe-area-bottom)",
+          height: "calc(var(--mobile-nav-height) + var(--safe-area-bottom))"
+        }}
+      >
         <div className="flex items-center justify-around h-16">
           {navItems.map((item) => {
             if (item.isFab) {

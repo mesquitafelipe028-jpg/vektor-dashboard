@@ -21,19 +21,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Get session first — unblock rendering ASAP
     let mounted = true;
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
+      if (error) {
+        // Token inválido/corrompido — limpar sessão local
+        supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
       setLoading(false);
     });
 
     // Listen for future changes (login/logout) — don't block initial render
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        // Only set loading false if it's still true (fallback)
+      (event, session) => {
+        if (event === "SIGNED_OUT" || (event === "TOKEN_REFRESHED" && !session)) {
+          // Token de refresh inválido ou sessão expirada — limpar tudo
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
         setLoading(false);
       }
     );

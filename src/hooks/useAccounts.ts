@@ -12,7 +12,7 @@ export function useAccounts() {
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("contas_financeiras" as any)
+        .from("contas_financeiras")
         .select("*")
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
@@ -24,8 +24,8 @@ export function useAccounts() {
   const createAccount = useMutation({
     mutationFn: async (account: ContaFinanceiraInsert) => {
       const { data, error } = await supabase
-        .from("contas_financeiras" as any)
-        .insert(account as any)
+        .from("contas_financeiras")
+        .insert(account as any) // as any needed because of partial match with insert type
         .select()
         .single();
       if (error) throw error;
@@ -39,7 +39,7 @@ export function useAccounts() {
   const updateAccount = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ContaFinanceira> & { id: string }) => {
       const { data, error } = await supabase
-        .from("contas_financeiras" as any)
+        .from("contas_financeiras")
         .update(updates as any)
         .eq("id", id)
         .select()
@@ -55,7 +55,7 @@ export function useAccounts() {
   const deleteAccount = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("contas_financeiras" as any)
+        .from("contas_financeiras")
         .delete()
         .eq("id", id);
       if (error) throw error;

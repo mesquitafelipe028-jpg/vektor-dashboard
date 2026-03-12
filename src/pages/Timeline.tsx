@@ -9,7 +9,7 @@ import {
   TrendingUp, TrendingDown, CreditCard, Calendar,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/utils";
 import { format, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -35,6 +35,7 @@ const typeConfig = {
 export default function Timeline() {
   const { user } = useAuth();
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [sortBy, setSortBy] = useState("data-desc");
 
   const { data: receitas = [] } = useQuery({
     queryKey: ["timeline_receitas"],
@@ -103,10 +104,16 @@ export default function Timeline() {
   });
 
   const allEvents = useMemo(() => {
-    return [...receitas, ...despesas, ...compras].sort(
-      (a, b) => b.date.localeCompare(a.date)
-    );
-  }, [receitas, despesas, compras]);
+    const list = [...receitas, ...despesas, ...compras];
+    
+    return list.sort((a, b) => {
+      if (sortBy === "data-desc") return b.date.localeCompare(a.date);
+      if (sortBy === "data-asc") return a.date.localeCompare(b.date);
+      if (sortBy === "valor-desc") return b.amount - a.amount;
+      if (sortBy === "valor-asc") return a.amount - b.amount;
+      return 0;
+    });
+  }, [receitas, despesas, compras, sortBy]);
 
   const renderTimeline = (events: TimelineEvent[]) => {
     const visible = events.slice(0, visibleCount);
@@ -207,9 +214,27 @@ export default function Timeline() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-heading">Timeline Financeira</h1>
-        <p className="text-sm text-muted-foreground">Todas as movimentações em ordem cronológica</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold font-heading">Timeline Financeira</h1>
+          <p className="text-sm text-muted-foreground">Todas as movimentações em ordem cronológica</p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+           <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-lg border border-border">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest hidden lg:inline">Ordenação:</span>
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="data-desc">Mais recentes</option>
+                <option value="data-asc">Mais antigos</option>
+                <option value="valor-desc">Maior valor</option>
+                <option value="valor-asc">Menor valor</option>
+              </select>
+           </div>
+        </div>
       </div>
 
       <Tabs defaultValue="tudo" className="space-y-4">

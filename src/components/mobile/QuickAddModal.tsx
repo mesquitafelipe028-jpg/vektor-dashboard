@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TrendingUp, TrendingDown, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { expenseCategories, revenueCategories } from "@/lib/mockData";
+import { expenseCategories, revenueCategories } from "@/lib/utils";
 import { toast } from "sonner";
+import { queryKeys } from "@/lib/queryKeys";
 
 const QUICK_ADD_PREFS_KEY = "quickadd_prefs";
 
@@ -118,9 +119,9 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
       savePrefs(p);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["receitas"] });
-      qc.invalidateQueries({ queryKey: ["despesas"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: queryKeys.receitas() });
+      qc.invalidateQueries({ queryKey: queryKeys.despesas() });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard() });
       toast.success("Transação registrada com sucesso");
       onOpenChange(false);
     },

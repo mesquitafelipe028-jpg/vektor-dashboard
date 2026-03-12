@@ -2,94 +2,41 @@ import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CreditCard, Plus, Pencil, Trash2, CheckCircle, Calendar, DollarSign, MoreVertical } from "lucide-react";
-import { formatCurrency, formatDate, expenseCategories } from "@/lib/mockData";
-import { CategoryIcon } from "@/components/CategoryIcon";
-import { transactionColors } from "@/lib/categories";
-import { banks, BankLogo } from "@/lib/banks";
+import { CreditCard, Plus, HelpCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// ── Types ──────────────────────────────────────────
-interface Cartao {
-  id: string;
-  nome: string;
-  limite_total: number;
-  dia_fechamento: number;
-  dia_vencimento: number;
-  tipo_conta: string;
-}
+// Icons and Utils
+import { expenseCategories } from "@/lib/utils";
+import { banks } from "@/lib/banks";
 
-interface Compra {
-  id: string;
-  cartao_id: string;
-  descricao: string;
-  valor: number;
-  data: string;
-  categoria: string | null;
-}
+// Types
+import { Tables } from "@/integrations/supabase/types";
 
-interface Fatura {
-  id: string;
-  cartao_id: string;
-  mes_referencia: string;
-  valor_total: number;
-  status: string;
-  data_pagamento: string | null;
-}
+// Subcomponents
+import { CardDashboardItem } from "@/components/credit-cards/CardDashboardItem";
+import { InvoiceTimeline } from "@/components/credit-cards/InvoiceTimeline";
+import { PurchaseSimulator } from "@/components/credit-cards/PurchaseSimulator";
+
+// Types mapping
+type Cartao = Tables<"cartoes_credito">;
+type Compra = Tables<"compras_cartao">;
+type Fatura = Tables<"faturas_cartao">;
 
 type CardForm = { nome: string; limite_total: string; dia_fechamento: string; dia_vencimento: string; tipo_conta: string; banco: string };
 const emptyCardForm: CardForm = { nome: "", limite_total: "", dia_fechamento: "1", dia_vencimento: "10", tipo_conta: "pessoal", banco: "" };
 
-type CompraForm = { descricao: string; valor: string; data: string; categoria: string; cartao_id: string };
-const emptyCompraForm: CompraForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "", cartao_id: "" };
+type CompraForm = { descricao: string; valor: string; data: string; categoria: string; cartao_id: string; parcelas: string };
+const emptyCompraForm: CompraForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "", cartao_id: "", parcelas: "1" };
 
-// ── Helpers ────────────────────────────────────────
-function getCurrentInvoicePeriod(diaFechamento: number) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth(); // 0-indexed
-  const d = now.getDate();
-  // If past closing day, current invoice is next month
-  if (d > diaFechamento) {
-    const next = new Date(y, m + 1, 1);
-    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
-  }
-  return `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
-function getNextInvoicePeriod(diaFechamento: number) {
-  const current = getCurrentInvoicePeriod(diaFechamento);
-  const [y, m] = current.split("-").map(Number);
-  const next = new Date(y, m, 1); // m is already 1-indexed, so this gives next month
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function getPurchaseInvoicePeriod(purchaseDate: string, diaFechamento: number) {
-  const d = new Date(purchaseDate + "T12:00:00");
-  const day = d.getDate();
-  const y = d.getFullYear();
-  const m = d.getMonth();
-  if (day > diaFechamento) {
-    const next = new Date(y, m + 1, 1);
-    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
-  }
-  return `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
+// Helper format month label
 function formatMonthLabel(mesRef: string) {
   const [y, m] = mesRef.split("-").map(Number);
   const d = new Date(y, m - 1);
@@ -97,7 +44,19 @@ function formatMonthLabel(mesRef: string) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-// ── Component ──────────────────────────────────────
+// Helper to determine invoice period of a purchase
+function getPurchaseInvoicePeriod(purchaseDate: string, diaFechamento: number) {
+  const d = new Date(purchaseDate + "T12:00:00");
+  const day = d.getDate();
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  if (day >= diaFechamento) {
+    const next = new Date(y, m + 1, 1);
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return `${y}-${String(m + 1).padStart(2, "0")}`;
+}
+
 export default function CreditCards() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -118,17 +77,17 @@ export default function CreditCards() {
   const { data: cartoes = [], isLoading: loadingCards } = useQuery({
     queryKey: ["cartoes_credito", user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("cartoes_credito").select("*").order("nome");
+      const { data, error } = await supabase.from("cartoes_credito").select("*").order("nome");
       if (error) throw error;
       return (data ?? []) as Cartao[];
     },
     enabled: !!user,
   });
 
-  const { data: compras = [] } = useQuery({
+  const { data: compras = [], isLoading: loadingCompras } = useQuery({
     queryKey: ["compras_cartao", user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("compras_cartao").select("*").order("data", { ascending: false });
+      const { data, error } = await supabase.from("compras_cartao").select("*").order("data", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Compra[];
     },
@@ -138,7 +97,7 @@ export default function CreditCards() {
   const { data: faturas = [] } = useQuery({
     queryKey: ["faturas_cartao", user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("faturas_cartao").select("*").order("mes_referencia", { ascending: false });
+      const { data, error } = await supabase.from("faturas_cartao").select("*").order("mes_referencia", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Fatura[];
     },
@@ -150,33 +109,28 @@ export default function CreditCards() {
     return cartoes[0] ?? null;
   }, [cartoes, selectedCardId]);
 
-  // ── Derived data ──
-  const currentPeriod = activeCard ? getCurrentInvoicePeriod(activeCard.dia_fechamento) : "";
-  const nextPeriod = activeCard ? getNextInvoicePeriod(activeCard.dia_fechamento) : "";
-
+  // Filtra logs do cartao ativo
   const cardCompras = useMemo(() => activeCard ? compras.filter((c) => c.cartao_id === activeCard.id) : [], [compras, activeCard]);
+  const cardFaturas = useMemo(() => activeCard ? faturas.filter((f) => f.cartao_id === activeCard.id) : [], [faturas, activeCard]);
 
-  const currentCompras = useMemo(() =>
-    cardCompras.filter((c) => getPurchaseInvoicePeriod(c.data, activeCard?.dia_fechamento ?? 1) === currentPeriod),
-    [cardCompras, currentPeriod, activeCard]
-  );
+  // Calcula limites processando TODAS as compras do cartao q não estao em faturas PAGAS
+  const { limiteUsado, limiteDisponivel } = useMemo(() => {
+    if (!activeCard) return { limiteUsado: 0, limiteDisponivel: 0 };
+    
+    // Paga se fatura.status === "paga"
+    const faturasPagas = new Set(cardFaturas.filter(f => f.status === "paga").map(f => f.mes_referencia));
+    
+    let totalUsado = 0;
+    for (const c of cardCompras) {
+      const mesRef = getPurchaseInvoicePeriod(c.data, activeCard.dia_fechamento || 1);
+      if (!faturasPagas.has(mesRef)) {
+        totalUsado += c.valor;
+      }
+    }
 
-  const nextCompras = useMemo(() =>
-    cardCompras.filter((c) => getPurchaseInvoicePeriod(c.data, activeCard?.dia_fechamento ?? 1) === nextPeriod),
-    [cardCompras, nextPeriod, activeCard]
-  );
-
-  const currentTotal = currentCompras.reduce((s, c) => s + c.valor, 0);
-  const nextTotal = nextCompras.reduce((s, c) => s + c.valor, 0);
-
-  const limiteUsado = currentTotal + nextTotal;
-  const limiteDisponivel = activeCard ? Math.max(0, activeCard.limite_total - limiteUsado) : 0;
-  const usagePercent = activeCard && activeCard.limite_total > 0 ? (limiteUsado / activeCard.limite_total) * 100 : 0;
-
-  const cardFaturas = useMemo(() =>
-    activeCard ? faturas.filter((f) => f.cartao_id === activeCard.id) : [],
-    [faturas, activeCard]
-  );
+    const disponivel = Math.max(0, (activeCard.limite_total || 0) - totalUsado);
+    return { limiteUsado: totalUsado, limiteDisponivel: disponivel };
+  }, [activeCard, cardCompras, cardFaturas]);
 
   // ── Card mutations ──
   const saveCard = useMutation({
@@ -192,10 +146,10 @@ export default function CreditCards() {
       };
       if (!payload.nome) throw new Error("Nome obrigatório");
       if (editingCardId) {
-        const { error } = await (supabase as any).from("cartoes_credito").update(payload).eq("id", editingCardId);
+        const { error } = await supabase.from("cartoes_credito").update(payload).eq("id", editingCardId);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from("cartoes_credito").insert(payload);
+        const { error } = await supabase.from("cartoes_credito").insert(payload as any);
         if (error) throw error;
       }
     },
@@ -209,7 +163,7 @@ export default function CreditCards() {
 
   const deleteCard = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("cartoes_credito").delete().eq("id", id);
+      const { error } = await supabase.from("cartoes_credito").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -225,31 +179,58 @@ export default function CreditCards() {
   // ── Purchase mutations ──
   const saveCompra = useMutation({
     mutationFn: async () => {
-      const valor = parseFloat(compraForm.valor);
-      if (!valor || valor <= 0) throw new Error("Valor inválido");
+      const valorTotal = parseFloat(compraForm.valor);
+      const parcelas = parseInt(compraForm.parcelas) || 1;
+      
+      if (!valorTotal || valorTotal <= 0) throw new Error("Valor inválido");
       if (!compraForm.descricao.trim()) throw new Error("Descrição obrigatória");
       const cartaoId = compraForm.cartao_id || activeCard?.id;
       if (!cartaoId) throw new Error("Selecione um cartão");
 
-      const payload = {
-        descricao: compraForm.descricao.trim(),
-        valor,
-        data: compraForm.data,
-        categoria: compraForm.categoria || null,
-        cartao_id: cartaoId,
-        user_id: user!.id,
-      };
+      // Editar uma compra especifica (nunca e parcelada ao editar, e sim uma unica)
       if (editingCompraId) {
-        const { error } = await (supabase as any).from("compras_cartao").update(payload).eq("id", editingCompraId);
+        const payload = {
+          descricao: compraForm.descricao.trim(),
+          valor: valorTotal,
+          data: compraForm.data,
+          categoria: compraForm.categoria || null,
+          cartao_id: cartaoId,
+        };
+        const { error } = await supabase.from("compras_cartao").update(payload).eq("id", editingCompraId);
         if (error) throw error;
-      } else {
-        const { error } = await (supabase as any).from("compras_cartao").insert(payload);
-        if (error) throw error;
+        return;
       }
+
+      // Insercao nova (pode ser parcelada)
+      const valorParcela = valorTotal / parcelas;
+      const inserts: any[] = [];
+      let currentCompra = new Date(compraForm.data + "T12:00:00");
+      
+      for (let i = 1; i <= parcelas; i++) {
+        let desc = compraForm.descricao.trim();
+        if (parcelas > 1) {
+          desc = `${desc} (${i}/${parcelas})`;
+        }
+        
+        inserts.push({
+          descricao: desc,
+          valor: valorParcela,
+          data: currentCompra.toISOString().slice(0, 10),
+          categoria: compraForm.categoria || null,
+          cartao_id: cartaoId,
+          user_id: user!.id,
+        });
+
+        // Avancar 1 mes exato para a prox parcela
+        currentCompra.setMonth(currentCompra.getMonth() + 1);
+      }
+
+      const { error } = await supabase.from("compras_cartao").insert(inserts);
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["compras_cartao", user?.id] });
-      toast.success(editingCompraId ? "Compra atualizada!" : "Compra registrada!");
+      toast.success(editingCompraId ? "Compra atualizada!" : "Compra(s) registrada(s)!");
       closeCompraDialog();
     },
     onError: (e) => toast.error(e.message || "Erro ao salvar compra"),
@@ -257,7 +238,7 @@ export default function CreditCards() {
 
   const deleteCompra = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("compras_cartao").delete().eq("id", id);
+      const { error } = await supabase.from("compras_cartao").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -269,30 +250,27 @@ export default function CreditCards() {
 
   // ── Pay invoice ──
   const payInvoice = useMutation({
-    mutationFn: async (mesRef: string) => {
+    mutationFn: async ({ mesRef, total }: { mesRef: string; total: number }) => {
       if (!activeCard) return;
-      const total = cardCompras
-        .filter((c) => getPurchaseInvoicePeriod(c.data, activeCard.dia_fechamento) === mesRef)
-        .reduce((s, c) => s + c.valor, 0);
 
       // Upsert fatura
       const existing = cardFaturas.find((f) => f.mes_referencia === mesRef);
       if (existing) {
-        const { error } = await (supabase as any).from("faturas_cartao").update({
+        const { error } = await supabase.from("faturas_cartao").update({
           status: "paga",
           valor_total: total,
           data_pagamento: new Date().toISOString().slice(0, 10),
         }).eq("id", existing.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from("faturas_cartao").insert({
+        const { error } = await supabase.from("faturas_cartao").insert({
           cartao_id: activeCard.id,
           mes_referencia: mesRef,
           valor_total: total,
           status: "paga",
           data_pagamento: new Date().toISOString().slice(0, 10),
           user_id: user!.id,
-        });
+        } as any);
         if (error) throw error;
       }
 
@@ -335,8 +313,8 @@ export default function CreditCards() {
       limite_total: String(c.limite_total),
       dia_fechamento: String(c.dia_fechamento),
       dia_vencimento: String(c.dia_vencimento),
-      tipo_conta: c.tipo_conta,
-      banco: (c as any).banco ?? "",
+      tipo_conta: c.tipo_conta ?? "pessoal",
+      banco: c.banco ?? "",
     });
     setCardDialogOpen(true);
   };
@@ -349,6 +327,7 @@ export default function CreditCards() {
       data: c.data,
       categoria: c.categoria ?? "",
       cartao_id: c.cartao_id,
+      parcelas: "1" // Edicao nao altera nr de parcelas, edita so o individual
     });
     setCompraDialogOpen(true);
   };
@@ -357,149 +336,6 @@ export default function CreditCards() {
     setCompraForm({ ...emptyCompraForm, cartao_id: activeCard?.id ?? "" });
     setEditingCompraId(null);
     setCompraDialogOpen(true);
-  };
-
-  // ── Render helpers ──
-  const isPeriodPaid = (mesRef: string) => cardFaturas.some((f) => f.mes_referencia === mesRef && f.status === "paga");
-
-  const renderPurchaseList = (purchases: Compra[], showActions = true) => {
-    if (purchases.length === 0) {
-      return <p className="py-8 text-center text-muted-foreground">Nenhuma compra registrada</p>;
-    }
-
-    if (isMobile) {
-      return (
-        <div className="space-y-2">
-          {purchases.map((c, i) => (
-            <motion.div
-              key={c.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.02 }}
-              className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
-            >
-              <CategoryIcon category={c.categoria} type="cartao" size={28} />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{c.descricao}</p>
-                <p className="text-[11px] text-muted-foreground">{c.categoria ?? "Sem categoria"}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-[11px] text-muted-foreground">{formatDate(c.data)}</p>
-                <p className={`font-heading font-bold text-sm ${transactionColors.cartao.text}`}>
-                  {formatCurrency(c.valor)}
-                </p>
-              </div>
-              {showActions && (
-                <AlertDialog>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEditCompra(c)}>
-                        <Pencil className="mr-2 h-4 w-4" /> Editar
-                      </DropdownMenuItem>
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" /> Excluir
-                        </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Excluir compra?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        A compra "{c.descricao}" será removida permanentemente.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deleteCompra.mutate(c.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Excluir
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </motion.div>
-          ))}
-        </div>
-      );
-    }
-
-    return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Data</TableHead>
-            <TableHead>Descrição</TableHead>
-            <TableHead>Categoria</TableHead>
-            <TableHead className="text-right">Valor</TableHead>
-            {showActions && <TableHead className="text-right">Ações</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {purchases.map((c, i) => (
-            <motion.tr
-              key={c.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.03 }}
-              className="border-b transition-colors hover:bg-muted/50"
-            >
-              <TableCell>{formatDate(c.data)}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <CategoryIcon category={c.categoria} type="cartao" size={24} />
-                  <span className="font-medium">{c.descricao}</span>
-                </div>
-              </TableCell>
-              <TableCell>{c.categoria ?? "—"}</TableCell>
-              <TableCell className={`text-right font-semibold ${transactionColors.cartao.text}`}>
-                {formatCurrency(c.valor)}
-              </TableCell>
-              {showActions && (
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => openEditCompra(c)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir compra?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          A compra "{c.descricao}" será removida permanentemente.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deleteCompra.mutate(c.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </TableCell>
-              )}
-            </motion.tr>
-          ))}
-        </TableBody>
-      </Table>
-    );
   };
 
   // ── No cards state ──
@@ -528,15 +364,55 @@ export default function CreditCards() {
         </Card>
 
         {/* Card Dialog */}
-        <CardFormDialog
-          open={cardDialogOpen}
-          onOpenChange={(v) => { if (!v) closeCardDialog(); else setCardDialogOpen(true); }}
-          form={cardForm}
-          setForm={setCardForm}
-          onSave={() => saveCard.mutate()}
-          isPending={saveCard.isPending}
-          isEditing={!!editingCardId}
-        />
+        <Dialog open={cardDialogOpen} onOpenChange={(v) => { if (!v) closeCardDialog(); else setCardDialogOpen(true); }}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{editingCardId ? "Editar Cartão" : "Novo Cartão"}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                    <div className="space-y-2">
+                    <Label>Nome do Cartão *</Label>
+                    <Input value={cardForm.nome} onChange={(e) => setCardForm({ ...cardForm, nome: e.target.value })} placeholder="Ex: Nubank, Itaú Black" />
+                    </div>
+                    <div className="space-y-2">
+                    <Label>Banco Emissor</Label>
+                    <Select value={cardForm.banco} onValueChange={(v) => setCardForm({ ...cardForm, banco: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                        {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    </div>
+                    <div className="space-y-2">
+                    <Label>Limite Total (R$)</Label>
+                    <Input type="number" step="0.01" value={cardForm.limite_total} onChange={(e) => setCardForm({ ...cardForm, limite_total: e.target.value })} placeholder="Ex: 5000.00" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Dia de Fechamento</Label>
+                        <Input type="number" min="1" max="31" value={cardForm.dia_fechamento} onChange={(e) => setCardForm({ ...cardForm, dia_fechamento: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Dia de Vencimento</Label>
+                        <Input type="number" min="1" max="31" value={cardForm.dia_vencimento} onChange={(e) => setCardForm({ ...cardForm, dia_vencimento: e.target.value })} />
+                    </div>
+                    </div>
+                    <div className="space-y-2">
+                    <Label>Tipo de Conta</Label>
+                    <Select value={cardForm.tipo_conta} onValueChange={(v) => setCardForm({ ...cardForm, tipo_conta: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="pessoal">Pessoal</SelectItem>
+                        <SelectItem value="mei">MEI / Empresarial</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    </div>
+                    <Button className="w-full mt-4" onClick={() => saveCard.mutate()} disabled={saveCard.isPending}>
+                        {saveCard.isPending ? "Salvando..." : "Salvar Cartão"}
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -547,263 +423,118 @@ export default function CreditCards() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold">Cartões de Crédito</h1>
-          <p className="text-sm text-muted-foreground">Controle seus cartões e faturas</p>
+          <p className="text-sm text-muted-foreground">Controle inteligente de faturas e parcelamentos</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setCardForm(emptyCardForm); setEditingCardId(null); setCardDialogOpen(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Novo Cartão
-          </Button>
+        {activeCard && <PurchaseSimulator cartaoDiaFechamento={activeCard.dia_fechamento || 1} />}
           <Button onClick={openNewCompra} disabled={!activeCard}>
-            <Plus className="mr-2 h-4 w-4" /> Adicionar Compra
+            <Plus className="mr-2 h-4 w-4" /> Nova Compra
           </Button>
         </div>
       </div>
 
-      {/* Card selector (if multiple) */}
-      {cartoes.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {cartoes.map((c) => {
-            const bankInfo = banks.find(b => b.id === (c as any).banco);
-            return (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCardId(c.id)}
-                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-                  activeCard?.id === c.id
-                    ? "border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300"
-                    : "border-border bg-card text-muted-foreground hover:border-purple-500/50"
-                }`}
-              >
-                {bankInfo ? <BankLogo bankId={bankInfo.id} size={24} /> : <CreditCard className="h-4 w-4" />}
-                {c.nome}
-              </button>
-            );
-          })}
+      {/* Cards Horizontal List */}
+      <div className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x scrollbar-hide">
+        {/* Renderiza botao de add cartao se hover outros */}
+        <Button 
+            variant="outline" 
+            className="shrink-0 h-[178px] min-w-[140px] flex flex-col justify-center gap-2 border-dashed snap-start" 
+            onClick={() => { setCardForm(emptyCardForm); setEditingCardId(null); setCardDialogOpen(true); }}
+        >
+            <Plus className="h-6 w-6 text-muted-foreground" />
+            <span className="text-muted-foreground font-normal">Novo Cartão</span>
+        </Button>
+          
+        {cartoes.map((c) => (
+            <div key={c.id} className="snap-start shrink-0">
+                <CardDashboardItem
+                    cartao={c}
+                    isActive={activeCard?.id === c.id}
+                    onClick={() => setSelectedCardId(c.id)}
+                    onEdit={openEditCard}
+                    onDelete={(id) => deleteCard.mutate(id)}
+                    limiteUsado={c.id === activeCard?.id ? limiteUsado : 0} 
+                    limiteDisponivel={c.id === activeCard?.id ? limiteDisponivel : c.limite_total || 0}
+                />
+            </div>
+        ))}
+      </div>
+
+      {/* Invoices Timeline */}
+      {activeCard && (
+        <div className="mt-8 space-y-4">
+            <h2 className="font-heading text-xl font-bold mb-2 flex items-center gap-2 text-primary">
+                Faturas do Cartão
+            </h2>
+            <InvoiceTimeline
+                cartao={activeCard}
+                compras={cardCompras}
+                faturas={cardFaturas}
+                isMobile={isMobile}
+                onPayInvoice={(mesRef, total) => payInvoice.mutate({ mesRef, total })}
+                onEditCompra={openEditCompra}
+                onDeleteCompra={(id) => deleteCompra.mutate(id)}
+            />
         </div>
       )}
 
-      {/* Card Summary */}
-      {activeCard && (
-        <Card>
-          <CardContent className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${transactionColors.cartao.bg}`}>
-                  <CreditCard className={`h-6 w-6 ${transactionColors.cartao.text}`} />
-                </div>
-                <div>
-                  <h2 className="font-heading text-lg font-bold">{activeCard.nome}</h2>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Fecha dia {activeCard.dia_fechamento}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <DollarSign className="h-3 w-3" />
-                      Vence dia {activeCard.dia_vencimento}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={() => openEditCard(activeCard)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Excluir cartão?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Todas as compras e faturas deste cartão serão excluídas permanentemente.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deleteCard.mutate(activeCard.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Excluir
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-
-            {/* Limit bar */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Limite utilizado</span>
-                <span className="font-semibold">
-                  {formatCurrency(limiteUsado)} / {formatCurrency(activeCard.limite_total)}
-                </span>
-              </div>
-              <Progress
-                value={Math.min(usagePercent, 100)}
-                className="h-3"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Usado: {formatCurrency(limiteUsado)}</span>
-                <span className="text-secondary font-medium">Disponível: {formatCurrency(limiteDisponivel)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tabs: Fatura Atual / Próxima / Histórico */}
-      {activeCard && (
-        <Tabs defaultValue="current">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="current">Fatura Atual</TabsTrigger>
-            <TabsTrigger value="next">Próxima Fatura</TabsTrigger>
-            <TabsTrigger value="history">Histórico</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="current" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
-                  <CardTitle className="font-heading text-lg">
-                    Fatura Atual — {formatMonthLabel(currentPeriod)}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Total: <span className="font-semibold text-foreground">{formatCurrency(currentTotal)}</span>
-                  </p>
-                </div>
-                {currentTotal > 0 && !isPeriodPaid(currentPeriod) && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="outline" className="text-secondary border-secondary hover:bg-secondary/10">
-                        <CheckCircle className="mr-2 h-4 w-4" /> Pagar Fatura
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Pagar fatura de {formatMonthLabel(currentPeriod)}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Será registrada uma despesa de {formatCurrency(currentTotal)} no sistema. Esta ação não pode ser desfeita.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => payInvoice.mutate(currentPeriod)}>
-                          Confirmar Pagamento
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-                {isPeriodPaid(currentPeriod) && (
-                  <Badge variant="secondary" className="bg-secondary/10 text-secondary">
-                    <CheckCircle className="mr-1 h-3 w-3" /> Paga
-                  </Badge>
-                )}
-              </CardHeader>
-              <CardContent>
-                {renderPurchaseList(currentCompras)}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="next" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-heading text-lg">
-                  Próxima Fatura — {formatMonthLabel(nextPeriod)}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Total parcial: <span className="font-semibold text-foreground">{formatCurrency(nextTotal)}</span>
-                </p>
-              </CardHeader>
-              <CardContent>
-                {renderPurchaseList(nextCompras)}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="history" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-heading text-lg">Histórico de Faturas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {cardFaturas.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">Nenhuma fatura no histórico</p>
-                ) : (
-                  isMobile ? (
-                    <div className="space-y-2">
-                      {cardFaturas.map((f) => (
-                        <div key={f.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm">{formatMonthLabel(f.mes_referencia)}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {f.data_pagamento ? `Pago em ${formatDate(f.data_pagamento)}` : "Sem pagamento"}
-                            </p>
-                          </div>
-                          <Badge variant={f.status === "paga" ? "secondary" : "destructive"} className={f.status === "paga" ? "bg-secondary/10 text-secondary" : ""}>
-                            {f.status === "paga" ? "Pago" : f.status === "fechada" ? "Fechada" : "Pendente"}
-                          </Badge>
-                          <p className="font-heading font-bold text-sm shrink-0">{formatCurrency(f.valor_total)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Mês</TableHead>
-                          <TableHead className="text-right">Valor Total</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Data Pagamento</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {cardFaturas.map((f) => (
-                          <TableRow key={f.id}>
-                            <TableCell className="font-medium">{formatMonthLabel(f.mes_referencia)}</TableCell>
-                            <TableCell className="text-right font-semibold">{formatCurrency(f.valor_total)}</TableCell>
-                            <TableCell>
-                              <Badge variant={f.status === "paga" ? "secondary" : "destructive"} className={f.status === "paga" ? "bg-secondary/10 text-secondary" : ""}>
-                                {f.status === "paga" ? "Pago" : f.status === "fechada" ? "Fechada" : "Pendente"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{f.data_pagamento ? formatDate(f.data_pagamento) : "—"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      )}
-
       {/* Card Dialog */}
-      <CardFormDialog
-        open={cardDialogOpen}
-        onOpenChange={(v) => { if (!v) closeCardDialog(); else setCardDialogOpen(true); }}
-        form={cardForm}
-        setForm={setCardForm}
-        onSave={() => saveCard.mutate()}
-        isPending={saveCard.isPending}
-        isEditing={!!editingCardId}
-      />
+      <Dialog open={cardDialogOpen} onOpenChange={(v) => { if (!v) closeCardDialog(); else setCardDialogOpen(true); }}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>{editingCardId ? "Editar Cartão" : "Novo Cartão"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                <Label>Nome do Cartão *</Label>
+                <Input value={cardForm.nome} onChange={(e) => setCardForm({ ...cardForm, nome: e.target.value })} placeholder="Ex: Nubank, Itaú Black" />
+                </div>
+                <div className="space-y-2">
+                <Label>Banco Emissor</Label>
+                <Select value={cardForm.banco} onValueChange={(v) => setCardForm({ ...cardForm, banco: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                    {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                </div>
+                <div className="space-y-2">
+                <Label>Limite Total (R$)</Label>
+                <Input type="number" step="0.01" value={cardForm.limite_total} onChange={(e) => setCardForm({ ...cardForm, limite_total: e.target.value })} placeholder="Ex: 5000.00" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Dia de Fechamento</Label>
+                    <Input type="number" min="1" max="31" value={cardForm.dia_fechamento} onChange={(e) => setCardForm({ ...cardForm, dia_fechamento: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                    <Label>Dia de Vencimento</Label>
+                    <Input type="number" min="1" max="31" value={cardForm.dia_vencimento} onChange={(e) => setCardForm({ ...cardForm, dia_vencimento: e.target.value })} />
+                </div>
+                </div>
+                <div className="space-y-2">
+                <Label>Tipo de Conta</Label>
+                <Select value={cardForm.tipo_conta} onValueChange={(v) => setCardForm({ ...cardForm, tipo_conta: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="pessoal">Pessoal</SelectItem>
+                    <SelectItem value="mei">MEI / Empresarial</SelectItem>
+                    </SelectContent>
+                </Select>
+                </div>
+                <Button className="w-full mt-4" onClick={() => saveCard.mutate()} disabled={saveCard.isPending}>
+                    {saveCard.isPending ? "Salvando..." : "Salvar Cartão"}
+                </Button>
+            </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Purchase Dialog */}
       <Dialog open={compraDialogOpen} onOpenChange={(v) => { if (!v) closeCompraDialog(); else setCompraDialogOpen(true); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="font-heading">
-              {editingCompraId ? "Editar Compra" : "Nova Compra no Cartão"}
+              {editingCompraId ? "Editar Compra / Parcela" : "Nova Compra Cartão"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -820,159 +551,72 @@ export default function CreditCards() {
                 </Select>
               </div>
             )}
+            
             <div className="space-y-2">
-              <Label>Descrição *</Label>
+              <Label>Descrição da Compra *</Label>
               <Input
                 value={compraForm.descricao}
                 onChange={(e) => setCompraForm({ ...compraForm, descricao: e.target.value })}
-                placeholder="Ex: Compra no iFood"
-                maxLength={200}
+                placeholder="Ex: Supermercado Extra"
               />
             </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>{editingCompraId ? "Valor da Parcela (R$)" : "Valor TOTAL (R$)"} *</Label>
+                    <Input
+                        type="number"
+                        step="0.01"
+                        value={compraForm.valor}
+                        onChange={(e) => setCompraForm({ ...compraForm, valor: e.target.value })}
+                        placeholder="Ex: 150.00"
+                    />
+                </div>
+                {!editingCompraId && (
+                    <div className="space-y-2">
+                        <Label>Parcelas *</Label>
+                        <Input
+                            type="number"
+                            min="1"
+                            max="72"
+                            value={compraForm.parcelas}
+                            onChange={(e) => setCompraForm({ ...compraForm, parcelas: e.target.value })}
+                            placeholder="Ex: 1"
+                        />
+                    </div>
+                )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Data da Compra *</Label>
+              <Input
+                type="date"
+                value={compraForm.data}
+                onChange={(e) => setCompraForm({ ...compraForm, data: e.target.value })}
+              />
+            </div>
+            
             <div className="space-y-2">
               <Label>Categoria</Label>
               <Select value={compraForm.categoria} onValueChange={(v) => setCompraForm({ ...compraForm, categoria: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
+                <SelectContent className="max-h-[300px]">
                   {expenseCategories.map((c) => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Valor (R$) *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={compraForm.valor}
-                  onChange={(e) => setCompraForm({ ...compraForm, valor: e.target.value })}
-                  placeholder="0,00"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Data *</Label>
-                <Input
-                  type="date"
-                  value={compraForm.data}
-                  onChange={(e) => setCompraForm({ ...compraForm, data: e.target.value })}
-                />
-              </div>
-            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeCompraDialog}>Cancelar</Button>
-            <Button onClick={() => saveCompra.mutate()} disabled={saveCompra.isPending}>
-              {saveCompra.isPending ? "Salvando..." : "Salvar"}
-            </Button>
-          </DialogFooter>
+          <Button
+            className="w-full mt-4"
+            disabled={saveCompra.isPending}
+            onClick={() => saveCompra.mutate()}
+          >
+            {saveCompra.isPending ? "Salvando..." : editingCompraId ? "Salvar Alterações" : "Registrar Compra"}
+          </Button>
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-// ── Card Form Dialog Component ──
-function CardFormDialog({
-  open, onOpenChange, form, setForm, onSave, isPending, isEditing,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  form: CardForm;
-  setForm: (f: CardForm) => void;
-  onSave: () => void;
-  isPending: boolean;
-  isEditing: boolean;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="font-heading">
-            {isEditing ? "Editar Cartão" : "Novo Cartão de Crédito"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label>Banco</Label>
-            <Select value={form.banco} onValueChange={(v) => {
-              const bank = banks.find(b => b.id === v);
-              setForm({ ...form, banco: v, nome: bank && !form.nome ? bank.name : form.nome });
-            }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o banco" />
-              </SelectTrigger>
-              <SelectContent>
-                {banks.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    <div className="flex items-center gap-2">
-                      <BankLogo bankId={b.id} size={20} />
-                      <span>{b.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Nome do Cartão *</Label>
-            <Input
-              value={form.nome}
-              onChange={(e) => setForm({ ...form, nome: e.target.value })}
-              placeholder="Ex: Nubank, Inter, C6..."
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Limite Total (R$)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={form.limite_total}
-              onChange={(e) => setForm({ ...form, limite_total: e.target.value })}
-              placeholder="5000"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Dia de Fechamento</Label>
-              <Input
-                type="number"
-                min="1"
-                max="31"
-                value={form.dia_fechamento}
-                onChange={(e) => setForm({ ...form, dia_fechamento: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Dia de Vencimento</Label>
-              <Input
-                type="number"
-                min="1"
-                max="31"
-                value={form.dia_vencimento}
-                onChange={(e) => setForm({ ...form, dia_vencimento: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Tipo de Conta</Label>
-            <Select value={form.tipo_conta} onValueChange={(v) => setForm({ ...form, tipo_conta: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pessoal">Pessoal</SelectItem>
-                <SelectItem value="mei">MEI</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={onSave} disabled={isPending}>
-            {isPending ? "Salvando..." : "Salvar"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -1,47 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { Tables, TablesInsert } from "@/integrations/supabase/types";
 
-export interface InvestimentoAtivo {
-  id: string;
-  user_id: string;
-  nome: string;
-  tipo: "acao" | "fii" | "etf" | "cripto" | "renda_fixa" | "fundo";
-  quantidade: number;
-  preco_medio: number;
-  preco_atual: number;
-  data_compra: string;
-  created_at: string;
-}
-
-export interface InvestimentoAtivoInsert {
-  nome: string;
-  tipo: string;
-  quantidade: number;
-  preco_medio: number;
-  preco_atual?: number;
-  data_compra: string;
-}
-
-export interface InvestimentoDividendo {
-  id: string;
-  user_id: string;
-  ativo_id: string | null;
-  valor: number;
-  data_recebimento: string;
-  tipo: "dividendo" | "jcp" | "rendimento";
-  created_at: string;
-}
-
-export interface InvestimentoDividendoInsert {
-  ativo_id?: string | null;
-  valor: number;
-  data_recebimento: string;
-  tipo?: string;
-}
-
-// Use untyped client for tables not yet in generated types
-const db = supabase as any;
+export type InvestimentoAtivo = Tables<"investimento_ativos">;
+export type InvestimentoAtivoInsert = TablesInsert<"investimento_ativos">;
+export type InvestimentoDividendo = Tables<"investimento_dividendos">;
+export type InvestimentoDividendoInsert = TablesInsert<"investimento_dividendos">;
 
 export function useInvestments() {
   const { user } = useAuth();
@@ -51,10 +16,10 @@ export function useInvestments() {
   const ativos = useQuery({
     queryKey: ["investimento_ativos", userId],
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("investimento_ativos")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as InvestimentoAtivo[];
@@ -63,10 +28,10 @@ export function useInvestments() {
   });
 
   const addAtivo = useMutation({
-    mutationFn: async (ativo: InvestimentoAtivoInsert) => {
-      const { error } = await db
+    mutationFn: async (ativo: Omit<InvestimentoAtivoInsert, "user_id">) => {
+      const { error } = await supabase
         .from("investimento_ativos")
-        .insert({ ...ativo, user_id: userId });
+        .insert({ ...ativo, user_id: userId! } as InvestimentoAtivoInsert);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_ativos"] }),
@@ -74,11 +39,11 @@ export function useInvestments() {
 
   const updateAtivo = useMutation({
     mutationFn: async ({ id, ...data }: Partial<InvestimentoAtivo> & { id: string }) => {
-      const { error } = await db
+      const { error } = await supabase
         .from("investimento_ativos")
-        .update(data)
+        .update(data as any)
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("user_id", userId!);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_ativos"] }),
@@ -86,11 +51,11 @@ export function useInvestments() {
 
   const deleteAtivo = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db
+      const { error } = await supabase
         .from("investimento_ativos")
         .delete()
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("user_id", userId!);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_ativos"] }),
@@ -99,10 +64,10 @@ export function useInvestments() {
   const dividendos = useQuery({
     queryKey: ["investimento_dividendos", userId],
     queryFn: async () => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from("investimento_dividendos")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", userId!)
         .order("data_recebimento", { ascending: false });
       if (error) throw error;
       return (data ?? []) as InvestimentoDividendo[];
@@ -111,10 +76,10 @@ export function useInvestments() {
   });
 
   const addDividendo = useMutation({
-    mutationFn: async (div: InvestimentoDividendoInsert) => {
-      const { error } = await db
+    mutationFn: async (div: Omit<InvestimentoDividendoInsert, "user_id">) => {
+      const { error } = await supabase
         .from("investimento_dividendos")
-        .insert({ ...div, user_id: userId });
+        .insert({ ...div, user_id: userId! } as InvestimentoDividendoInsert);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_dividendos"] }),
@@ -122,11 +87,11 @@ export function useInvestments() {
 
   const deleteDividendo = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db
+      const { error } = await supabase
         .from("investimento_dividendos")
         .delete()
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("user_id", userId!);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_dividendos"] }),

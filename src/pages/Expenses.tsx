@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, TrendingDown, Pencil, Trash2, Filter, Search } from "lucide-react";
-import { formatCurrency, formatDate, expenseCategories as expenseCategoryNames } from "@/lib/mockData";
+import { Plus, TrendingDown, Pencil, Trash2, Filter, Search, X } from "lucide-react";
+import { formatCurrency, formatDate, expenseCategories as expenseCategoryNames } from "@/lib/utils";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
@@ -21,6 +21,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import type { DespesaExtended } from "@/types/transactions";
+import { useFinancialData } from "@/hooks/useFinancialData";
 
 export default function Expenses() {
   const { user } = useAuth();
@@ -32,16 +33,10 @@ export default function Expenses() {
   const [filterCategoria, setFilterCategoria] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [sortBy, setSortBy] = useState("data-desc");
 
-  const { data: despesas = [], isLoading } = useQuery({
-    queryKey: ["despesas", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
-      if (error) throw error;
-      return data as unknown as DespesaExtended[];
-    },
-    enabled: !!user,
-  });
+  const { raw, loading: isLoading } = useFinancialData();
+  const despesas = (raw.despesas as unknown as DespesaExtended[]) || [];
 
   const filtered = useMemo(() => {
     let list = despesas;
@@ -51,8 +46,17 @@ export default function Expenses() {
       const q = searchText.toLowerCase().trim();
       list = list.filter((d) => d.descricao.toLowerCase().includes(q) || (d.categoria ?? "").toLowerCase().includes(q));
     }
-    return list;
-  }, [despesas, filterMonth, filterCategoria, searchText]);
+
+    // Sorting logic
+    return [...list].sort((a, b) => {
+      if (sortBy === "data-desc") return new Date(b.data).getTime() - new Date(a.data).getTime();
+      if (sortBy === "data-asc") return new Date(a.data).getTime() - new Date(b.data).getTime();
+      if (sortBy === "valor-desc") return b.valor - a.valor;
+      if (sortBy === "valor-asc") return a.valor - b.valor;
+      if (sortBy === "abc-asc") return a.descricao.localeCompare(b.descricao);
+      return 0;
+    });
+  }, [despesas, filterMonth, filterCategoria, searchText, sortBy]);
 
   const total = filtered.reduce((s, d) => s + d.valor, 0);
 
@@ -134,8 +138,36 @@ export default function Expenses() {
                   </SelectContent>
                 </Select>
               </div>
-              {hasFilters && (
-                <Button variant="ghost" size="sm" onClick={() => { setFilterCategoria(""); setSearchText(""); }}>Limpar filtros</Button>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ordenação Profissional</Label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-56 h-10 border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors">
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="data-desc">📅 Data (Mais recentes)</SelectItem>
+                    <SelectItem value="data-asc">📅 Data (Mais antigos)</SelectItem>
+                    <SelectItem value="valor-desc">💰 Valor (Maior p/ menor)</SelectItem>
+                    <SelectItem value="valor-asc">💰 Valor (Menor p/ maior)</SelectItem>
+                    <SelectItem value="abc-asc">🔤 A-Z (Alfabética)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(hasFilters || sortBy !== "data-desc") && (
+                <Button 
+                   variant="ghost" 
+                   size="sm" 
+                   className="text-xs h-10 px-3 hover:bg-destructive/10 hover:text-destructive"
+                   onClick={() => { 
+                     setFilterCategoria(""); 
+                     setSortBy("data-desc"); 
+                     setSearchText(""); 
+                   }}
+                >
+                  <X className="mr-2 h-3 w-3" /> Limpar filtros
+                </Button>
               )}
             </div>
           </CardContent>

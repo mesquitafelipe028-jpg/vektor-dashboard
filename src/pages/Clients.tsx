@@ -17,10 +17,13 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Pencil, Trash2, Users, Search, Trophy, Eye, UserPlus, MoreVertical } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Plus, Pencil, Trash2, Users, Search, Trophy, Eye, UserPlus, MoreVertical, X } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function Clients() {
@@ -29,6 +32,7 @@ export default function Clients() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("nome-asc");
 
   const { data: clientes = [], isLoading } = useQuery({
     queryKey: ["clientes", user?.id],
@@ -48,7 +52,7 @@ export default function Clients() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("receitas")
-        .select("id, valor, data, cliente_id")
+        .select("id, valor, data, cliente_id, status")
         .order("data", { ascending: false });
       if (error) throw error;
       return data;
@@ -82,24 +86,47 @@ export default function Clients() {
     onError: () => toast.error("Erro ao excluir cliente."),
   });
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return clientes;
-    const q = search.toLowerCase().trim();
-    return clientes.filter(
-      (c) =>
-        c.nome.toLowerCase().includes(q) ||
-        (c.email ?? "").toLowerCase().includes(q) ||
-        (c.telefone ?? "").toLowerCase().includes(q)
-    );
-  }, [clientes, search]);
-
+  // clientRevenue must be declared BEFORE filtered to avoid temporal dead zone
   const clientRevenue = useMemo(() => {
     const map: Record<string, number> = {};
     receitas.forEach((r) => {
-      if (r.cliente_id) map[r.cliente_id] = (map[r.cliente_id] || 0) + r.valor;
+      if (r.cliente_id && r.status === "recebido") {
+        map[r.cliente_id] = (map[r.cliente_id] || 0) + r.valor;
+      }
     });
     return map;
   }, [receitas]);
+
+  const clientPending = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    receitas.forEach((r) => {
+      if (r.cliente_id && (r.status === "pendente" || r.status === "atrasado")) {
+        map[r.cliente_id] = true;
+      }
+    });
+    return map;
+  }, [receitas]);
+
+  const filtered = useMemo(() => {
+    const base = search.trim()
+      ? clientes.filter((c) => {
+          const q = search.toLowerCase().trim();
+          return (
+            c.nome.toLowerCase().includes(q) ||
+            (c.email ?? "").toLowerCase().includes(q) ||
+            (c.telefone ?? "").toLowerCase().includes(q)
+          );
+        })
+      : clientes;
+
+    return [...base].sort((a, b) => {
+      if (sortBy === "nome-asc") return a.nome.localeCompare(b.nome);
+      if (sortBy === "nome-desc") return b.nome.localeCompare(a.nome);
+      if (sortBy === "faturamento-desc") return (clientRevenue[b.id] || 0) - (clientRevenue[a.id] || 0);
+      if (sortBy === "faturamento-asc") return (clientRevenue[a.id] || 0) - (clientRevenue[b.id] || 0);
+      return 0;
+    });
+  }, [clientes, search, sortBy, clientRevenue]);
 
   return (
     <div className="space-y-4">
@@ -117,15 +144,35 @@ export default function Clients() {
         )}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar nome, e-mail ou telefone..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Search & Sort */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar nome, e-mail ou telefone..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+           <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full sm:w-56 bg-muted/30 h-10 border-border">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nome-asc">🔤 Nome (A-Z)</SelectItem>
+                <SelectItem value="nome-desc">🔤 Nome (Z-A)</SelectItem>
+                <SelectItem value="faturamento-desc">💰 Faturamento (Maior)</SelectItem>
+                <SelectItem value="faturamento-asc">💰 Faturamento (Menor)</SelectItem>
+              </SelectContent>
+           </Select>
+           {(search || sortBy !== "nome-asc") && (
+             <Button variant="ghost" size="icon" onClick={() => { setSearch(""); setSortBy("nome-asc"); }} className="shrink-0 h-10 w-10">
+               <X className="h-4 w-4" />
+             </Button>
+           )}
+        </div>
       </div>
 
       {topClients.length > 0 && (
@@ -199,7 +246,12 @@ export default function Clients() {
                 <Users className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{c.nome}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-sm truncate">{c.nome}</p>
+                  {clientPending[c.id] && (
+                    <div className="h-2 w-2 rounded-full bg-amber-500 shrink-0" title="Possui cobranças pendentes" />
+                  )}
+                </div>
                 <p className="text-[11px] text-muted-foreground truncate">
                   {c.email || c.telefone || "Sem contato"}
                 </p>
@@ -278,9 +330,16 @@ export default function Clients() {
                     className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
                     onClick={() => navigate(`/clientes/${c.id}`)}
                   >
-                    <TableCell className="font-medium">{c.nome}</TableCell>
-                    <TableCell>{c.email ?? "—"}</TableCell>
-                    <TableCell>{c.telefone ?? "—"}</TableCell>
+                    <TableCell className="font-medium text-left">
+                      <div className="flex items-center gap-2">
+                        {c.nome}
+                        {clientPending[c.id] && (
+                          <div className="h-2 w-2 rounded-full bg-amber-500 shrink-0" title="Possui cobranças pendentes" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-left">{c.email ?? "—"}</TableCell>
+                    <TableCell className="text-left">{c.telefone ?? "—"}</TableCell>
                     <TableCell className="text-right font-semibold text-primary">
                       {formatCurrency(clientRevenue[c.id] ?? 0)}
                     </TableCell>

@@ -13,11 +13,13 @@ import {
   CreditCard,
   Wallet,
   Search,
-  Plus,
-  LucideIcon,
+  Clock,
+  Tag,
   Calculator,
   ClipboardList,
-  Clock,
+  Plus,
+  Briefcase,
+  Upload,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { LogoVektor } from "@/components/branding/LogoVektor";
@@ -73,7 +75,9 @@ const menuGroups = [
     label: "Planejamento",
     items: [
       { title: "Metas", url: "/metas", icon: Target },
+      { title: "Projetos", url: "/projetos", icon: Briefcase },
       { title: "Análise Financeira", url: "/analise-financeira", icon: Activity },
+      { title: "Assinaturas", url: "/assinaturas", icon: Receipt },
       { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
     ],
   },
@@ -86,6 +90,8 @@ const menuGroups = [
   {
     label: "Sistema",
     items: [
+      { title: "Importar Extrato", url: "/importar-extrato", icon: Upload },
+      { title: "Categorias", url: "/categorias", icon: Tag },
       { title: "Configurações", url: "/configuracoes", icon: Settings },
     ],
   },

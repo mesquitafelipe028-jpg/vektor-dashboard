@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { ShieldAlert, AlertTriangle, CheckCircle2, Flame, Lightbulb, PieChart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/utils";
 
 export interface InsightsFinanceirosProps {
   faturamentoMes: number;

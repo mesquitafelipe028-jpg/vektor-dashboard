@@ -41,11 +41,11 @@ function getNextDate(currentDate: string, freq: Frequencia): string {
 
 async function generateNext(table: "receitas" | "despesas", userId: string) {
   // Get all recurring parent transactions (no transacao_pai_id)
-  const { data: parents, error } = await (supabase
+  const { data: parents, error } = await supabase
     .from(table)
     .select("*")
-    .eq("user_id", userId) as any)
-    .eq("tipo_transacao", "recorrente")
+    .eq("user_id", userId)
+    .eq("tipo_transacao", "recorrente" as any)
     .is("transacao_pai_id", null);
 
   if (error || !parents?.length) return;
@@ -61,24 +61,24 @@ async function generateNext(table: "receitas" | "despesas", userId: string) {
     if (p.data_fim && p.data_fim < today) continue;
 
     // Find the latest child (or parent itself)
-    const { data: children } = await (supabase
+    const { data: children } = await supabase
       .from(table)
-      .select("data") as any)
+      .select("data")
       .eq("transacao_pai_id", p.id)
       .order("data", { ascending: false })
       .limit(1);
 
-    const latestDate = children?.length ? (children[0] as any).data : p.data;
-    let nextDate = getNextDate(latestDate, freq);
+    const latestDate = children?.length ? children[0].data : p.data;
+    let nextDate = getNextDate(latestDate!, freq);
 
     // Generate all missing occurrences up to today
     while (nextDate <= today) {
       if (p.data_fim && nextDate > p.data_fim) break;
 
       // Check if already exists for this date
-      const { data: existing } = await (supabase
+      const { data: existing } = await supabase
         .from(table)
-        .select("id") as any)
+        .select("id")
         .eq("transacao_pai_id", p.id)
         .eq("data", nextDate)
         .limit(1);

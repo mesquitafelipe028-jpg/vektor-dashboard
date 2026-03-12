@@ -41,6 +41,10 @@
     --chart-3: 200 70% 50%;
     --chart-4: 280 60% 55%;
     --chart-5: 0 72% 51%;
+
+    /* Mobile / PWA offsets */
+    --mobile-nav-height: 4rem; /* 64px */
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .dark {

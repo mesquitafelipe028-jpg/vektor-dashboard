@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, TrendingUp, Pencil, Trash2, Filter, Search } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/mockData";
+import { Plus, TrendingUp, Pencil, Trash2, Filter, Search, X } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
@@ -21,6 +21,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import type { ReceitaExtended } from "@/types/transactions";
+import { useFinancialData } from "@/hooks/useFinancialData";
 
 export default function Revenues() {
   const { user } = useAuth();
@@ -32,19 +33,10 @@ export default function Revenues() {
   const [filterClientId, setFilterClientId] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [sortBy, setSortBy] = useState("data-desc");
 
-  const { data: receitas = [], isLoading } = useQuery({
-    queryKey: ["receitas", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("receitas")
-        .select("*, clientes(nome)")
-        .order("data", { ascending: false });
-      if (error) throw error;
-      return data as unknown as ReceitaExtended[];
-    },
-    enabled: !!user,
-  });
+  const { raw, loading: isLoading } = useFinancialData();
+  const receitas = (raw.receitas as unknown as ReceitaExtended[]) || [];
 
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes", user?.id],
@@ -64,8 +56,17 @@ export default function Revenues() {
       const q = searchText.toLowerCase().trim();
       list = list.filter((r) => r.descricao.toLowerCase().includes(q) || (r.categoria ?? "").toLowerCase().includes(q));
     }
-    return list;
-  }, [receitas, filterMonth, filterClientId, searchText]);
+
+    // Sorting logic
+    return [...list].sort((a, b) => {
+      if (sortBy === "data-desc") return new Date(b.data).getTime() - new Date(a.data).getTime();
+      if (sortBy === "data-asc") return new Date(a.data).getTime() - new Date(b.data).getTime();
+      if (sortBy === "valor-desc") return b.valor - a.valor;
+      if (sortBy === "valor-asc") return a.valor - b.valor;
+      if (sortBy === "abc-asc") return a.descricao.localeCompare(b.descricao);
+      return 0;
+    });
+  }, [receitas, filterMonth, filterClientId, searchText, sortBy]);
 
   const total = filtered.reduce((s, r) => s + r.valor, 0);
 
@@ -141,7 +142,6 @@ export default function Revenues() {
                 <span className="font-medium">Filtros</span>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Cliente</Label>
                 <Select value={filterClientId} onValueChange={setFilterClientId}>
                   <SelectTrigger className="w-48"><SelectValue placeholder="Todos" /></SelectTrigger>
                   <SelectContent>
@@ -150,8 +150,36 @@ export default function Revenues() {
                   </SelectContent>
                 </Select>
               </div>
-              {hasFilters && (
-                <Button variant="ghost" size="sm" onClick={() => setFilterClientId("")}>Limpar filtros</Button>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ordenação Profissional</Label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-56 h-10 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors">
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="data-desc">📅 Data (Mais recentes)</SelectItem>
+                    <SelectItem value="data-asc">📅 Data (Mais antigos)</SelectItem>
+                    <SelectItem value="valor-desc">💰 Valor (Maior p/ menor)</SelectItem>
+                    <SelectItem value="valor-asc">💰 Valor (Menor p/ maior)</SelectItem>
+                    <SelectItem value="abc-asc">🔤 A-Z (Alfabética)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(hasFilters || sortBy !== "data-desc" || searchText.trim() !== "") && (
+                <Button 
+                   variant="ghost" 
+                   size="sm" 
+                   className="text-xs h-10 px-3 hover:bg-destructive/10 hover:text-destructive"
+                   onClick={() => { 
+                     setFilterClientId(""); 
+                     setSortBy("data-desc"); 
+                     setSearchText(""); 
+                   }}
+                >
+                  <X className="mr-2 h-3 w-3" /> Limpar filtros
+                </Button>
               )}
             </div>
           </CardContent>

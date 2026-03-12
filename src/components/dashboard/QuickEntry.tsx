@@ -2,16 +2,18 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Zap, Banknote, Tag, ArrowRight } from "lucide-react";
+import { Send, Zap, Banknote, Tag, ArrowRight, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { suggestCategory, formatCurrency } from "@/lib/mockData";
+import { suggestCategory, formatCurrency } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Building2, User as UserIcon } from "lucide-react";
+import { queryKeys } from "@/lib/queryKeys";
 
 type ParsedData = {
   isValid: boolean;
@@ -26,11 +28,19 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedData | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedConta, setSelectedConta] = useState<"mei" | "pessoal">(financialView === "pessoal" ? "pessoal" : "mei");
+  const [selectedContaId, setSelectedContaId] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { accounts } = useAccounts();
   const qc = useQueryClient();
   const navigate = useNavigate();
+
+  // Auto-select first account if only one exists
+  useEffect(() => {
+    if (isDialogOpen && !selectedContaId && accounts.length > 0) {
+      setSelectedContaId(accounts[0].id);
+    }
+  }, [isDialogOpen, selectedContaId, accounts]);
 
   const parseInput = useCallback((input: string): ParsedData => {
     const trimmed = input.trim();
@@ -91,8 +101,8 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
 
     const result = parseInput(text);
     setParsed(result);
-    setSelectedConta(financialView === "pessoal" ? "pessoal" : "mei");
-
+    // Logic to select default account will happen in useEffect above
+    
     if (result.isValid) {
       setIsDialogOpen(true);
     } else {
@@ -112,7 +122,8 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
         data: new Date().toISOString().slice(0, 10),
         tipo_transacao: "unica",
         status: data.type === "receita" ? "recebido" : "pago",
-        tipo_conta: selectedConta,
+        tipo_conta: accounts.find(a => a.id === selectedContaId)?.classificacao || (financialView === "tudo" ? "mei" : financialView),
+        conta_id: selectedContaId || null,
         user_id: user?.id,
         ...(data.type === "despesa" && { categoria: data.categoria }), // Despesas use category field primarily
       };
@@ -121,8 +132,9 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
-      qc.invalidateQueries({ queryKey: [variables.type === "receita" ? "receitas" : "despesas"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: queryKeys.receitas() });
+      qc.invalidateQueries({ queryKey: queryKeys.despesas() });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard() });
       toast.success(`${variables.type === "receita" ? "Receita" : "Despesa"} registrada com sucesso!`);
       setText("");
       setIsDialogOpen(false);
@@ -145,7 +157,8 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
     const params = new URLSearchParams({
       descricao: parsed.descricao,
       valor: String(parsed.valor),
-      tipo_conta: selectedConta,
+      conta_id: selectedContaId,
+      tipo_conta: accounts.find(a => a.id === selectedContaId)?.classificacao || "",
       ...(parsed.categoria ? { categoria: parsed.categoria } : {})
     });
     navigate(`${path}?${params.toString()}`); 
@@ -183,6 +196,16 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
             disabled={!text.trim()}
           >
             <Send className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2 text-xs font-semibold text-primary hover:bg-primary/10 mr-1"
+            onClick={() => navigate("/despesas/nova?tipo=investment")}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            + Investimento
           </Button>
         </div>
       </div>
@@ -229,28 +252,27 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
             </div>
           )}
 
-          <div className="flex items-center gap-3 pt-2">
             <div className="flex-1">
                <p className="text-xs text-muted-foreground mb-1">Destino do Registro</p>
-               <Select value={selectedConta} onValueChange={(v: "mei" | "pessoal") => setSelectedConta(v)}>
+               <Select value={selectedContaId} onValueChange={(v) => setSelectedContaId(v)}>
                  <SelectTrigger className="h-9">
                    <SelectValue placeholder="Selecionar conta..." />
                  </SelectTrigger>
                  <SelectContent>
-                   <SelectItem value="mei">
-                     <div className="flex items-center gap-2">
-                       <Building2 className="h-4 w-4 text-muted-foreground" /> <span>Conta MEI</span>
-                     </div>
-                   </SelectItem>
-                   <SelectItem value="pessoal">
-                     <div className="flex items-center gap-2">
-                       <UserIcon className="h-4 w-4 text-muted-foreground" /> <span>Conta Pessoal</span>
-                     </div>
-                   </SelectItem>
+                   {accounts.map((acc) => (
+                     <SelectItem key={acc.id} value={acc.id}>
+                       <div className="flex items-center gap-2">
+                         {acc.classificacao === "mei" ? <Building2 className="h-4 w-4 text-muted-foreground" /> : <UserIcon className="h-4 w-4 text-muted-foreground" />}
+                         <span>{acc.nome}</span>
+                       </div>
+                     </SelectItem>
+                   ))}
+                   {accounts.length === 0 && (
+                     <SelectItem value="none" disabled>Nenhuma conta cadastrada</SelectItem>
+                   )}
                  </SelectContent>
                </Select>
             </div>
-          </div>
 
           <DialogFooter className="mt-4 flex flex-row sm:justify-between items-center gap-2">
             <Button variant="outline" onClick={handleEdit} className="w-full sm:w-auto">

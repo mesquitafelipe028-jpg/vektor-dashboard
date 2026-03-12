@@ -11,7 +11,7 @@ import {
   MessageSquare, DollarSign,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { formatCurrency, formatDate } from "@/lib/mockData";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/transaction/TransactionBadge";
 import { BillingReminderSheet } from "@/components/billing/BillingReminderSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -38,9 +38,13 @@ export default function Receivables() {
         .select("*, clientes(nome, telefone, email)")
         .order("data", { ascending: true });
       if (error) throw error;
-      // Filter client-side to avoid deep type instantiation
       return (data as any[])
-        .filter((r: any) => r.status === "pendente" || r.status === "atrasado")
+        .filter((r: any) => 
+          !!r.cliente_id && (
+            r.status !== "recebido" || 
+            (r.tipo_transacao === "recorrente" && !r.transacao_pai_id)
+          )
+        )
         .map((r: any) => ({
           ...r,
           cliente_nome: r.clientes?.nome,
@@ -66,6 +70,19 @@ export default function Receivables() {
     },
   });
 
+  const handleDirectWhatsApp = (r: ReceivableWithClient) => {
+    if (!r.cliente_telefone) {
+      toast.info("O cliente não tem telefone cadastrado. Usando o Painel de Opções.");
+      setReminderData(r);
+      return;
+    }
+    const phone = r.cliente_telefone.replace(/\D/g, "");
+    if (!phone) return;
+    const fullPhone = phone.length <= 11 ? `55${phone}` : phone;
+    const msg = `Olá ${r.cliente_nome}, estou passando para lembrar do pagamento de ${formatCurrency(r.valor)} referente ao serviço realizado.`;
+    window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+
   const hoje = new Date().toISOString().slice(0, 10);
   const fimSemana = (() => {
     const d = new Date();
@@ -74,10 +91,47 @@ export default function Receivables() {
   })();
 
   const groups = useMemo(() => {
-    const atrasados = receivables.filter((r) => r.data < hoje && r.status !== "recebido");
-    const hojeList = receivables.filter((r) => r.data === hoje);
-    const semana = receivables.filter((r) => r.data > hoje && r.data <= fimSemana);
-    const futuras = receivables.filter((r) => r.data > fimSemana);
+    // Collect all receivables first
+    const items = [...receivables];
+
+    // Add generated projections for next 7 days for recurring parents
+    const parentRecurrentes = items.filter((r) => r.tipo_transacao === "recorrente" && !r.transacao_pai_id && r.frequencia);
+    for (const p of parentRecurrentes) {
+      // Começamos a partir da data de início. 
+      // Em vez de "T12:00:00", vamos tratar as strings de data para não ter conflito de TZ.
+      let currentD = new Date(p.data + "T00:00:00");
+      const limitDate = new Date(fimSemana + "T23:59:59");
+      
+      for (let i = 0; i < 60; i++) { // Aumentar prevenção de loop
+         const dStr = currentD.toISOString().slice(0, 10);
+         
+         if (dStr > hoje && dStr <= fimSemana) {
+            const exists = items.some(e => (e.transacao_pai_id === p.id || e.id === p.id) && e.data === dStr);
+            if (!exists) {
+               items.push({
+                 ...p,
+                 id: `sim-${p.id}-${dStr}`,
+                 data: dStr,
+                 transacao_pai_id: "simulada",
+                 status: "pendente",
+               });
+            }
+         }
+         
+         if (currentD > limitDate) break;
+
+         // Incrementar para a próxima ocorrência
+         if (p.frequencia === "semanal") currentD.setDate(currentD.getDate() + 7);
+         else if (p.frequencia === "quinzenal") currentD.setDate(currentD.getDate() + 15);
+         else if (p.frequencia === "mensal") currentD.setMonth(currentD.getMonth() + 1);
+         else currentD.setFullYear(currentD.getFullYear() + 1);
+      }
+    }
+
+    const atrasados = items.filter((r) => r.data < hoje && r.status !== "recebido" && r.transacao_pai_id !== "simulada");
+    const hojeList = items.filter((r) => r.data === hoje && r.status !== "recebido" && r.transacao_pai_id !== "simulada");
+    const semana = items.filter((r) => r.data > hoje && r.data <= fimSemana && r.status !== "recebido");
+    const futuras = items.filter((r) => r.data > fimSemana && r.status !== "recebido");
     return { atrasados, hoje: hojeList, semana, futuras };
   }, [receivables, hoje, fimSemana]);
 
@@ -99,12 +153,12 @@ export default function Receivables() {
       bg: "bg-primary/10",
     },
     {
-      label: "Esta Semana",
+      label: "Próximos 7 dias",
       value: formatCurrency(groups.semana.reduce((s, r) => s + r.valor, 0)),
       count: groups.semana.length,
       icon: CalendarClock,
-      color: "text-chart-2",
-      bg: "bg-chart-2/10",
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-500/10",
     },
   ];
 
@@ -127,34 +181,77 @@ export default function Receivables() {
           {formatCurrency(r.valor)}
         </span>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          <span>{formatDate(r.data)}</span>
-          <StatusBadge status={r.data < hoje ? "atrasado" : (r.status || "pendente")} type="receita" />
+      {r.transacao_pai_id === "simulada" ? (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>{formatDate(r.data)}</span>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-blue-500/30 text-blue-600 dark:text-blue-400">
+              Prevista
+            </Badge>
+          </div>
+          <div className="flex items-center gap-1">
+             <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs gap-1 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+                onClick={() => handleDirectWhatsApp(r)}
+              >
+                <MessageSquare className="h-3 w-3" />
+                WhatsApp
+              </Button>
+             <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs gap-1 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                onClick={() => {
+                   toast.info("Para marcar uma previsão como paga, vá ao Perfil original deste Cliente.");
+                }}
+              >
+                <CheckCircle className="h-3 w-3" />
+                Registrar Pgto
+              </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-xs gap-1"
-            onClick={() => setReminderData(r)}
-          >
-            <MessageSquare className="h-3 w-3" />
-            {!isMobile && "Cobrar"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2 text-xs gap-1 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-            onClick={() => markPaid.mutate(r.id)}
-            disabled={markPaid.isPending}
-          >
-            <CheckCircle className="h-3 w-3" />
-            {!isMobile && "Recebido"}
-          </Button>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>{formatDate(r.data)}</span>
+            <StatusBadge status={r.data < hoje ? "atrasado" : (r.status || "pendente")} type="receita" />
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs gap-1 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]"
+              onClick={() => handleDirectWhatsApp(r)}
+            >
+              <MessageSquare className="h-3 w-3" />
+              {!isMobile && "WhatsApp"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs gap-1"
+              title="Outras Opções (Copiar / E-mail)"
+              onClick={() => setReminderData(r)}
+            >
+              ...
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs gap-1 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+              onClick={() => markPaid.mutate(r.id)}
+              disabled={markPaid.isPending}
+            >
+              <CheckCircle className="h-3 w-3" />
+              {!isMobile && "Registrar Pgto"}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 
@@ -222,13 +319,13 @@ export default function Receivables() {
             <TabsTrigger value="todos" className="flex-1">Todos</TabsTrigger>
             <TabsTrigger value="atrasados" className="flex-1">Atrasados</TabsTrigger>
             <TabsTrigger value="hoje" className="flex-1">Hoje</TabsTrigger>
-            <TabsTrigger value="semana" className="flex-1">Semana</TabsTrigger>
+            <TabsTrigger value="semana" className="flex-1">Próximos 7 dias</TabsTrigger>
           </TabsList>
 
           <TabsContent value="todos" className="space-y-6">
             {renderSection("Atrasados", groups.atrasados, <AlertTriangle className="h-4 w-4 text-destructive" />)}
             {renderSection("Hoje", groups.hoje, <CalendarCheck className="h-4 w-4 text-primary" />)}
-            {renderSection("Esta Semana", groups.semana, <CalendarClock className="h-4 w-4 text-chart-2" />)}
+            {renderSection("Próximos 7 dias", groups.semana, <CalendarClock className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />)}
             {renderSection("Futuras", groups.futuras, <Clock className="h-4 w-4 text-muted-foreground" />)}
           </TabsContent>
 

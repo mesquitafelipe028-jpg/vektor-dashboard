@@ -38,30 +38,90 @@ export type Database = {
         }
         Relationships: []
       }
-      categorias: {
+      cartoes_credito: {
         Row: {
+          banco: string | null
           created_at: string
+          dia_fechamento: number | null
+          dia_vencimento: number | null
           id: string
+          limite_total: number | null
           nome: string
+          tipo_conta: string | null
           user_id: string
         }
         Insert: {
+          banco?: string | null
           created_at?: string
+          dia_fechamento?: number | null
+          dia_vencimento?: number | null
           id?: string
+          limite_total?: number | null
           nome: string
+          tipo_conta?: string | null
           user_id: string
         }
         Update: {
+          banco?: string | null
           created_at?: string
+          dia_fechamento?: number | null
+          dia_vencimento?: number | null
           id?: string
+          limite_total?: number | null
           nome?: string
+          tipo_conta?: string | null
           user_id?: string
         }
         Relationships: []
       }
+      categorias: {
+        Row: {
+          categoria_pai_id: string | null
+          cor: string | null
+          created_at: string
+          id: string
+          icone: string | null
+          nome: string
+          ordem: number | null
+          tipo: string | null
+          user_id: string
+        }
+        Insert: {
+          categoria_pai_id?: string | null
+          cor?: string | null
+          created_at?: string
+          id?: string
+          icone?: string | null
+          nome: string
+          ordem?: number | null
+          tipo?: string | null
+          user_id: string
+        }
+        Update: {
+          categoria_pai_id?: string | null
+          cor?: string | null
+          created_at?: string
+          id?: string
+          icone?: string | null
+          nome?: string
+          ordem?: number | null
+          tipo?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categorias_categoria_pai_id_fkey"
+            columns: ["categoria_pai_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           created_at: string
+          documento: string | null
           email: string | null
           id: string
           nome: string
@@ -70,6 +130,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          documento?: string | null
           email?: string | null
           id?: string
           nome: string
@@ -78,6 +139,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          documento?: string | null
           email?: string | null
           id?: string
           nome?: string
@@ -86,8 +148,9 @@ export type Database = {
         }
         Relationships: []
       }
-      despesas: {
+      compras_cartao: {
         Row: {
+          cartao_id: string
           categoria: string | null
           created_at: string
           data: string
@@ -97,15 +160,17 @@ export type Database = {
           valor: number
         }
         Insert: {
+          cartao_id: string
           categoria?: string | null
           created_at?: string
-          data?: string
+          data: string
           descricao: string
           id?: string
           user_id: string
-          valor?: number
+          valor: number
         }
         Update: {
+          cartao_id?: string
           categoria?: string | null
           created_at?: string
           data?: string
@@ -114,7 +179,240 @@ export type Database = {
           user_id?: string
           valor?: number
         }
+        Relationships: [
+          {
+            foreignKeyName: "compras_cartao_cartao_id_fkey"
+            columns: ["cartao_id"]
+            isOneToOne: false
+            referencedRelation: "cartoes_credito"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contas_financeiras: {
+        Row: {
+          banco_id: string | null
+          classificacao: string | null
+          cor: string | null
+          created_at: string
+          id: string
+          icone: string | null
+          nome: string
+          saldo: number | null
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          banco_id?: string | null
+          classificacao?: string | null
+          cor?: string | null
+          created_at?: string
+          id?: string
+          icone?: string | null
+          nome: string
+          saldo?: number | null
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          banco_id?: string | null
+          classificacao?: string | null
+          cor?: string | null
+          created_at?: string
+          id?: string
+          icone?: string | null
+          nome?: string
+          saldo?: number | null
+          tipo?: string
+          user_id?: string
+        }
         Relationships: []
+      }
+      depositos_meta: {
+        Row: {
+          created_at: string
+          data: string
+          descricao: string | null
+          id: string
+          meta_id: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          data: string
+          descricao?: string | null
+          id?: string
+          meta_id: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          data?: string
+          descricao?: string | null
+          id?: string
+          meta_id?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "depositos_meta_meta_id_fkey"
+            columns: ["meta_id"]
+            isOneToOne: false
+            referencedRelation: "metas_financeiras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      despesas: {
+        Row: {
+          categoria: string | null
+          created_at: string
+          data: string
+          data_fim: string | null
+          data_inicio: string | null
+          descricao: string
+          frequencia: string | null
+          id: string
+          numero_parcelas: number | null
+          parcela_atual: number | null
+          status: string | null
+          tipo: string | null
+          tipo_conta: string | null
+          tipo_transacao: string | null
+          transacao_pai_id: string | null
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string
+          data?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao: string
+          frequencia?: string | null
+          id?: string
+          numero_parcelas?: number | null
+          parcela_atual?: number | null
+          status?: string | null
+          tipo?: string | null
+          tipo_conta?: string | null
+          tipo_transacao?: string | null
+          transacao_pai_id?: string | null
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string
+          data?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string
+          frequencia?: string | null
+          id?: string
+          numero_parcelas?: number | null
+          parcela_atual?: number | null
+          status?: string | null
+          tipo?: string | null
+          tipo_conta?: string | null
+          tipo_transacao?: string | null
+          transacao_pai_id?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "despesas_transacao_pai_id_fkey"
+            columns: ["transacao_pai_id"]
+            isOneToOne: false
+            referencedRelation: "despesas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      empresas: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          cnae_principal: string | null
+          data_abertura: string | null
+          id: string
+          natureza_juridica: string | null
+          nome_fantasia: string | null
+          razao_social: string | null
+          situacao_cadastral: string | null
+          user_id: string
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          cnae_principal?: string | null
+          data_abertura?: string | null
+          id?: string
+          natureza_juridica?: string | null
+          nome_fantasia?: string | null
+          razao_social?: string | null
+          situacao_cadastral?: string | null
+          user_id: string
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          cnae_principal?: string | null
+          data_abertura?: string | null
+          id?: string
+          natureza_juridica?: string | null
+          nome_fantasia?: string | null
+          razao_social?: string | null
+          situacao_cadastral?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      faturas_cartao: {
+        Row: {
+          cartao_id: string
+          created_at: string
+          data_pagamento: string | null
+          id: string
+          mes_referencia: string
+          status: string | null
+          user_id: string
+          valor_total: number | null
+        }
+        Insert: {
+          cartao_id: string
+          created_at?: string
+          data_pagamento?: string | null
+          id?: string
+          mes_referencia: string
+          status?: string | null
+          user_id: string
+          valor_total?: number | null
+        }
+        Update: {
+          cartao_id?: string
+          created_at?: string
+          data_pagamento?: string | null
+          id?: string
+          mes_referencia?: string
+          status?: string | null
+          user_id?: string
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faturas_cartao_cartao_id_fkey"
+            columns: ["cartao_id"]
+            isOneToOne: false
+            referencedRelation: "cartoes_credito"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       impostos_mei: {
         Row: {
@@ -146,6 +444,113 @@ export type Database = {
         }
         Relationships: []
       }
+      investimento_ativos: {
+        Row: {
+          created_at: string
+          data_compra: string | null
+          id: string
+          nome: string
+          preco_atual: number | null
+          preco_medio: number | null
+          quantidade: number | null
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_compra?: string | null
+          id?: string
+          nome: string
+          preco_atual?: number | null
+          preco_medio?: number | null
+          quantidade?: number | null
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_compra?: string | null
+          id?: string
+          nome?: string
+          preco_atual?: number | null
+          preco_medio?: number | null
+          quantidade?: number | null
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      investimento_dividendos: {
+        Row: {
+          ativo_id: string | null
+          created_at: string
+          data_recebimento: string
+          id: string
+          tipo: string | null
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          ativo_id?: string | null
+          created_at?: string
+          data_recebimento: string
+          id?: string
+          tipo?: string | null
+          user_id: string
+          valor: number
+        }
+        Update: {
+          ativo_id?: string | null
+          created_at?: string
+          data_recebimento?: string
+          id?: string
+          tipo?: string | null
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investimento_dividendos_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "investimento_ativos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      metas_financeiras: {
+        Row: {
+          categoria: string | null
+          created_at: string
+          id: string
+          prazo: string | null
+          titulo: string
+          valor_alvo: number
+          valor_atual: number | null
+          user_id: string
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          prazo?: string | null
+          titulo: string
+          valor_alvo: number
+          valor_atual?: number | null
+          user_id: string
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          prazo?: string | null
+          titulo?: string
+          valor_alvo?: number
+          valor_atual?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -170,31 +575,55 @@ export type Database = {
       receitas: {
         Row: {
           cliente_id: string | null
+          conta_id: string | null
           created_at: string
           data: string
+          data_fim: string | null
+          data_inicio: string | null
           descricao: string
           forma_pagamento: string | null
+          frequencia: string | null
           id: string
+          status: string | null
+          tipo_conta: string | null
+          tipo_transacao: string | null
+          transacao_pai_id: string | null
           user_id: string
           valor: number
         }
         Insert: {
           cliente_id?: string | null
+          conta_id?: string | null
           created_at?: string
           data?: string
+          data_fim?: string | null
+          data_inicio?: string | null
           descricao: string
           forma_pagamento?: string | null
+          frequencia?: string | null
           id?: string
+          status?: string | null
+          tipo_conta?: string | null
+          tipo_transacao?: string | null
+          transacao_pai_id?: string | null
           user_id: string
           valor?: number
         }
         Update: {
           cliente_id?: string | null
+          conta_id?: string | null
           created_at?: string
           data?: string
+          data_fim?: string | null
+          data_inicio?: string | null
           descricao?: string
           forma_pagamento?: string | null
+          frequencia?: string | null
           id?: string
+          status?: string | null
+          tipo_conta?: string | null
+          tipo_transacao?: string | null
+          transacao_pai_id?: string | null
           user_id?: string
           valor?: number
         }
@@ -206,7 +635,47 @@ export type Database = {
             referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "receitas_transacao_pai_id_fkey"
+            columns: ["transacao_pai_id"]
+            isOneToOne: false
+            referencedRelation: "receitas"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      user_preferences: {
+        Row: {
+          alerta_lembretes: boolean | null
+          alerta_recebimentos: boolean | null
+          alerta_vencimento: boolean | null
+          dia_fechamento: number | null
+          id: string
+          moeda: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alerta_lembretes?: boolean | null
+          alerta_recebimentos?: boolean | null
+          alerta_vencimento?: boolean | null
+          dia_fechamento?: number | null
+          id?: string
+          moeda?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alerta_lembretes?: boolean | null
+          alerta_recebimentos?: boolean | null
+          alerta_vencimento?: boolean | null
+          dia_fechamento?: number | null
+          id?: string
+          moeda?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {

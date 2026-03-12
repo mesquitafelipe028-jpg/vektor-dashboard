@@ -9,6 +9,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import { SplashScreen } from "./components/branding/SplashScreen";
+import { AssistantVektor } from "./components/AssistantWidget";
+import { FinancialViewProvider } from "./contexts/FinancialViewContext";
 
 // Lazy-loaded pages
 const Login = lazy(() => import("./pages/Login"));
@@ -36,6 +38,9 @@ const Accounts = lazy(() => import("./pages/Accounts"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TransactionForm = lazy(() => import("./pages/TransactionForm"));
 const ClientForm = lazy(() => import("./pages/ClientForm"));
+const Subscriptions = lazy(() => import("./pages/Subscriptions"));
+const Projects = lazy(() => import("./pages/Projects"));
+const StatementImport = lazy(() => import("./pages/StatementImport"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -56,6 +61,7 @@ const PageFallback = () => (
 );
 
 const App = () => {
+  // Force update v1.0.1
   const [splashDone, setSplashDone] = useState(false);
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
 
@@ -68,6 +74,8 @@ const App = () => {
           {!splashDone && <SplashScreen onFinish={handleSplashFinish} />}
           <BrowserRouter>
             <AuthProvider>
+              <FinancialViewProvider>
+                <AssistantVektor />
               <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/" element={<Login />} />
@@ -102,11 +110,15 @@ const App = () => {
                       <Route path="/contas-a-receber" element={<Receivables />} />
                       <Route path="/timeline" element={<Timeline />} />
                       <Route path="/mais" element={<More />} />
+                      <Route path="/assinaturas" element={<Subscriptions />} />
+                      <Route path="/projetos" element={<Projects />} />
+                      <Route path="/importar-extrato" element={<StatementImport />} />
                     </Route>
                   </Route>
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
+              </FinancialViewProvider>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>

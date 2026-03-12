@@ -17,7 +17,7 @@ import {
   TrendingUp, DollarSign, Target, ShieldAlert, Lightbulb,
   Building2, ExternalLink, Calendar, Shield, FileText,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
@@ -27,9 +27,11 @@ import {
   ResponsiveContainer, ReferenceLine, Legend,
 } from "recharts";
 import {
-  LIMITE_MEI, DAS_VALOR_PADRAO, DAS_CONFIG, type ActivityType,
+  LIMITE_MEI_ANUAL, DAS_VALOR_PADRAO, DAS_CONFIG, type ActivityType,
   type Imposto, getEffectiveStatus, statusConfig, alertColorMap, situacaoColor,
+  calcularLimiteProporcional
 } from "@/lib/fiscal";
+import { queryKeys } from "@/lib/queryKeys";
 
 export default function Taxes() {
   const { user } = useAuth();
@@ -45,9 +47,9 @@ export default function Taxes() {
 
   // ── Queries ──────────────────────────────────────────
   const { data: empresa } = useQuery({
-    queryKey: ["empresa", user?.id],
+    queryKey: queryKeys.empresa(user?.id),
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("empresas")
         .select("*")
         .eq("user_id", user!.id)
@@ -59,7 +61,7 @@ export default function Taxes() {
   });
 
   const { data: impostos = [], isLoading } = useQuery({
-    queryKey: ["impostos_mei", user?.id],
+    queryKey: queryKeys.impostos(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("impostos_mei")
@@ -72,7 +74,7 @@ export default function Taxes() {
   });
 
   const { data: receitas = [] } = useQuery({
-    queryKey: ["receitas", user?.id],
+    queryKey: queryKeys.receitas(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*");
       if (error) throw error;
@@ -86,10 +88,11 @@ export default function Taxes() {
   const currentYear = now.getFullYear().toString();
   const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
+  const limiteMei = calcularLimiteProporcional(empresa?.data_abertura);
   const receitasAno = receitas.filter((r: any) => r.data.startsWith(currentYear));
   const faturamentoAnual = receitasAno.reduce((s: number, r: any) => s + r.valor, 0);
-  const limiteDisponivel = Math.max(LIMITE_MEI - faturamentoAnual, 0);
-  const percentLimit = Math.min((faturamentoAnual / LIMITE_MEI) * 100, 100);
+  const limiteDisponivel = Math.max(limiteMei - faturamentoAnual, 0);
+  const percentLimit = limiteMei > 0 ? Math.min((faturamentoAnual / limiteMei) * 100, 100) : 0;
 
   const faturamentoMes = receitas
     .filter((r: any) => r.data.startsWith(currentMonth))
@@ -129,7 +132,7 @@ export default function Taxes() {
     if (percentLimit >= 100) {
       alerts.push({ type: "critical", message: "⚠️ Seu faturamento ultrapassou o limite anual do MEI (R$ 81.000). Você precisa migrar para outra categoria empresarial.", icon: ShieldAlert });
     } else if (percentLimit >= 90) {
-      alerts.push({ type: "danger", message: `Atenção: seu faturamento atingiu ${percentLimit.toFixed(1)}% do limite anual do MEI. Faltam apenas ${formatCurrency(LIMITE_MEI - faturamentoAnual)}.`, icon: AlertTriangle });
+      alerts.push({ type: "danger", message: `Atenção: seu faturamento atingiu ${percentLimit.toFixed(1)}% do limite anual do MEI. Faltam apenas ${formatCurrency(limiteMei - faturamentoAnual)}.`, icon: AlertTriangle });
     } else if (percentLimit >= 80) {
       alerts.push({ type: "warning", message: `Seu faturamento está próximo do limite anual do MEI (${percentLimit.toFixed(1)}%). Planeje-se para não ultrapassar.`, icon: AlertTriangle });
     }
@@ -156,7 +159,7 @@ export default function Taxes() {
     if (monthsRemaining > 0 && faturamentoAnual > 0) {
       const avgMonthly = faturamentoAnual / (now.getMonth() + 1);
       const projected = faturamentoAnual + avgMonthly * monthsRemaining;
-      if (projected > LIMITE_MEI) return `Com base no seu faturamento médio mensal de ${formatCurrency(avgMonthly)}, a projeção anual é de ${formatCurrency(projected)}. Isso ultrapassa o limite MEI.`;
+      if (projected > limiteMei) return `Com base no seu faturamento médio mensal de ${formatCurrency(avgMonthly)}, a projeção anual é de ${formatCurrency(projected)}. Isso ultrapassa o limite MEI.`;
     }
     return null;
   }, [percentLimit, faturamentoAnual, now]);
@@ -335,7 +338,7 @@ export default function Taxes() {
               <CardContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
                   <div>
-                    <p className="text-2xl sm:text-3xl font-heading font-bold">{formatCurrency(faturamentoAnual)} <span className="text-base font-normal text-muted-foreground">/ {formatCurrency(LIMITE_MEI)}</span></p>
+                    <p className="text-2xl sm:text-3xl font-heading font-bold">{formatCurrency(faturamentoAnual)} <span className="text-base font-normal text-muted-foreground">/ {formatCurrency(limiteMei)}</span></p>
                     <p className="text-sm text-muted-foreground mt-1">Disponível: <span className="font-semibold text-primary">{formatCurrency(limiteDisponivel)}</span></p>
                   </div>
                   <span className={`text-lg font-heading font-bold ${percentLimit >= 80 ? "text-amber-600" : "text-primary"}`}>{percentLimit.toFixed(1)}%</span>
@@ -542,7 +545,7 @@ export default function Taxes() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium">Limite Anual MEI</span>
-                <span className="text-sm text-muted-foreground">{formatCurrency(faturamentoAnual)} / {formatCurrency(LIMITE_MEI)}</span>
+                <span className="text-sm text-muted-foreground">{formatCurrency(faturamentoAnual)} / {formatCurrency(limiteMei)}</span>
               </div>
               <div className="relative">
                 <Progress value={percentLimit} className="h-4" />
@@ -571,7 +574,7 @@ export default function Taxes() {
                     <Legend />
                     <Bar dataKey="faturamento" name="Faturamento Mensal" fill="hsl(160, 60%, 38%)" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="acumulado" name="Acumulado" fill="hsl(200, 70%, 50%)" radius={[4, 4, 0, 0]} />
-                    <ReferenceLine y={LIMITE_MEI} stroke="hsl(0, 72%, 51%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: "Limite MEI", position: "top", fill: "hsl(0, 72%, 51%)", fontSize: 11 }} />
+                    <ReferenceLine y={limiteMei} stroke="hsl(0, 72%, 51%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: "Limite MEI", position: "top", fill: "hsl(0, 72%, 51%)", fontSize: 11 }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

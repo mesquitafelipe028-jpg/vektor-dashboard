@@ -4,18 +4,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/utils";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Lightbulb, BarChart3, DollarSign, Percent, ShoppingCart } from "lucide-react";
 import { motion } from "framer-motion";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { queryKeys } from "@/lib/queryKeys";
 
 export default function FinancialAnalysis() {
   const { user } = useAuth();
 
   const { data: receitas = [] } = useQuery({
-    queryKey: ["receitas"],
+    queryKey: queryKeys.receitas(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*").order("data", { ascending: false });
       if (error) throw error;
@@ -25,7 +26,7 @@ export default function FinancialAnalysis() {
   });
 
   const { data: despesas = [] } = useQuery({
-    queryKey: ["despesas"],
+    queryKey: queryKeys.despesas(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
       if (error) throw error;

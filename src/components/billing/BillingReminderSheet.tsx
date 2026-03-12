@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquare, Copy, Mail } from "lucide-react";
 import { toast } from "sonner";
-import { formatCurrency, formatDate } from "@/lib/mockData";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface BillingReminderSheetProps {
   open: boolean;
@@ -19,8 +19,8 @@ interface BillingReminderSheetProps {
   dueDate: string;
 }
 
-function buildDefaultMessage(name: string, amount: number, description: string, dueDate: string) {
-  return `Olá ${name}!\n\nSua mensalidade de ${formatCurrency(amount)} referente a "${description}" vence em ${formatDate(dueDate)}.\n\nObrigado!`;
+function buildDefaultMessage(name: string, amount: number, _description: string, _dueDate: string) {
+  return `Olá ${name}, estou passando para lembrar do pagamento de ${formatCurrency(amount)} referente ao serviço realizado.`;
 }
 
 export function BillingReminderSheet({

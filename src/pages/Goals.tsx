@@ -18,7 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatCurrency, formatDate } from "@/lib/mockData";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   Target, Plus, Pencil, Trash2, TrendingUp, Trophy, Rocket,
   PiggyBank, History, ArrowUpRight, ArrowDownLeft,
@@ -28,26 +28,10 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
-interface Meta {
-  id: string;
-  user_id: string;
-  titulo: string;
-  valor_alvo: number;
-  valor_atual: number;
-  prazo: string;
-  categoria: string;
-  created_at: string;
-}
+import { Tables, TablesInsert } from "@/integrations/supabase/types";
 
-interface Deposito {
-  id: string;
-  meta_id: string;
-  user_id: string;
-  valor: number;
-  descricao: string | null;
-  data: string;
-  created_at: string;
-}
+type Meta = Tables<"metas_financeiras">;
+type Deposito = Tables<"depositos_meta">;
 
 const CATEGORIAS = [
   "Reserva de Emergência", "Equipamento", "Viagem",
@@ -84,7 +68,7 @@ export default function Goals() {
   const { data: metas = [], isLoading } = useQuery({
     queryKey: ["metas_financeiras", user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("metas_financeiras").select("*").order("prazo", { ascending: true });
       if (error) throw error;
       return data as Meta[];
@@ -95,7 +79,7 @@ export default function Goals() {
   const { data: allDepositos = [] } = useQuery({
     queryKey: ["depositos_meta", user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("depositos_meta").select("*").order("data", { ascending: true });
       if (error) throw error;
       return data as Deposito[];
@@ -106,10 +90,10 @@ export default function Goals() {
   const upsertMeta = useMutation({
     mutationFn: async (meta: Partial<Meta>) => {
       if (editing) {
-        const { error } = await (supabase as any).from("metas_financeiras").update(meta).eq("id", editing.id);
+        const { error } = await supabase.from("metas_financeiras").update(meta).eq("id", editing.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from("metas_financeiras").insert({ ...meta, user_id: user!.id });
+        const { error } = await supabase.from("metas_financeiras").insert({ ...meta, user_id: user!.id } as any);
         if (error) throw error;
       }
     },
@@ -123,7 +107,7 @@ export default function Goals() {
 
   const deleteMeta = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("metas_financeiras").delete().eq("id", id);
+      const { error } = await supabase.from("metas_financeiras").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -146,16 +130,16 @@ export default function Goals() {
       const valor = parseFloat(txValor);
       if (!valor || valor <= 0) throw new Error("Valor inválido");
 
-      const { error: depError } = await (supabase as any).from("depositos_meta").insert({
+      const { error: depError } = await supabase.from("depositos_meta").insert({
         meta_id: depositMeta.id,
         user_id: user!.id,
         valor,
         descricao: txDesc.trim() || null,
         data: txData,
-      });
+      } as any);
       if (depError) throw depError;
 
-      const { error: metaError } = await (supabase as any)
+      const { error: metaError } = await supabase
         .from("metas_financeiras")
         .update({ valor_atual: depositMeta.valor_atual + valor })
         .eq("id", depositMeta.id);
@@ -179,16 +163,16 @@ export default function Goals() {
       if (valor > withdrawMeta.valor_atual) throw new Error("Saldo insuficiente");
 
       // Insert negative deposit
-      const { error: depError } = await (supabase as any).from("depositos_meta").insert({
+      const { error: depError } = await supabase.from("depositos_meta").insert({
         meta_id: withdrawMeta.id,
         user_id: user!.id,
         valor: -valor,
         descricao: txDesc.trim() || "Saque",
         data: txData,
-      });
+      } as any);
       if (depError) throw depError;
 
-      const { error: metaError } = await (supabase as any)
+      const { error: metaError } = await supabase
         .from("metas_financeiras")
         .update({ valor_atual: withdrawMeta.valor_atual - valor })
         .eq("id", withdrawMeta.id);

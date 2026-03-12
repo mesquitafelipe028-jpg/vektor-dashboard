@@ -1,56 +1,79 @@
 import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from "react";
-import { Repeat, Calendar as CalendarIcon, Lightbulb } from "lucide-react";
+import {
+  TrendingUp, TrendingDown, Wallet, Receipt,
+  Plus, ShieldCheck, AlertTriangle, ShieldAlert, Target,
+  FileText, ArrowUpRight, ArrowDownRight, Building2, X, Bell,
+  Clock, Flame, User, Briefcase, Layers, Info, PiggyBank
+} from "lucide-react";
 import { AreaChart, Area, XAxis as AXAxis, YAxis as AYAxis, CartesianGrid as ACG, Tooltip as ATooltip, ResponsiveContainer as ARC } from "recharts";
 import { useQuery, useIsFetching } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  TrendingUp, TrendingDown, Wallet, Receipt,
-  Plus, HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert, Target,
-  FileText, ArrowUpRight, ArrowDownRight, Building2, X, Bell,
-  CheckCircle2, Clock, Flame, User, Briefcase, Layers,
-} from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/mockData";
+
+import { useCategories, type CategoriaDB } from "@/hooks/useCategories";
+import { useAccounts } from "@/hooks/useAccounts";
+import { useFinancialData } from "@/hooks/useFinancialData";
+import { useFinancialView } from "@/contexts/FinancialViewContext";
 
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
-import { useCategories, type CategoriaDB } from "@/hooks/useCategories";
 import { InsightsFinanceiros } from "@/components/dashboard/InsightsFinanceiros";
 import { QuickEntry } from "@/components/dashboard/QuickEntry";
+import { QuickSyncModal } from "@/components/dashboard/QuickSyncModal";
+import { queryKeys } from "@/lib/queryKeys";
+import { calcularLimiteProporcional } from "@/lib/fiscal";
+
+// New Dashboard Components
+import { FinancialStats } from "@/components/dashboard/FinancialStats";
+import { HealthAlerts, type AlertItem } from "@/components/dashboard/HealthAlerts";
+import { DashboardGoals } from "@/components/dashboard/DashboardGoals";
+import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import DashboardCharts from "@/components/dashboard/DashboardCharts";
+import { CashFlowProjection } from "@/components/dashboard/CashFlowProjection";
+
 
 const colorNameToHsl: Record<string, string> = {
-  orange:  "hsl(25, 95%, 53%)",
-  violet:  "hsl(263, 70%, 50%)",
-  blue:    "hsl(217, 91%, 60%)",
-  rose:    "hsl(350, 89%, 60%)",
-  sky:     "hsl(199, 89%, 48%)",
-  pink:    "hsl(330, 81%, 60%)",
-  slate:   "hsl(215, 16%, 47%)",
-  indigo:  "hsl(239, 84%, 67%)",
-  cyan:    "hsl(188, 94%, 43%)",
-  fuchsia: "hsl(292, 84%, 61%)",
-  amber:   "hsl(38, 92%, 50%)",
-  red:     "hsl(0, 84%, 60%)",
-  purple:  "hsl(271, 91%, 65%)",
-  gray:    "hsl(220, 9%, 46%)",
-  emerald: "hsl(160, 84%, 39%)",
-  green:   "hsl(142, 71%, 45%)",
+  orange:  "hsl(32, 100%, 55%)",
+  violet:  "hsl(262, 85%, 65%)",
+  blue:    "hsl(217, 100%, 65%)",
+  rose:    "hsl(350, 95%, 65%)",
+  sky:     "hsl(199, 95%, 60%)",
+  pink:    "hsl(330, 95%, 70%)",
+  slate:   "hsl(215, 30%, 65%)",
+  indigo:  "hsl(239, 95%, 75%)",
+  cyan:    "hsl(188, 100%, 55%)",
+  fuchsia: "hsl(292, 95%, 75%)",
+  amber:   "hsl(45, 100%, 55%)",
+  red:     "hsl(0, 95%, 65%)",
+  purple:  "hsl(271, 100%, 75%)",
+  gray:    "hsl(220, 20%, 65%)",
+  emerald: "hsl(160, 95%, 45%)",
+  green:   "hsl(142, 90%, 50%)",
 };
 
-import { PiggyBank } from "lucide-react";
+/**
+ * Generates a vibrant color based on a string hash.
+ * Used as a fallback to ensure we never have "gray" categories.
+ */
+function getVibrantColor(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = Math.abs(hash % 360);
+  return `hsl(${h}, 85%, 65%)`;
+}
+
 
 // Lazy-load heavy recharts components
-const DashboardCharts = lazy(() => import("@/components/dashboard/DashboardCharts"));
+// const DashboardCharts = lazy(() => import("@/components/dashboard/DashboardCharts")); // Now directly imported
 
 const ChartsFallback = () => (
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -59,37 +82,34 @@ const ChartsFallback = () => (
   </div>
 );
 
-function getMonthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const { view: financialView, setView: setFinancialView } = useFinancialView();
 
-  const { data: receitas = [], isLoading: loadingReceitas } = useQuery({
-    queryKey: ["receitas", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("receitas").select("*").order("data", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  const { data: despesas = [], isLoading: loadingDespesas } = useQuery({
-    queryKey: ["despesas", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const {
+    saldoTotal,
+    faturamentoMes,
+    despesasMesTotal,
+    saldoMes,
+    totalInvestido,
+    aportesMes,
+    limiteMei,
+    faturamentoAnual,
+    taxaPoupanca,
+    orphanedBalance,
+    orphanedCount,
+    hasCnpj,
+    loading,
+    raw,
+    empresa, // Added from the new structure
+  } = useFinancialData();
 
   const { data: impostoPendente } = useQuery({
-    queryKey: ["impostos_mei_pendente", user?.id],
+    queryKey: queryKeys.impostosPendente(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("impostos_mei")
@@ -104,11 +124,10 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  // Metas financeiras
   const { data: metas = [] } = useQuery({
-    queryKey: ["metas_financeiras", user?.id],
+    queryKey: queryKeys.metas(user?.id),
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("metas_financeiras")
         .select("*")
         .order("prazo", { ascending: true });
@@ -118,82 +137,68 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  const { data: empresa } = useQuery({
-    queryKey: ["empresa", user?.id],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("empresas")
-        .select("*")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-
+  const { accounts } = useAccounts();
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
-  const hasCnpj = !!empresa?.cnpj;
-
-  // Financial view filter
-  type FinancialView = "tudo" | "pessoal" | "mei";
-  const [financialView, setFinancialView] = useState<FinancialView>("tudo");
-
-  // Force "pessoal" view when no CNPJ
+  // Financial view filter effect - fixed dep array
   useEffect(() => {
     if (!hasCnpj && financialView !== "pessoal") {
       setFinancialView("pessoal");
     }
-  }, [hasCnpj, financialView]);
-
-  const filteredReceitas = useMemo(() => {
-    if (financialView === "tudo") return receitas;
-    return receitas.filter((r: any) => r.tipo_conta === financialView);
-  }, [receitas, financialView]);
-
-  const filteredDespesas = useMemo(() => {
-    if (financialView === "tudo") return despesas;
-    return despesas.filter((d: any) => d.tipo_conta === financialView);
-  }, [despesas, financialView]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCnpj]);
 
   const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
   const dismissAlert = useCallback((id: string) => {
     setHiddenAlerts((prev) => new Set(prev).add(id));
   }, []);
 
-  const now = new Date();
-  const currentYear = now.getFullYear().toString();
-  const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const receitasMes = filteredReceitas.filter((r) => r.data.startsWith(currentMonth));
-  const despesasMes = filteredDespesas.filter((d) => d.data.startsWith(currentMonth));
-  const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
-  const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
-  const saldoMes = faturamentoMes - despesasMesTotal;
+  // STATS derived from raw data in hook - memoized to prevent re-computation on every render
+  const currentMonth = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
 
-  const LIMITE_MEI = 81000;
-  const faturamentoAnual = filteredReceitas
-    .filter((r) => r.data.startsWith(currentYear))
-    .reduce((s, r) => s + r.valor, 0);
-  const percentLimit = Math.min((faturamentoAnual / LIMITE_MEI) * 100, 100);
+  const receitasMes = useMemo(
+    () => raw.settledReceitas.filter((r) => r.data.startsWith(currentMonth)),
+    [raw.settledReceitas, currentMonth]
+  );
+  const despesasMes = useMemo(
+    () => raw.settledDespesas.filter((d) => d.data.startsWith(currentMonth)),
+    [raw.settledDespesas, currentMonth]
+  );
 
   // Previous month for report summary
   const prevMonth = useMemo(() => {
+    const now = new Date();
     const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleDateString("pt-BR", { month: "long" });
-    const rec = filteredReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    const desp = filteredDespesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const rec = raw.settledReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+    const desp = raw.settledDespesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
     const lucro = rec - desp;
     const varFat = rec > 0 && faturamentoMes > 0 ? ((faturamentoMes - rec) / rec) * 100 : 0;
     return { label, rec, desp, lucro, varFat };
-  }, [filteredReceitas, filteredDespesas, faturamentoMes]);
+  }, [raw.settledReceitas, raw.settledDespesas, faturamentoMes]);
+
+  // Monthly chart data (last 6 months) - memoized
+  const monthlyData = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+      const rec = raw.settledReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
+      const desp = raw.settledDespesas.filter((d) => d.data.startsWith(key)).reduce((s, d) => s + d.valor, 0);
+      return { month: label.charAt(0).toUpperCase() + label.slice(1), receitas: rec, despesas: desp };
+    });
+  }, [raw.settledReceitas, raw.settledDespesas]);
+
 
   // Saúde Financeira
   const despesaPercent = faturamentoMes > 0 ? (despesasMesTotal / faturamentoMes) * 100 : 0;
   const healthStatus = despesaPercent < 50 ? "healthy" : despesaPercent <= 75 ? "warning" : "critical";
   const healthConfig = {
-    healthy: { label: "Saudável", icon: ShieldCheck, color: "text-green-600", bg: "bg-green-500/10", border: "border-green-500/30" },
     warning: { label: "Atenção", icon: AlertTriangle, color: "text-yellow-600", bg: "bg-yellow-500/10", border: "border-yellow-500/30" },
     critical: { label: "Crítico", icon: ShieldAlert, color: "text-red-600", bg: "bg-red-500/10", border: "border-red-500/30" },
   }[healthStatus];
@@ -222,19 +227,14 @@ export default function Dashboard() {
       map[cat] = (map[cat] || 0) + d.valor;
     });
     return Object.entries(map)
-      .map(([name, value]) => ({ name, value, fill: catColorMap[name] ?? "hsl(220, 9%, 46%)" }))
+      .map(([name, value]) => ({ 
+        name, 
+        value, 
+        fill: catColorMap[name] || getVibrantColor(name)
+      }))
       .sort((a, b) => b.value - a.value);
   }, [despesasMes, catColorMap]);
 
-  // Monthly chart data (last 6 months)
-  const monthlyData = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-    const rec = filteredReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    const desp = filteredDespesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    return { month: label.charAt(0).toUpperCase() + label.slice(1), receitas: rec, despesas: desp };
-  });
 
   const insightColors: Record<string, string> = {
     success: "border-l-green-500 bg-green-500/5",
@@ -249,19 +249,16 @@ export default function Dashboard() {
     info: "text-blue-600",
   };
 
-  const latestReceitas = filteredReceitas.slice(0, 5);
-  const latestDespesas = filteredDespesas.slice(0, 5);
-
   // Smart Financial Alerts
-  const financialAlerts = useMemo(() => {
-    type AlertItem = { id: string; icon: typeof AlertTriangle; message: string; type: "success" | "warning" | "danger" };
-    const alerts: AlertItem[] = [];
+  const alerts = useMemo(() => {
+    const newAlerts: AlertItem[] = [];
 
     // Alerta 1 — Limite MEI (thresholds: 70%, 90%) — only with CNPJ
+    const percentLimit = limiteMei > 0 ? Math.min((faturamentoAnual / limiteMei) * 100, 100) : 0;
     if (hasCnpj && percentLimit >= 90) {
-      alerts.push({ id: "mei-90", icon: ShieldAlert, type: "danger", message: `Atenção: você está próximo de ultrapassar o limite do MEI (${percentLimit.toFixed(1)}% utilizado).` });
+      newAlerts.push({ id: "mei-90", icon: ShieldAlert, type: "danger", message: `Atenção: você está próximo de ultrapassar o limite do MEI (${percentLimit.toFixed(1)}% utilizado).` });
     } else if (hasCnpj && percentLimit >= 70) {
-      alerts.push({ id: "mei-70", icon: AlertTriangle, type: "warning", message: `Você já utilizou ${percentLimit.toFixed(1)}% do limite anual do MEI.` });
+      newAlerts.push({ id: "mei-70", icon: AlertTriangle, type: "warning", message: `Você já utilizou ${percentLimit.toFixed(1)}% do limite anual do MEI.` });
     }
 
     // Alerta 2 — DAS pendente ou próximo do vencimento — only with CNPJ
@@ -273,13 +270,13 @@ export default function Dashboard() {
       const diffDays = Math.ceil((vencDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
       if (diffDays < 0) {
-        alerts.push({ id: "das-vencido", icon: ShieldAlert, type: "danger", message: `Seu DAS de ${impostoPendente.competencia} está vencido! Regularize o pagamento.` });
+        newAlerts.push({ id: "das-vencido", icon: ShieldAlert, type: "danger", message: `Seu DAS de ${impostoPendente.competencia} está vencido! Regularize o pagamento.` });
       } else if (diffDays === 0) {
-        alerts.push({ id: "das-hoje", icon: Clock, type: "danger", message: "Seu imposto MEI (DAS) vence hoje!" });
+        newAlerts.push({ id: "das-hoje", icon: CalendarIcon, type: "danger", message: "Seu imposto MEI (DAS) vence hoje!" });
       } else if (diffDays <= 7) {
-        alerts.push({ id: "das-vencimento", icon: Clock, type: "warning", message: `Seu DAS de ${impostoPendente.competencia} vence em ${diffDays} dia${diffDays > 1 ? "s" : ""} (${vencDate.toLocaleDateString("pt-BR")}).` });
+        newAlerts.push({ id: "das-vencimento", icon: CalendarIcon, type: "warning", message: `Seu DAS de ${impostoPendente.competencia} vence em ${diffDays} dia${diffDays > 1 ? "s" : ""} (${vencDate.toLocaleDateString("pt-BR")}).` });
       } else {
-        alerts.push({ id: "das-pendente", icon: Receipt, type: "warning", message: `DAS de ${impostoPendente.competencia} pendente — vencimento em ${vencDate.toLocaleDateString("pt-BR")}.` });
+        newAlerts.push({ id: "das-pendente", icon: FileText, type: "warning", message: `DAS de ${impostoPendente.competencia} pendente — vencimento em ${vencDate.toLocaleDateString("pt-BR")}.` });
       }
     }
 
@@ -290,504 +287,187 @@ export default function Dashboard() {
     const twoDaysStr = twoDaysLater.toISOString().slice(0, 10);
 
     // Receitas pendentes (cobranças)
-    const receitasPendentes = receitas.filter((r: any) => 
-      r.tipo_transacao === "recorrente" && r.status === "pendente"
+    const receitasPendentes = raw.receitas.filter((r: any) => 
+      r.status === "pendente" || r.status === "atrasado"
     );
     const receitasVencidas = receitasPendentes.filter((r: any) => r.data < todayStr);
     const receitasHoje = receitasPendentes.filter((r: any) => r.data === todayStr);
     const receitasProximas = receitasPendentes.filter((r: any) => r.data > todayStr && r.data <= twoDaysStr);
 
     if (receitasVencidas.length > 0) {
-      alerts.push({ id: "rec-vencidas", icon: ShieldAlert, type: "danger", message: `${receitasVencidas.length} cobrança${receitasVencidas.length > 1 ? "s" : ""} vencida${receitasVencidas.length > 1 ? "s" : ""} (${formatCurrency(receitasVencidas.reduce((s: number, r: any) => s + r.valor, 0))}).` });
+      if (receitasVencidas.length === 1 && receitasVencidas[0].clientes?.nome) {
+         newAlerts.push({ id: `rec-vencida-${receitasVencidas[0].id}`, icon: ShieldAlert, type: "danger", message: `Cliente ${receitasVencidas[0].clientes.nome} possui pagamento em atrasado (${formatCurrency(receitasVencidas[0].valor)}).` });
+      } else {
+         newAlerts.push({ id: "rec-vencidas", icon: ShieldAlert, type: "danger", message: `${receitasVencidas.length} cobrança${receitasVencidas.length > 1 ? "s" : ""} vencida${receitasVencidas.length > 1 ? "s" : ""} (${formatCurrency(receitasVencidas.reduce((s: number, r: any) => s + r.valor, 0))}).` });
+      }
     }
     if (receitasHoje.length > 0) {
-      alerts.push({ id: "rec-hoje", icon: Clock, type: "warning", message: `${receitasHoje.length} cobrança${receitasHoje.length > 1 ? "s" : ""} vence${receitasHoje.length > 1 ? "m" : ""} hoje (${formatCurrency(receitasHoje.reduce((s: number, r: any) => s + r.valor, 0))}).` });
+      newAlerts.push({ id: "rec-hoje", icon: CalendarIcon, type: "warning", message: `${receitasHoje.length} cobrança${receitasHoje.length > 1 ? "s" : ""} vence${receitasHoje.length > 1 ? "m" : ""} hoje (${formatCurrency(receitasHoje.reduce((s: number, r: any) => s + r.valor, 0))}).` });
     }
     if (receitasProximas.length > 0) {
-      alerts.push({ id: "rec-proximas", icon: Bell, type: "warning", message: `${receitasProximas.length} cobrança${receitasProximas.length > 1 ? "s" : ""} nos próximos 2 dias.` });
+      newAlerts.push({ id: "rec-proximas", icon: Info, type: "warning", message: `${receitasProximas.length} cobrança${receitasProximas.length > 1 ? "s" : ""} nos próximos 2 dias.` });
     }
 
     // Despesas pendentes
-    const despesasPendentes = despesas.filter((d: any) =>
+    const despesasPendentes = raw.despesas.filter((d: any) =>
       (d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") && d.status === "pendente"
     );
     const despesasVencidas = despesasPendentes.filter((d: any) => d.data < todayStr);
     const despesasHoje = despesasPendentes.filter((d: any) => d.data === todayStr);
 
     if (despesasVencidas.length > 0) {
-      alerts.push({ id: "desp-vencidas", icon: ShieldAlert, type: "danger", message: `${despesasVencidas.length} despesa${despesasVencidas.length > 1 ? "s" : ""} pendente${despesasVencidas.length > 1 ? "s" : ""} vencida${despesasVencidas.length > 1 ? "s" : ""} (${formatCurrency(despesasVencidas.reduce((s: number, d: any) => s + d.valor, 0))}).` });
+      newAlerts.push({ id: "desp-vencidas", icon: ShieldAlert, type: "danger", message: `${despesasVencidas.length} despesa${despesasVencidas.length > 1 ? "s" : ""} pendente${despesasVencidas.length > 1 ? "s" : ""} vencida${despesasVencidas.length > 1 ? "s" : ""} (${formatCurrency(despesasVencidas.reduce((s: number, d: any) => s + d.valor, 0))}).` });
     }
     if (despesasHoje.length > 0) {
-      alerts.push({ id: "desp-hoje", icon: Clock, type: "warning", message: `${despesasHoje.length} despesa${despesasHoje.length > 1 ? "s" : ""} vence${despesasHoje.length > 1 ? "m" : ""} hoje.` });
+      newAlerts.push({ id: "desp-hoje", icon: CalendarIcon, type: "warning", message: `${despesasHoje.length} despesa${despesasHoje.length > 1 ? "s" : ""} vence${despesasHoje.length > 1 ? "m" : ""} hoje.` });
     }
 
     // Alerta 3 & 4 — Variação de faturamento
     if (prevMonth.rec > 0 && faturamentoMes > 0) {
       const variation = ((faturamentoMes - prevMonth.rec) / prevMonth.rec) * 100;
       if (variation > 20) {
-        alerts.push({ id: "fat-cresceu", icon: Flame, type: "success", message: `Parabéns! Seu faturamento cresceu ${variation.toFixed(0)}% este mês. 🚀` });
+        newAlerts.push({ id: "fat-cresceu", icon: TrendingUp, type: "success", message: `Parabéns! Seu faturamento cresceu ${variation.toFixed(0)}% este mês. 🚀` });
       } else if (variation < 0) {
-        alerts.push({ id: "fat-caiu", icon: TrendingDown, type: "warning", message: `Seu faturamento caiu ${Math.abs(variation).toFixed(0)}% comparado ao mês passado.` });
+        newAlerts.push({ id: "fat-caiu", icon: TrendingDown, type: "warning", message: `Seu faturamento caiu ${Math.abs(variation).toFixed(0)}% comparado ao mês passado.` });
       }
     } else if (faturamentoMes > 0 && prevMonth.rec === 0) {
-      alerts.push({ id: "fat-novo", icon: CheckCircle2, type: "success", message: `Ótimo início de mês! Faturamento atual: ${formatCurrency(faturamentoMes)}.` });
+      newAlerts.push({ id: "fat-novo", icon: ShieldCheck, type: "success", message: `Ótimo início de mês! Faturamento atual: ${formatCurrency(faturamentoMes)}.` });
     }
 
-    return alerts.filter((a) => !hiddenAlerts.has(a.id));
-  }, [percentLimit, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts, hasCnpj, receitas, despesas]);
+    return newAlerts.filter((a) => !hiddenAlerts.has(a.id));
+  }, [limiteMei, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts, hasCnpj, raw.receitas, raw.despesas, faturamentoAnual]);
 
-  const alertStyles = {
-    success: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-700 dark:text-emerald-400", iconColor: "text-emerald-600" },
-    warning: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-700 dark:text-amber-400", iconColor: "text-amber-600" },
-    danger: { bg: "bg-destructive/10", border: "border-destructive/30", text: "text-destructive", iconColor: "text-destructive" },
-  };
+  const latestReceitas = raw.receitas.slice(0, 5);
+  const latestDespesas = raw.despesas.slice(0, 5);
 
-  const isLoading = loadingReceitas || loadingDespesas;
+
+  const isLoading = loading;
 
 
   // === NEW: Mini gráfico de fluxo (daily data for current month) ===
   const flowChartData = useMemo(() => {
+    const now = new Date();
     const today = now.getDate();
-    let accumulated = 0;
+    // Initial balance is total settled balance BEFORE this month started
+    const beforeThisMonthRec = raw.settledReceitas.filter(r => r.data < `${currentMonth}-01`).reduce((s, r) => s + r.valor, 0);
+    const beforeThisMonthDesp = raw.settledDespesas.filter(d => d.data < `${currentMonth}-01`).reduce((s, d) => s + d.valor, 0);
+    let accumulated = beforeThisMonthRec - beforeThisMonthDesp;
+    
     return Array.from({ length: today }, (_, i) => {
       const day = i + 1;
       const dayStr = `${currentMonth}-${String(day).padStart(2, "0")}`;
-      const rec = receitasMes.filter((r) => r.data.startsWith(dayStr)).reduce((s, r) => s + r.valor, 0);
-      const desp = despesasMes.filter((d) => d.data.startsWith(dayStr)).reduce((s, d) => s + d.valor, 0);
+      const rec = raw.receitas.filter((r) => r.data === dayStr).reduce((s, r) => s + r.valor, 0); // Simplified raw access
+      const desp = raw.despesas.filter((d) => d.data === dayStr).reduce((s, d) => s + d.valor, 0);
       accumulated += rec - desp;
       return { dia: day, receitas: rec, despesas: desp, saldo: accumulated };
     });
-  }, [receitasMes, despesasMes, currentMonth]);
+  }, [raw.settledReceitas, raw.settledDespesas, raw.receitas, raw.despesas, currentMonth]);
 
   // Extracted insight logic out to InsightsFinanceiros component
 
     return (
-    <div className="space-y-6 min-w-0 max-w-full">
-      {/* Header + CTAs */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-bold">Olá, bem-vindo ao Vektor</h1>
-          <p className="text-sm text-muted-foreground">Seu centro de controle financeiro.</p>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" className="hidden md:flex">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate("/receitas/nova")}>
-              <TrendingUp className="h-4 w-4 mr-2" /> Registrar Receita
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/despesas/nova")}>
-              <TrendingDown className="h-4 w-4 mr-2" /> Registrar Despesa
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/clientes/novo")}>
-              <User className="h-4 w-4 mr-2" /> Novo Cliente
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto px-4 py-6 md:px-6">
+      <DashboardHeader 
+        hasCnpj={hasCnpj} 
+        onSyncOpen={() => setSyncModalOpen(true)} 
+      />
 
-      {/* Quick Entry / Registro Rápido */}
-      <div className="w-full">
-        <QuickEntry financialView={financialView} />
-      </div>
+      <FinancialStats 
+        isLoading={isLoading}
+        saldoTotal={saldoTotal}
+        faturamentoMes={faturamentoMes}
+        despesasMesTotal={despesasMesTotal}
+        totalInvestido={totalInvestido}
+        saldoMes={saldoMes}
+      />
 
-      {/* Financial View Selector */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground font-medium">Visualizar:</span>
-        <ToggleGroup
-          type="single"
-          value={financialView}
-          onValueChange={(v) => { if (v) setFinancialView(v as FinancialView); }}
-          className="bg-muted/50 rounded-lg p-1"
-        >
-          <ToggleGroupItem value="pessoal" aria-label="Pessoal" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-            <User className="h-3.5 w-3.5" />
-            Pessoal
-          </ToggleGroupItem>
-          {hasCnpj && (
-            <>
-              <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-                <Briefcase className="h-3.5 w-3.5" />
-                MEI
-              </ToggleGroupItem>
-              <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-                <Layers className="h-3.5 w-3.5" />
-                Tudo
-              </ToggleGroupItem>
-            </>
-          )}
-        </ToggleGroup>
-      </div>
+      <HealthAlerts alerts={alerts} onDismiss={dismissAlert} />
 
-      {/* 1. SALDO DO MÊS — Hero card */}
       {isLoading ? (
-        <Skeleton className="h-32 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       ) : (
-        <Card className={`border-2 ${saldoMes >= 0 ? "border-primary/20" : "border-destructive/20"}`}>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <Wallet className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium text-muted-foreground">Saldo do Mês</span>
-            </div>
-            <p className={`font-heading text-3xl sm:text-4xl font-bold ${saldoMes >= 0 ? "text-primary" : "text-destructive"}`}>
-              {formatCurrency(saldoMes)}
-            </p>
-            <div className="flex flex-wrap items-center gap-4 mt-3 text-sm">
-              <div className="flex items-center gap-1.5">
-                <ArrowUpRight className="h-4 w-4 text-emerald-600" />
-                <span className="text-muted-foreground">Receitas:</span>
-                <span className="font-semibold text-emerald-600">{formatCurrency(faturamentoMes)}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <ArrowDownRight className="h-4 w-4 text-destructive" />
-                <span className="text-muted-foreground">Despesas:</span>
-                <span className="font-semibold text-destructive">{formatCurrency(despesasMesTotal)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-
-      {/* 2. MOVIMENTAÇÃO DO MÊS — Unified receitas + despesas */}
-      {isLoading ? (
-        <Skeleton className="h-24 w-full rounded-lg" />
-      ) : (() => {
-        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const prevKey = getMonthKey(prevDate);
-        const recPrev = filteredReceitas.filter((r) => r.data.startsWith(prevKey)).reduce((s, r) => s + r.valor, 0);
-        const despPrev = filteredDespesas.filter((d) => d.data.startsWith(prevKey)).reduce((s, d) => s + d.valor, 0);
-        const varRec = recPrev > 0 ? ((faturamentoMes - recPrev) / recPrev) * 100 : faturamentoMes > 0 ? 100 : 0;
-        const varDesp = despPrev > 0 ? ((despesasMesTotal - despPrev) / despPrev) * 100 : despesasMesTotal > 0 ? 100 : 0;
-        return (
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Receipt className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-muted-foreground">Movimentação do Mês</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <TrendingUp className="h-4 w-4 text-emerald-600" />
-                    <span className="text-sm text-muted-foreground">Receitas</span>
-                  </div>
-                  <p className="font-heading text-xl font-bold text-emerald-600">{formatCurrency(faturamentoMes)}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {varRec >= 0 ? <ArrowUpRight className="h-3 w-3 text-emerald-600" /> : <ArrowDownRight className="h-3 w-3 text-destructive" />}
-                    <span className={`text-xs ${varRec >= 0 ? "text-emerald-600" : "text-destructive"}`}>{Math.abs(varRec).toFixed(0)}%</span>
-                    <span className="text-xs text-muted-foreground">vs anterior</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <TrendingDown className="h-4 w-4 text-destructive" />
-                    <span className="text-sm text-muted-foreground">Despesas</span>
-                  </div>
-                  <p className="font-heading text-xl font-bold text-destructive">{formatCurrency(despesasMesTotal)}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {varDesp <= 0 ? <ArrowDownRight className="h-3 w-3 text-emerald-600" /> : <ArrowUpRight className="h-3 w-3 text-destructive" />}
-                    <span className={`text-xs ${varDesp <= 0 ? "text-emerald-600" : "text-destructive"}`}>{Math.abs(varDesp).toFixed(0)}%</span>
-                    <span className="text-xs text-muted-foreground">vs anterior</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
-
-      {/* NEW: MINI GRÁFICO DE FLUXO */}
-      {!isLoading && flowChartData.length > 1 && (
-        <Card>
-          <CardContent className="p-5 pb-2">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Fluxo do mês</span>
-            </div>
-            <div className="h-28">
-              <ARC width="100%" height="100%">
-                <AreaChart data={flowChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                  <ACG strokeDasharray="3 3" className="stroke-border" />
-                  <AXAxis dataKey="dia" tick={{ fontSize: 10 }} className="text-xs" />
-                  <AYAxis tick={{ fontSize: 10 }} className="text-xs" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <ATooltip formatter={(v: number) => formatCurrency(v)} labelFormatter={(l) => `Dia ${l}`} />
-                  <Area type="monotone" dataKey="receitas" name="Receitas" stroke="hsl(160, 60%, 38%)" fill="hsl(160, 60%, 38%)" fillOpacity={0.1} strokeWidth={1.5} />
-                  <Area type="monotone" dataKey="despesas" name="Despesas" stroke="hsl(0, 72%, 51%)" fill="hsl(0, 72%, 51%)" fillOpacity={0.1} strokeWidth={1.5} />
-                  <Area type="monotone" dataKey="saldo" name="Saldo" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.15} strokeWidth={2} />
-                </AreaChart>
-              </ARC>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 3. ALERTAS FINANCEIROS */}
-      {!isLoading && financialAlerts.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-muted-foreground" />
-            <h2 className="font-heading text-sm font-semibold text-muted-foreground uppercase tracking-wide">Alertas Financeiros</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <InsightsFinanceiros
+              faturamentoMes={faturamentoMes}
+              despesasMesTotal={despesasMesTotal}
+              despesaPercent={despesaPercent}
+              savingsRate={taxaPoupanca}
+              varFaturamento={prevMonth.varFat}
+              categoryData={categoryData}
+            />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {financialAlerts.map((alert) => {
-              const style = alertStyles[alert.type];
-              return (
-                <div key={alert.id} className="animate-fade-in">
-                  <div className={`flex items-start gap-3 rounded-lg border ${style.border} ${style.bg} p-3`}>
-                    <alert.icon className={`h-4 w-4 mt-0.5 shrink-0 ${style.iconColor}`} />
-                    <p className={`text-sm flex-1 ${style.text}`}>{alert.message}</p>
-                    <button
-                      onClick={() => dismissAlert(alert.id)}
-                      className="shrink-0 rounded-md p-0.5 hover:bg-background/50 transition-colors"
-                      aria-label="Ocultar alerta"
-                    >
-                      <X className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
+          <div className="flex flex-col gap-4">
+            <Card>
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                  <PiggyBank className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm text-muted-foreground">Taxa de Poupança</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-heading text-xl font-bold">{taxaPoupanca.toFixed(1)}%</span>
                   </div>
                 </div>
-              );
-            })}
+              </CardContent>
+            </Card>
+
+            {orphanedCount > 0 && accounts.length > 0 && (
+              <Card className="border-amber-500/20 bg-amber-500/5">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 shrink-0">
+                    <Info className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-amber-700">Ação Necessária</p>
+                    <p className="text-[10px] text-amber-600">Você tem {orphanedCount} transações sem conta bancária vinculada.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {hasCnpj && empresa && (
+              <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+                    <Building2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-heading font-semibold text-sm truncate">{empresa.razao_social || empresa.nome_fantasia || "Empresa"}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
-      )}
-
-      {/* NEW: INSIGHT FINANCEIRO */}
-      {!isLoading && (
-        <InsightsFinanceiros
-          faturamentoMes={faturamentoMes}
-          despesasMesTotal={despesasMesTotal}
-          despesaPercent={despesaPercent}
-          savingsRate={faturamentoMes > 0 ? ((faturamentoMes - despesasMesTotal) / faturamentoMes) * 100 : 0}
-          varFaturamento={prevMonth.varFat}
-          categoryData={categoryData}
-        />
-      )}
-
-      {/* 4. SAÚDE FINANCEIRA — Compact */}
-      {!isLoading && (
-        <Card className={`border ${healthConfig.border}`}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${healthConfig.bg} shrink-0`}>
-              <healthConfig.icon className={`h-5 w-5 ${healthConfig.color}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm text-muted-foreground">Saúde Financeira</span>
-                <Badge variant="outline" className={`text-xs ${healthConfig.color} border-current`}>
-                  {healthConfig.label}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-3">
-                <Progress value={Math.min(despesaPercent, 100)} className="h-2 flex-1" />
-                <span className="text-xs font-medium text-muted-foreground shrink-0">{despesaPercent.toFixed(0)}% gastos</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 5. TAXA DE POUPANÇA */}
-      {!isLoading && (() => {
-        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const prevKey = getMonthKey(prevDate);
-        const rendaPessoal = receitas.filter((r: any) => r.tipo_conta === "pessoal" && r.data.startsWith(currentMonth) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
-        const despPessoal = despesas.filter((d: any) => d.tipo_conta === "pessoal" && d.data.startsWith(currentMonth) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
-        const taxaPoupanca = rendaPessoal > 0 ? ((rendaPessoal - despPessoal) / rendaPessoal) * 100 : 0;
-        const rendaPrev = receitas.filter((r: any) => r.tipo_conta === "pessoal" && r.data.startsWith(prevKey) && (!r.tipo_transacao || r.tipo_transacao === "unica" || r.status === "recebido")).reduce((s: number, r: any) => s + r.valor, 0);
-        const despPrev = despesas.filter((d: any) => d.tipo_conta === "pessoal" && d.data.startsWith(prevKey) && (!d.tipo_transacao || d.tipo_transacao === "unica" || d.status === "pago")).reduce((s: number, d: any) => s + d.valor, 0);
-        const taxaPrev = rendaPrev > 0 ? ((rendaPrev - despPrev) / rendaPrev) * 100 : 0;
-        const varPoup = taxaPoupanca - taxaPrev;
-        const positive = varPoup >= 0;
-        return (
-          <Card>
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-                <PiggyBank className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm text-muted-foreground">Taxa de Poupança</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-heading text-xl font-bold">{taxaPoupanca.toFixed(1)}%</span>
-                  <div className="flex items-center gap-0.5">
-                    {positive ? <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" /> : <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />}
-                    <span className={`text-xs font-medium ${positive ? "text-emerald-600" : "text-destructive"}`}>
-                      {Math.abs(varPoup).toFixed(1)}pp
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
-
-      {/* 6. BANNER MEI — Only if no CNPJ */}
-      {!hasCnpj && (
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-dashed" onClick={() => navigate("/configuracoes")}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-              <Building2 className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-heading font-semibold text-sm">Você é MEI?</p>
-              <p className="text-xs text-muted-foreground">Cadastre seu CNPJ para desbloquear o controle empresarial.</p>
-            </div>
-            <Button size="sm" variant="outline" className="shrink-0">
-              Cadastrar
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Company info — only if has CNPJ */}
-      {hasCnpj && (
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-              <Building2 className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-heading font-semibold text-sm truncate">{empresa.razao_social || empresa.nome_fantasia || "Empresa"}</p>
-              {empresa.nome_fantasia && empresa.razao_social && (
-                <p className="text-xs text-muted-foreground truncate">{empresa.nome_fantasia}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              {empresa.situacao_cadastral && (
-                <Badge variant={empresa.situacao_cadastral.toLowerCase().includes("ativa") ? "default" : "destructive"} className="text-xs">
-                  {empresa.situacao_cadastral}
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       <Separator />
 
-
-      {/* Charts — lazy-loaded */}
       <Suspense fallback={<ChartsFallback />}>
-        <DashboardCharts monthlyData={monthlyData} categoryData={categoryData} />
+        <DashboardCharts monthlyData={monthlyData} categoryData={categoryData} flowChartData={flowChartData} />
       </Suspense>
 
-      {/* Meta Financeira + Resumo Mensal */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {metaAtual && (
-          <Card className="border-accent/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/metas")}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-accent" />
-                  <span className="font-heading font-semibold">Meta Atual: {metaAtual.titulo}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">{metaAtual.categoria}</span>
-              </div>
-              <Progress value={metaAtual.valor_alvo > 0 ? Math.min((metaAtual.valor_atual / metaAtual.valor_alvo) * 100, 100) : 0} className="h-3 mb-2" />
-              <div className="flex flex-wrap justify-between gap-2 text-sm">
-                <span className="text-muted-foreground">Acumulado: <span className="font-semibold text-primary">{formatCurrency(metaAtual.valor_atual)}</span></span>
-                <span className="text-muted-foreground">Meta: <span className="font-semibold">{formatCurrency(metaAtual.valor_alvo)}</span></span>
-                <span className="text-muted-foreground">Falta: <span className="font-semibold text-destructive">{formatCurrency(Math.max(metaAtual.valor_alvo - metaAtual.valor_atual, 0))}</span></span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        <Card className={`cursor-pointer hover:shadow-md transition-shadow ${!metaAtual ? "lg:col-span-2" : ""}`} onClick={() => navigate("/relatorio-mensal")}>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-chart-3" />
-                <span className="font-heading font-semibold">Resumo — {prevMonth.label}</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                {prevMonth.varFat >= 0
-                  ? <ArrowUpRight className="h-3.5 w-3.5 text-primary" />
-                  : <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />
-                }
-                {Math.abs(prevMonth.varFat).toFixed(1)}% vs mês anterior
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-xs text-muted-foreground">Faturamento</p>
-                <p className="text-lg font-bold text-primary">{formatCurrency(prevMonth.rec)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Despesas</p>
-                <p className="text-lg font-bold text-destructive">{formatCurrency(prevMonth.desp)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Lucro</p>
-                <p className={`text-lg font-bold ${prevMonth.lucro >= 0 ? "text-primary" : "text-destructive"}`}>{formatCurrency(prevMonth.lucro)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardGoals 
+        metaAtual={metaAtual} 
+        prevMonth={prevMonth} 
+        navigate={navigate} 
+        formatCurrency={formatCurrency} 
+      />
 
-      {/* Recent Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader><CardTitle className="font-heading text-lg">Últimas Receitas</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)
-              ) : latestReceitas.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma receita cadastrada.</p>
-              ) : (
-                latestReceitas.map((r: any) => (
-                  <div key={r.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
-                    <CategoryIcon category={r.categoria ?? r.forma_pagamento} type="receita" size={36} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-medium truncate">{r.descricao}</p>
-                        {r.tipo_transacao === "recorrente" && <Repeat className="h-3 w-3 text-amber-500 shrink-0" />}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{r.forma_pagamento ?? "—"} • {formatDate(r.data)}</p>
-                    </div>
-                    <span className={`text-sm font-bold shrink-0 ${transactionColors.receita.text}`}>+{formatCurrency(r.valor)}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="font-heading text-lg">Últimas Despesas</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-1">
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)
-              ) : latestDespesas.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma despesa cadastrada.</p>
-              ) : (
-                latestDespesas.map((d: any) => (
-                  <div key={d.id} className="flex items-center gap-3 border-b border-border py-3 last:border-0">
-                    <CategoryIcon category={d.categoria} type="despesa" size={36} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-medium truncate">{d.descricao}</p>
-                        {d.tipo_transacao === "recorrente" && <Repeat className="h-3 w-3 text-amber-500 shrink-0" />}
-                        {d.tipo_transacao === "parcelada" && <CalendarIcon className="h-3 w-3 text-blue-500 shrink-0" />}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {d.categoria ?? "—"} • {formatDate(d.data)}
-                        {d.tipo_transacao === "parcelada" && d.parcela_atual && d.numero_parcelas && ` • ${d.parcela_atual}/${d.numero_parcelas}`}
-                      </p>
-                    </div>
-                    <span className={`text-sm font-bold shrink-0 ${transactionColors.despesa.text}`}>-{formatCurrency(d.valor)}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <CashFlowProjection
+        receitas={raw.receitas}
+        despesas={raw.despesas}
+        saldoAtual={saldoTotal}
+      />
+
+      <RecentActivity 
+        isLoading={isLoading}
+        receitas={raw.receitas}
+        despesas={raw.despesas}
+      />
+
+      <QuickSyncModal open={syncModalOpen} onOpenChange={setSyncModalOpen} />
     </div>
   );
 }

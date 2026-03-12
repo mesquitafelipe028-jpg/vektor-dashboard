@@ -1,9 +1,8 @@
-import { useState, useRef, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Send, Bot, User as UserIcon, X, Sparkles, MessageSquare } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { generateAssistantResponse, type AssistantData } from "@/lib/assistantEngine";
+// Force refresh to clear any stale cache
+import { identifyIntent, generateAssistantResponse, getDynamicSuggestions, type Transaction, type AssistantData } from "@/lib/assistantEngine";
+import { useFinancialData } from "@/hooks/useFinancialData";
 
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Message {
   id: string;
@@ -20,42 +20,39 @@ interface Message {
   timestamp: Date;
 }
 
-export function AssistantWidget() {
-  const { user } = useAuth();
+export function AssistantVektor() {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Olá! Sou o Assistente Vektor. Como posso ajudar com suas finanças?",
-      timestamp: new Date(),
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Buscar dados
-  const { data: receitas = [] } = useQuery({
-    queryKey: ["receitas", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("receitas").select("*");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && isOpen,
-  });
+  // Use the centralized financial data hook
+  const { user } = useAuth();
+  const { raw, loading } = useFinancialData("tudo");
 
-  const { data: despesas = [] } = useQuery({
-    queryKey: ["despesas", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("despesas").select("*");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && isOpen,
-  });
+  const assistantData = useMemo<AssistantData>(() => {
+    return {
+      receitas: raw.receitas.map(r => ({
+        id: r.id,
+        valor: r.valor,
+        data: r.data,
+        categoria: r.categoria,
+        descricao: r.descricao
+      })),
+      despesas: raw.despesas.map(d => ({
+        id: d.id,
+        valor: d.valor,
+        data: d.data,
+        categoria: d.categoria,
+        descricao: d.descricao
+      }))
+    };
+  }, [raw]);
+
+  const suggestions = useMemo(() => getDynamicSuggestions(assistantData), [assistantData]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -69,6 +66,29 @@ export function AssistantWidget() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping, isOpen]);
+
+  // Mensagem inicial dinâmica
+  useEffect(() => {
+    if (isOpen && !hasInitialized && !loading && assistantData.receitas.length >= 0 && assistantData.despesas.length >= 0) {
+      const currentMonth = new Date().toISOString().substring(0, 7);
+      const despesasMes = assistantData.despesas.filter((d: any) => d.data.startsWith(currentMonth));
+      const totalGasto = despesasMes.reduce((acc: number, curr: any) => acc + curr.valor, 0);
+
+      let initialContent = "Olá! Sou o Assistente Vektor. Como posso ajudar com suas finanças hoje?";
+      
+      if (totalGasto > 2000) {
+        initialContent = `Olá! Notei que seus gastos este mês já somam ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalGasto)}. Gostaria de uma análise das suas maiores despesas?`;
+      }
+
+      setMessages([{
+        id: "1",
+        role: "assistant",
+        content: initialContent,
+        timestamp: new Date(),
+      }]);
+      setHasInitialized(true);
+    }
+  }, [isOpen, assistantData.receitas, assistantData.despesas, hasInitialized, loading]);
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -85,12 +105,7 @@ export function AssistantWidget() {
     setIsTyping(true);
 
     setTimeout(() => {
-      const data: AssistantData = {
-        receitas: receitas,
-        despesas: despesas
-      };
-      
-      const responseContent = generateAssistantResponse(userMsg.content, data);
+      const responseContent = generateAssistantResponse(userMsg.content, assistantData);
       
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -111,12 +126,7 @@ export function AssistantWidget() {
     }
   };
 
-  const sugestoes = [
-    "Quanto gastei este mês?",
-    "Quanto recebi este mês?",
-    "Saldo atual?",
-    "Maior despesa?"
-  ];
+  const sugestoes = suggestions;
 
   // Não renderiza o widget se o usuário não estiver logado
   if (!user) return null;
@@ -124,7 +134,13 @@ export function AssistantWidget() {
   return (
     <>
       <div 
-        className={`fixed z-[9999] transition-all duration-300 ${isMobile ? 'bottom-20 right-4' : 'bottom-6 right-6'}`}
+        className="fixed z-[9999] transition-all duration-300"
+        style={{ 
+          bottom: isMobile 
+            ? "calc(var(--mobile-nav-height) + var(--safe-area-bottom) + 1rem)" 
+            : "1.5rem",
+          right: isMobile ? "1rem" : "1.5rem"
+        }}
       >
         <AnimatePresence>
           {!isOpen && (
@@ -152,11 +168,18 @@ export function AssistantWidget() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className={`fixed z-[10000] flex flex-col shadow-2xl overflow-hidden border border-border
-              ${isMobile 
-                ? 'inset-4 bottom-20 rounded-2xl bg-background' 
-                : 'bottom-24 right-6 w-[380px] h-[600px] rounded-2xl bg-background max-h-[calc(100vh-8rem)]'
-              }`}
+            className="fixed z-[10000] flex flex-col shadow-2xl overflow-hidden border border-border bg-background"
+            style={{
+              inset: isMobile ? "1rem" : "auto",
+              bottom: isMobile 
+                ? "calc(var(--mobile-nav-height) + var(--safe-area-bottom) + 1rem)" 
+                : "6rem",
+              right: isMobile ? "1rem" : "1.5rem",
+              width: isMobile ? "auto" : "380px",
+              height: isMobile ? "auto" : "600px",
+              maxHeight: isMobile ? "calc(100vh - var(--mobile-nav-height) - var(--safe-area-bottom) - 4rem)" : "calc(100vh - 8rem)",
+              borderRadius: "1rem"
+            }}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 bg-primary text-primary-foreground">
@@ -242,8 +265,8 @@ export function AssistantWidget() {
               </div>
             </ScrollArea>
 
-            {/* Sugestões (Somente se poucas msgs e não digitando) */}
-            {messages.length <= 2 && !isTyping && (
+            {/* Sugestões Dinâmicas */}
+            {!isTyping && (
               <div className="px-4 py-2 bg-muted/20 border-t flex gap-2 overflow-x-auto no-scrollbar scroll-smooth">
                 {sugestoes.map((sugestao) => (
                   <Button

@@ -1,4 +1,7 @@
-export const LIMITE_MEI = 81000;
+import { Tables } from "@/integrations/supabase/types";
+
+export const LIMITE_MEI_ANUAL = 81000;
+export const LIMITE_MEI_MENSAL = 6750;
 export const DAS_VALOR_PADRAO = 71.60;
 
 export const DAS_CONFIG = {
@@ -9,14 +12,7 @@ export const DAS_CONFIG = {
 
 export type ActivityType = keyof typeof DAS_CONFIG;
 
-export interface Imposto {
-  id: string;
-  competencia: string;
-  vencimento: string;
-  valor: number;
-  status: string;
-  user_id: string;
-}
+export type Imposto = Tables<"impostos_mei">;
 
 export function getEffectiveStatus(imp: Imposto): "pago" | "pendente" | "vencido" {
   if (imp.status === "pago") return "pago";
@@ -25,6 +21,30 @@ export function getEffectiveStatus(imp: Imposto): "pago" | "pendente" | "vencido
   const venc = new Date(imp.vencimento + "T12:00:00");
   venc.setHours(0, 0, 0, 0);
   return venc < today ? "vencido" : "pendente";
+}
+
+/**
+ * Calcula o limite MEI proporcional com base na data de abertura da empresa
+ */
+export function calcularLimiteProporcional(dataAbertura?: string | null): number {
+  if (!dataAbertura) return LIMITE_MEI_ANUAL;
+  
+  const abertura = new Date(dataAbertura + "T12:00:00");
+  const agora = new Date();
+  
+  // Se a abertura foi em ano anterior, o limite é o total
+  if (abertura.getFullYear() < agora.getFullYear()) {
+    return LIMITE_MEI_ANUAL;
+  }
+  
+  // Se a abertura foi no futuro (ano posterior), tecnicamente limite é 0 para o ano atual
+  if (abertura.getFullYear() > agora.getFullYear()) {
+    return 0;
+  }
+  
+  // Se abriu este ano, o limite é proporcional aos meses restantes
+  const mesesAtivos = 12 - abertura.getMonth();
+  return mesesAtivos * LIMITE_MEI_MENSAL;
 }
 
 export const statusConfig = {

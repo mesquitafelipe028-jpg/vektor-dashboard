@@ -1,8 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, TrendingDown, ArrowLeftRight, Receipt, BarChart3,
-  Target, Activity, Settings, LogOut, Calculator, CreditCard, Users, Tag, LineChart,
-  ClipboardList, Clock,
+  Target, Activity, Settings, LogOut, Calculator, CreditCard, Users, Tag,
+  ClipboardList, Clock, Wallet, Briefcase, Upload
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -16,28 +16,30 @@ const menuGroups = [
     ],
   },
   {
-    label: "Movimentações",
+    label: "Finanças",
     items: [
       { label: "Receitas", icon: TrendingUp, path: "/receitas", color: "bg-primary/10 text-primary" },
       { label: "Despesas", icon: TrendingDown, path: "/despesas", color: "bg-destructive/10 text-destructive" },
+      { label: "Contas", icon: Wallet, path: "/contas", color: "bg-chart-1/10 text-chart-1" },
       { label: "Cartões", icon: CreditCard, path: "/cartoes", color: "bg-chart-1/10 text-chart-1" },
       { label: "Clientes", icon: Users, path: "/clientes", color: "bg-chart-3/10 text-chart-3" },
       { label: "Cobranças", icon: ClipboardList, path: "/contas-a-receber", color: "bg-chart-4/10 text-chart-4" },
     ],
   },
   {
-    label: "Planejamento",
+    label: "Investimentos",
     items: [
-      { label: "Metas", icon: Target, path: "/metas", color: "bg-chart-1/10 text-chart-1" },
-      { label: "Análise", icon: Activity, path: "/analise-financeira", color: "bg-accent text-accent-foreground" },
-      { label: "Relatórios", icon: BarChart3, path: "/relatorios", color: "bg-chart-3/10 text-chart-3" },
-      { label: "Calculadora", icon: Calculator, path: "/calculadora-investimentos", color: "bg-chart-2/10 text-chart-2" },
+      { label: "Simulador", icon: Calculator, path: "/calculadora-investimentos", color: "bg-chart-2/10 text-chart-2" },
     ],
   },
   {
-    label: "Investimentos",
+    label: "Planejamento",
     items: [
-      { label: "Investimentos", icon: LineChart, path: "/investimentos", color: "bg-chart-2/10 text-chart-2" },
+      { label: "Metas", icon: Target, path: "/metas", color: "bg-chart-1/10 text-chart-1" },
+      { label: "Projetos", icon: Briefcase, path: "/projetos", color: "bg-chart-4/10 text-chart-4" },
+      { label: "Análise", icon: Activity, path: "/analise-financeira", color: "bg-accent text-accent-foreground" },
+      { label: "Assinaturas", icon: Receipt, path: "/assinaturas", color: "bg-chart-1/10 text-chart-1" },
+      { label: "Relatórios", icon: BarChart3, path: "/relatorios", color: "bg-chart-3/10 text-chart-3" },
     ],
   },
   {
@@ -49,8 +51,9 @@ const menuGroups = [
   {
     label: "Sistema",
     items: [
-      { label: "Configurações", icon: Settings, path: "/configuracoes", color: "bg-muted text-muted-foreground" },
+      { label: "Importar Extrato", icon: Upload, path: "/importar-extrato", color: "bg-muted text-muted-foreground" },
       { label: "Categorias", icon: Tag, path: "/categorias", color: "bg-chart-4/10 text-chart-4" },
+      { label: "Configurações", icon: Settings, path: "/configuracoes", color: "bg-muted text-muted-foreground" },
     ],
   },
 ];
