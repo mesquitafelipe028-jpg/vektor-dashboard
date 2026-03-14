@@ -1,3 +1,9 @@
 {
-  "name": "vektor-financas"
+  "name": "vektor-financas",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
