@@ -71,6 +71,52 @@ serve(async (req) => {
       return new Response(JSON.stringify(expenses), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // GET /revenues
+    if (actualPath === 'revenues' && req.method === 'GET') {
+      const limit = url.searchParams.get('limit') || '50';
+      const { data: revenues, error } = await supabase
+        .from('receitas')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('data', { ascending: false })
+        .limit(parseInt(limit));
+
+      if (error) throw error;
+      return new Response(JSON.stringify(revenues), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // GET /customers (Ranking de Clientes por Faturamento)
+    if (actualPath === 'customers' && req.method === 'GET') {
+      const { data: customers, error } = await supabase
+        .from('clientes')
+        .select('id, nome, receitas(valor)')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const ranking = customers.map(c => ({
+        id: c.id,
+        nome: c.nome,
+        total_faturado: (c.receitas || []).reduce((acc: number, r: any) => acc + (r.valor || 0), 0)
+      })).sort((a, b) => b.total_faturado - a.total_faturado);
+
+      return new Response(JSON.stringify(ranking), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // GET /billings (Cobranças por Status)
+    if (actualPath === 'billings' && req.method === 'GET') {
+      const status = url.searchParams.get('status') || 'pendente';
+      const { data: billings, error } = await supabase
+        .from('receitas')
+        .select('*, clientes(nome)')
+        .eq('user_id', user.id)
+        .eq('status', status)
+        .order('data', { ascending: false });
+
+      if (error) throw error;
+      return new Response(JSON.stringify(billings), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // GET /cards
     if (actualPath === 'cards' && req.method === 'GET') {
       const { data: cards, error: cardsError } = await supabase
@@ -134,12 +180,14 @@ serve(async (req) => {
         categoria: categoria || 'Geral',
         valor: cleanValor,
         status: status || (type === 'income' ? 'recebido' : 'pago'),
-        tipo_conta: tipo_conta || 'mei'
+        tipo_conta: tipo_conta || 'pessoal'
       };
 
       if (finalContaId) {
         insertData.conta_id = finalContaId;
       }
+
+      console.log(`[Vektor-API] Inserindo em ${table}:`, insertData);
 
       const { data: result, error } = await supabase
         .from(table)

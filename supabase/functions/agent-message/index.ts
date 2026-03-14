@@ -8,38 +8,41 @@ const corsHeaders = {
 }
 
 const SYSTEM_PROMPT = `
-SISTEMA: VEKTOR_AGENT_CORE
-VOCÊ É O AGENTE FINANCEIRO INTELIGENTE DO VEKTOR.
-SEU OBJETIVO É AJUDAR O USUÁRIO A GERIR SUAS FINANÇAS COM PRECISÃO E VELOCIDADE.
+SISTEMA: VEKTOR_MULTIMODAL_INTEL (v6.0)
+AGENTE: Vektor Assistant
+NATUREZA: Analista Financeiro Multimidia
 
-### DIRETRIZES DE COMPORTAMENTO:
-1. **Identificação**: Você já sabe quem o usuário é (contexto fornecido). Nunca peça ID ou nome.
-2. **Extração de Dados**: Ao identificar um registro (despesa ou receita), extraia:
-   - 'valor': NUMERIC (ex: 50.00). Remova currency symbols.
-   - 'descricao': Texto conciso.
-   - 'categoria': Uma das categorias comuns (Alimentação, Transporte, Saúde, Lazer, Assinaturas, Outros).
-   - 'data': YYYY-MM-DD (use a data atual se não mencionada).
-3. **Imagens**: Se houver imagem, priorize os dados nela contidos (OCR).
-4. **Respostas**: Seja amigável, mas direto ao ponto. Use emojis moderadamente.
+### REGRAS DE ÁUDIO E FOTO:
+1. **ÁUDIO**: O texto processado de áudio pode ser casual ("Gastei 10 reais com café"). Trate como intenção de 'add_transaction'.
+2. **FOTO**: Se receber uma imagem, o GPT-4o extrairá os dados (OCR). Se for um recibo, preencha valor e descrição.
 
-### CAPACIDADES (VIA VEKTOR-API):
-- Consultar saldos (get_balance)
-- Consultar gastos/despesas (get_expenses)
-- Consultar cartões e faturas (get_cards)
-- Registrar transações (add_transaction) -> Requer confirmação por padrão.
+### CONTEXTO DO USUÁRIO (FONTE ÚNICA):
+HISTÓRICO REAL DO BANCO DE DADOS:
+{{HISTORY_CONTEXT}}
 
-### FORMATO DE SAÍDA (Obrigatório JSON):
+### REGRAS DE CRM E COBRANÇA:
+1. **INTENÇÕES**:
+   - 'get_customers': Quando perguntado sobre melhores clientes, quem paga mais, ranking de vendas por cliente.
+   - 'get_billings': Quando perguntado sobre quem deve, cobranças pendentes, faturas atrasadas.
+2. **GRÁFICOS**:
+   - Use 'bar' para rankings de clientes (label: nome do cliente, value: total faturado).
+   - Use 'pie' para status de cobranças se houver distribuição.
+3. **PROATIVIDADE**: Se houver cobranças atrasadas no histórico, mencione-as e sugira um lembrete.
+
+### REGRAS DE INTEGRIDADE:
+- NÃO invente clientes ou valores. Use apenas o que a API retornar ou o que estiver no histórico.
+- Se não houver clientes cadastrados, sugira cadastrar um para começar a gestão.
+
+### FORMATO DE RESPOSTA (JSON):
 {
-  "message": "Sua resposta textual ou confirmação sugerida",
-  "intent": "get_balance | get_expenses | get_cards | add_transaction | none",
-  "api_params": {
-    "type": "income | expense",
-    "valor": 0.00,
-    "descricao": "...",
-    "categoria": "...",
-    "data": "YYYY-MM-DD"
+  "message": "### 🤝 Gestão de Clientes\\n\\n[Análise baseada nos dados...]",
+  "intent": "get_customers | get_billings | get_insights | add_transaction | ...",
+  "visual_data": {
+    "type": "pie | bar",
+    "title": "...",
+    "data": [{ "label": "...", "value": 0.0 }]
   },
-  "suggested_confirmation": "Quero registrar esta [despesa/receita] de R$ [valor]?"
+  "api_params": { "status": "pendente | pago | atrasado" }
 }
 `;
 
@@ -48,8 +51,50 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+
+  if (!openaiKey) {
+      return new Response(JSON.stringify({ error: "OPENAI_API_KEY is not configured in Supabase Secrets" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+      });
+  }
+
   try {
-    const { message, image } = await req.json();
+    const { message: rawMessage, image, audio } = await req.json();
+    let message = rawMessage;
+
+    // Se houver áudio, transcrever primeiro usando Whisper
+    if (audio) {
+      console.log("[agent-message] Transcrevendo áudio com Whisper...");
+      try {
+        const audioBytes = Uint8Array.from(atob(audio), c => c.charCodeAt(0));
+        const formData = new FormData();
+        const audioBlob = new Blob([audioBytes], { type: 'audio/webm' });
+        formData.append('file', audioBlob, 'audio.webm');
+        formData.append('model', 'whisper-1');
+        formData.append('language', 'pt');
+
+        const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${openaiKey}` },
+          body: formData
+        });
+
+        if (whisperRes.ok) {
+          const whisperData = await whisperRes.json();
+          message = whisperData.text;
+          console.log(`[agent-message] Áudio transcrito: "${message}"`);
+        } else {
+          console.error("[agent-message] Erro Whisper:", await whisperRes.text());
+        }
+      } catch (whisperErr) {
+        console.error("[agent-message] Falha na transcrição:", whisperErr);
+      }
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
         return new Response(JSON.stringify({ error: "No authorization header" }), {
@@ -58,25 +103,16 @@ serve(async (req) => {
         });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-
-    if (!openaiKey) {
-        return new Response(JSON.stringify({ error: "OPENAI_API_KEY is not configured in Supabase Secrets" }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 500,
-        });
-    }
-
     const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log("[agent-message] Autenticando usuário...");
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
 
     if (authError || !user) {
+        console.error("[agent-message] Erro de autenticação:", authError);
         return new Response(JSON.stringify({ 
             error: "Não autorizado", 
             details: authError?.message || authError,
-            hint: "Verifique se o token é válido ou se você está logado no projeto correto."
+            hint: "Verifique se o token é válido."
         }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 401,
@@ -84,9 +120,38 @@ serve(async (req) => {
     }
 
     // 1. Interpretar intenção com OpenAI
+    const currentDate = new Date().toISOString().split('T')[0];
     const userContext = `USUÁRIO_AUTENTICADO: Nome: ${user.user_metadata?.full_name || 'Usuário'}, ID: ${user.id}`;
+    
+    // Injeção de Contexto Financeiro Real (Histórico Recente)
+    console.log("[agent-message] Buscando contexto histórico (Receitas + Despesas)...");
+    let historyContext = "SEM_HISTORICO_RECENTE";
+    
+    try {
+      const [recRes, desRes] = await Promise.all([
+        supabase.from('receitas').select('valor, descricao, data').eq('user_id', user.id).order('data', { ascending: false }).limit(30),
+        supabase.from('despesas').select('valor, descricao, categoria, data').eq('user_id', user.id).order('data', { ascending: false }).limit(30)
+      ]);
+      
+      const combined = [
+        ...(recRes.data || []).map(r => ({ ...r, type: 'RECEITA', categoria: 'Recebimento' })),
+        ...(desRes.data || []).map(d => ({ ...d, type: 'DESPESA' }))
+      ].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+       .slice(0, 50);
+
+      if (combined.length > 0) {
+        historyContext = combined.map(t => `${t.data} | ${t.type} | R$ ${t.valor} | ${t.descricao} (${t.categoria})`).join('\n');
+      }
+    } catch (historyErr) {
+      console.error("[agent-message] Erro crítico ao buscar histórico:", historyErr);
+    }
+
+    const fullSystemPrompt = SYSTEM_PROMPT
+      .replace(/{{CURRENT_DATE}}/g, currentDate)
+      .replace('{{HISTORY_CONTEXT}}', historyContext);
+    
     const messages: any[] = [
-      { role: "system", content: SYSTEM_PROMPT.replace('VOCÊ É O AGENTE', `${userContext}\nVOCÊ É O AGENTE`) }
+      { role: "system", content: fullSystemPrompt.replace('VOCÊ É O AGENTE', `${userContext}\nVOCÊ É O AGENTE`) }
     ];
     const userContent: any[] = [{ type: "text", text: message || "Analise esta imagem." }];
     
@@ -95,6 +160,7 @@ serve(async (req) => {
     }
     messages.push({ role: "user", content: userContent });
 
+    console.log("[agent-message] Chamando OpenAI gpt-4o...");
     const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${openaiKey}`, "Content-Type": "application/json" },
@@ -106,55 +172,90 @@ serve(async (req) => {
     });
 
     const aiData = await aiRes.json();
+    if (aiData.error) throw new Error(`OpenAI Error: ${aiData.error.message}`);
+    
     const interpretation = JSON.parse(aiData.choices[0].message.content);
+    console.log("[agent-message] Intenção detectada:", interpretation.intent);
 
     // 2. Orquestrar chamadas para Vektor-API conforme a intenção
     let apiData = null;
-    if (interpretation.intent !== 'none' && interpretation.intent !== 'add_transaction') {
+    if (interpretation.intent !== 'none' && interpretation.intent !== 'add_transaction' && interpretation.intent !== 'get_insights') {
         const apiPath = interpretation.intent.replace('get_', '');
-        const apiRes = await fetch(`${supabaseUrl}/functions/v1/vektor-api/${apiPath}`, {
+        
+        // Construir URL com query params se houver api_params
+        let url = `${supabaseUrl}/functions/v1/vektor-api/${apiPath}`;
+        if (interpretation.api_params && Object.keys(interpretation.api_params).length > 0) {
+          const params = new URLSearchParams(interpretation.api_params);
+          url += `?${params.toString()}`;
+        }
+
+        console.log(`[agent-message] Chamando Vektor-API: ${url}`);
+        const apiRes = await fetch(url, {
             method: 'GET',
             headers: { 'Authorization': authHeader!, 'Content-Type': 'application/json' }
         });
-        apiData = await apiRes.json();
+        if (apiRes.ok) apiData = await apiRes.json();
     }
 
     // 3. Gerar resposta final se houver dados da API
     let finalMessage = interpretation.message;
+    let finalVisualData = interpretation.visual_data;
+
     if (apiData) {
-        // Segunda chamada para formatar os dados reais na resposta
+        console.log("[agent-message] Formatando dados da API com IA...");
         const secondAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: { "Authorization": `Bearer ${openaiKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-                model: "gpt-4o-mini",
+                model: "gpt-4o",
                 messages: [
-                    { role: "system", content: "Formate os dados financeiros recebidos em uma resposta amigável em português." },
-                    { role: "user", content: `Pergunta: ${message}\nDados: ${JSON.stringify(apiData)}` }
-                ]
+                    { role: "system", content: `Você é um refinador de dados financeiros.
+                      Sua tarefa é pegar os dados da API e a intenção do usuário e criar uma resposta amigável e opcionalmente um gráfico.
+                      Responda no formato JSON: { "message": "...", "visual_data": { "type": "pie|bar", "title": "...", "data": [...] } }
+                      Use Markdown nas mensagens.` },
+                    { role: "user", content: `Pergunta: ${message}\nIntenção: ${interpretation.intent}\nDados da API: ${JSON.stringify(apiData)}` }
+                ],
+                response_format: { type: "json_object" }
             })
         });
         const secondAiData = await secondAiRes.json();
-        finalMessage = secondAiData.choices[0].message.content;
+        const refinedResult = JSON.parse(secondAiData.choices[0].message.content);
+        finalMessage = refinedResult.message;
+        if (refinedResult.visual_data) {
+            finalVisualData = refinedResult.visual_data;
+        }
     }
 
     // 4. Persistir no histórico
-    const { data: savedMsg, error: saveError } = await supabase.from('assistant_messages').insert([
+    console.log("[agent-message] Persistindo no histórico...");
+    const finalMetadata = { 
+        ...interpretation, 
+        visual_data: finalVisualData,
+        api_data: apiData 
+    };
+
+    await supabase.from('assistant_messages').insert([
         { user_id: user.id, role: 'user', content: message || "Imagem enviada", image_url: image ? 'base64_hidden' : null },
-        { user_id: user.id, role: 'assistant', content: finalMessage, metadata: { ...interpretation, api_data: apiData } }
+        { user_id: user.id, role: 'assistant', content: finalMessage, metadata: finalMetadata }
     ]);
 
     return new Response(JSON.stringify({
         message: finalMessage,
         intent: interpretation.intent,
-        data: interpretation.api_params || apiData,
+        visual_data: finalVisualData,
+        data: finalMetadata,
         suggested_confirmation: interpretation.suggested_confirmation
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    console.error("[agent-message] CRITICAL ERROR:", err);
+    return new Response(JSON.stringify({ 
+      error: err.message,
+      stack: err.stack,
+      message: "Ocorreu um erro interno na IA Vektor. Por favor, tente novamente." 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+      status: 200, // Retornamos 200 para que o frontend possa ler a mensagem de erro
     });
   }
 });
