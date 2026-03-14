@@ -10,26 +10,36 @@ const corsHeaders = {
 const SYSTEM_PROMPT = `
 SISTEMA: VEKTOR_AGENT_CORE
 VOCÊ É O AGENTE FINANCEIRO INTELIGENTE DO VEKTOR.
-SEU OBJETIVO É AJUDAR O USUÁRIO A GERIR SUAS FINANÇAS.
+SEU OBJETIVO É AJUDAR O USUÁRIO A GERIR SUAS FINANÇAS COM PRECISÃO E VELOCIDADE.
+
+### DIRETRIZES DE COMPORTAMENTO:
+1. **Identificação**: Você já sabe quem o usuário é (contexto fornecido). Nunca peça ID ou nome.
+2. **Extração de Dados**: Ao identificar um registro (despesa ou receita), extraia:
+   - 'valor': NUMERIC (ex: 50.00). Remova currency symbols.
+   - 'descricao': Texto conciso.
+   - 'categoria': Uma das categorias comuns (Alimentação, Transporte, Saúde, Lazer, Assinaturas, Outros).
+   - 'data': YYYY-MM-DD (use a data atual se não mencionada).
+3. **Imagens**: Se houver imagem, priorize os dados nela contidos (OCR).
+4. **Respostas**: Seja amigável, mas direto ao ponto. Use emojis moderadamente.
 
 ### CAPACIDADES (VIA VEKTOR-API):
 - Consultar saldos (get_balance)
 - Consultar gastos/despesas (get_expenses)
 - Consultar cartões e faturas (get_cards)
-- Registrar transações (add_transaction)
+- Registrar transações (add_transaction) -> Requer confirmação por padrão.
 
-### REGRAS:
-1. SEMPRE consulte a API antes de responder sobre dados financeiros.
-2. Se o usuário enviar uma imagem, extraia os dados (valor, data, descrição) e use 'add_transaction' sugerindo confirmação.
-3. Responda em Português do Brasil, de forma profissional e concisa.
-4. Use o user_id fornecido em todas as operações.
-
-### FORMATO DE SAÍDA (JSON):
+### FORMATO DE SAÍDA (Obrigatório JSON):
 {
-  "message": "Sua resposta textual",
+  "message": "Sua resposta textual ou confirmação sugerida",
   "intent": "get_balance | get_expenses | get_cards | add_transaction | none",
-  "api_params": {},
-  "suggested_confirmation": "Texto para o botão se for registro"
+  "api_params": {
+    "type": "income | expense",
+    "valor": 0.00,
+    "descricao": "...",
+    "categoria": "...",
+    "data": "YYYY-MM-DD"
+  },
+  "suggested_confirmation": "Quero registrar esta [despesa/receita] de R$ [valor]?"
 }
 `;
 
@@ -63,14 +73,21 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
 
     if (authError || !user) {
-        return new Response(JSON.stringify({ error: "Não autorizado", details: authError }), {
+        return new Response(JSON.stringify({ 
+            error: "Não autorizado", 
+            details: authError?.message || authError,
+            hint: "Verifique se o token é válido ou se você está logado no projeto correto."
+        }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 401,
         });
     }
 
     // 1. Interpretar intenção com OpenAI
-    const messages: any[] = [{ role: "system", content: SYSTEM_PROMPT }];
+    const userContext = `USUÁRIO_AUTENTICADO: Nome: ${user.user_metadata?.full_name || 'Usuário'}, ID: ${user.id}`;
+    const messages: any[] = [
+      { role: "system", content: SYSTEM_PROMPT.replace('VOCÊ É O AGENTE', `${userContext}\nVOCÊ É O AGENTE`) }
+    ];
     const userContent: any[] = [{ type: "text", text: message || "Analise esta imagem." }];
     
     if (image) {

@@ -35,10 +35,14 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const path = url.pathname.split('/').pop();
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    const path = pathParts.pop();
+    
+    // Se o caminho for o nome da função ou vazio, tentamos inferir pelo método
+    const actualPath = (path === 'vektor-api' || !path) ? null : path;
 
     // GET /balance
-    if (path === 'balance' && req.method === 'GET') {
+    if ((actualPath === 'balance' || (!actualPath && req.method === 'GET')) && req.method === 'GET') {
       const { data: contas, error } = await supabase
         .from('contas_financeiras')
         .select('*')
@@ -54,7 +58,7 @@ serve(async (req) => {
     }
 
     // GET /expenses
-    if (path === 'expenses' && req.method === 'GET') {
+    if (actualPath === 'expenses' && req.method === 'GET') {
       const limit = url.searchParams.get('limit') || '50';
       const { data: expenses, error } = await supabase
         .from('despesas')
@@ -68,7 +72,7 @@ serve(async (req) => {
     }
 
     // GET /cards
-    if (path === 'cards' && req.method === 'GET') {
+    if (actualPath === 'cards' && req.method === 'GET') {
       const { data: cards, error: cardsError } = await supabase
         .from('cartoes_credito')
         .select('*')
@@ -90,22 +94,52 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // POST /transactions
-    if (path === 'transactions' && req.method === 'POST') {
+    // POST /transactions (ou rota padrão para POST)
+    if ((actualPath === 'transactions' || (!actualPath && req.method === 'POST')) && req.method === 'POST') {
       const body = await req.json();
-      const { type, data, descricao, categoria, valor, conta_id, status, tipo_conta } = body;
+      const { type, data: dateParam, descricao, categoria, valor, conta_id, status, tipo_conta } = body;
+
+      // Sanitização do valor (remover R$, trocar vírgula por ponto)
+      let cleanValor = 0;
+      if (typeof valor === 'string') {
+        cleanValor = parseFloat(valor.replace(/[R$\s.]/g, '').replace(',', '.'));
+      } else {
+        cleanValor = parseFloat(valor);
+      }
+
+      if (isNaN(cleanValor)) {
+        return new Response(JSON.stringify({ error: "Valor inválido fornecido" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+
+      // Buscar conta padrão se não houver conta_id
+      let finalContaId = conta_id;
+      if (!finalContaId) {
+        const { data: defaultAcc } = await supabase
+          .from('contas_financeiras')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single();
+        finalContaId = defaultAcc?.id;
+      }
 
       const table = type === 'income' ? 'receitas' : 'despesas';
-      const insertData = {
+      const insertData: any = {
         user_id: user.id,
-        data: data || new Date().toISOString().split('T')[0],
-        descricao,
-        categoria,
-        valor: parseFloat(valor),
-        conta_id,
+        data: dateParam || new Date().toISOString().split('T')[0],
+        descricao: descricao || (type === 'income' ? 'Receita via Agente' : 'Despesa via Agente'),
+        categoria: categoria || 'Geral',
+        valor: cleanValor,
         status: status || (type === 'income' ? 'recebido' : 'pago'),
         tipo_conta: tipo_conta || 'mei'
       };
+
+      if (finalContaId) {
+        insertData.conta_id = finalContaId;
+      }
 
       const { data: result, error } = await supabase
         .from(table)
@@ -113,7 +147,11 @@ serve(async (req) => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Erro ao inserir na tabela ${table}:`, error);
+        throw error;
+      }
+      
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
