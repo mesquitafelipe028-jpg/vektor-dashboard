@@ -14,14 +14,21 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+        return new Response(JSON.stringify({ error: "No authorization header" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 401,
+        });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader?.replace("Bearer ", ""));
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Sessão expirada ou inválida" }), {
+      return new Response(JSON.stringify({ error: "Sessão expirada ou inválida", details: authError }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });

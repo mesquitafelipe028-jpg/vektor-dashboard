@@ -41,14 +41,33 @@ serve(async (req) => {
   try {
     const { message, image } = await req.json();
     const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+        return new Response(JSON.stringify({ error: "No authorization header" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 401,
+        });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader?.replace("Bearer ", ""));
+    if (!openaiKey) {
+        return new Response(JSON.stringify({ error: "OPENAI_API_KEY is not configured in Supabase Secrets" }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+        });
+    }
 
-    if (authError || !user) throw new Error("Não autorizado");
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+
+    if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Não autorizado", details: authError }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 401,
+        });
+    }
 
     // 1. Interpretar intenção com OpenAI
     const messages: any[] = [{ role: "system", content: SYSTEM_PROMPT }];
