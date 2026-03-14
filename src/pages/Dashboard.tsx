@@ -37,6 +37,7 @@ import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
 import { CashFlowProjection } from "@/components/dashboard/CashFlowProjection";
+import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 
 const colorNameToHsl: Record<string, string> = {
@@ -85,6 +86,7 @@ const ChartsFallback = () => (
 
 
 export default function Dashboard() {
+  useDynamicFavicon('system');
   const { user } = useAuth();
   const navigate = useNavigate();
   const [syncModalOpen, setSyncModalOpen] = useState(false);
@@ -142,6 +144,9 @@ export default function Dashboard() {
 
   // Financial view filter effect - fixed dep array
   useEffect(() => {
+    // Ao entrar no dashboard, resetamos a preferência de landing para o app principal
+    localStorage.setItem('vektor_preferred_landing', '/dashboard');
+
     if (!hasCnpj && financialView !== "pessoal") {
       setFinancialView("pessoal");
     }

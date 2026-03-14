@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, TrendingDown, ArrowLeftRight, Receipt, BarChart3,
   Target, Activity, Settings, LogOut, Calculator, CreditCard, Users, Tag,
-  ClipboardList, Clock, Wallet, Briefcase, Upload
+  ClipboardList, Clock, Wallet, Briefcase, Upload, Bot
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 

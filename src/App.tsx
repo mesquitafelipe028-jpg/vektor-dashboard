@@ -4,15 +4,34 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import { SplashScreen } from "./components/branding/SplashScreen";
-import { AssistantVektor } from "./components/AssistantWidget";
 import { FinancialViewProvider } from "./contexts/FinancialViewContext";
 
+const RootRedirect = () => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  
+  if (loading) return null;
+  
+  // No RootRedirect, se não estiver logado ou se estiver na raiz, vamos para o Portal de Escolha
+  if (!user && location.pathname === "/") {
+     return <LandingGate />;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  
+  // Se o usuário já está logado e acessa a raiz, mostramos o Portal também para ele escolher onde quer ir
+  return <LandingGate />;
+};
+
 // Lazy-loaded pages
+const LandingGate = lazy(() => import("./pages/LandingGate"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -74,11 +93,9 @@ const App = () => {
           {!splashDone && <SplashScreen onFinish={handleSplashFinish} />}
           <BrowserRouter>
             <AuthProvider>
-              <FinancialViewProvider>
-                <AssistantVektor />
               <Suspense fallback={<PageFallback />}>
                 <Routes>
-                  <Route path="/" element={<Login />} />
+                  <Route path="/" element={<RootRedirect />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/cadastro" element={<Signup />} />
                   <Route element={<ProtectedRoute />}>

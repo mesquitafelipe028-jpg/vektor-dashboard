@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,12 +13,15 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, user } = useAuth();
 
-  // Redirect already-logged-in users via effect (NOT during render)
+  const from = location.state?.from?.pathname || "/dashboard";
+
+  // Redirect already-logged-in users via effect
   useEffect(() => {
-    if (user) navigate("/dashboard", { replace: true });
-  }, [user, navigate]);
+    if (user) navigate(from, { replace: true });
+  }, [user, navigate, from]);
 
   if (user) return null;
 
@@ -30,7 +33,7 @@ export default function Login() {
     if (error) {
       toast.error("E-mail ou senha inválidos.");
     } else {
-      navigate("/dashboard");
+      navigate(from);
     }
   };
 

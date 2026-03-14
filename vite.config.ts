@@ -28,6 +28,22 @@ export default defineConfig(({ mode }) => ({
         orientation: "portrait-primary",
         start_url: "/",
         scope: "/",
+        shortcuts: [
+          {
+            name: "Vektor Gestão",
+            short_name: "Gestão",
+            description: "Acesse o painel financeiro completo",
+            url: "/dashboard",
+            icons: [{ src: "/pwa-192x192.svg", sizes: "192x192" }]
+          },
+          {
+            name: "Vektor Agente",
+            short_name: "Agente",
+            description: "Assistente de IA independente",
+            url: "/chat",
+            icons: [{ src: "/agent-icon.svg", sizes: "192x192" }]
+          }
+        ],
         icons: [
           { src: "/pwa-192x192.svg", sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
           { src: "/pwa-512x512.svg", sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
