@@ -12,6 +12,27 @@ export const DAS_CONFIG = {
 
 export type ActivityType = keyof typeof DAS_CONFIG;
 
+export type BusinessRegime = "MEI" | "PJ_SIMPLES" | "PJ_NORMAL";
+
+export function getRegime(naturezaJuridica?: string | null): BusinessRegime {
+  if (!naturezaJuridica) return "MEI"; // Default safe fallback
+  const normalized = naturezaJuridica.toLowerCase();
+  
+  // Natureza 213-5 is Empresário Individual (Common for MEI)
+  if (normalized.includes("213-5") || normalized.includes("empresário individual")) {
+    return "MEI";
+  }
+  
+  // Natureza 206-2 (LTDA) or 230-5 (EIRELI) or 224-0 (SA)
+  if (normalized.includes("206-2") || normalized.includes("sociedade empresária limitada") || 
+      normalized.includes("230-5") || normalized.includes("eireli") ||
+      normalized.includes("limitada")) {
+    return "PJ_SIMPLES";
+  }
+
+  return "PJ_NORMAL";
+}
+
 export type Imposto = Tables<"impostos_mei">;
 
 export function getEffectiveStatus(imp: Imposto): "pago" | "pendente" | "vencido" {

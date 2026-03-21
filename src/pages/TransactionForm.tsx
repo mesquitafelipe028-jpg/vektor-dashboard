@@ -19,8 +19,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { expenseCategories, revenueCategories, type CategoryMeta } from "@/lib/categories";
-import { suggestCategory } from "@/lib/utils";
-import { frequenciaLabels, generateInstallments } from "@/types/transactions";
+import { suggestCategory, getLocalDateString, IS_INVESTMENT_REGEX } from "@/lib/utils";
+import { frequenciaLabels, generateInstallments, type TipoTransacao, type Frequencia } from "@/types/transactions";
 import { queryKeys } from "@/lib/queryKeys";
 
 type FormType = "receita" | "despesa";
@@ -40,6 +40,7 @@ interface FormData {
   cliente_id?: string;
   categoria?: string;
   numero_parcelas?: string;
+  parcelamento_tipo?: "total" | "parcela";
   tipo: "expense" | "investment";
 }
 
@@ -73,6 +74,7 @@ const emptyForm: FormData = {
   cliente_id: "",
   categoria: "",
   numero_parcelas: "",
+  parcelamento_tipo: "total",
   tipo: "expense",
 };
 
@@ -246,9 +248,43 @@ export default function TransactionForm() {
         const suggested = suggestCategory(desc);
         if (suggested) updates.categoria = suggested;
       }
-      setForm((prev) => ({ ...prev, ...updates }));
+      
+      // Auto-set type to investment if description matches
+      if (IS_INVESTMENT_REGEX.test(desc)) {
+        updates.tipo = "investment";
+      } else if (!isEditing) {
+        // Only revert to expense if we are NOT editing an existing investment
+        // or if it was previously auto-detected and now changed
+        updates.tipo = "expense";
+      }
+      
+      update(updates);
     } else {
       update({ descricao: desc });
+    }
+  };
+
+  const updateAccountBalance = async (contaId: string, delta: number) => {
+    if (!contaId || delta === 0) return;
+    try {
+      const { data: acc, error: fetchErr } = await supabase
+        .from("contas_financeiras")
+        .select("saldo")
+        .eq("id", contaId)
+        .single();
+      
+      if (fetchErr) throw fetchErr;
+      
+      const newSaldo = (acc?.saldo || 0) + delta;
+      const { error: updateErr } = await supabase
+        .from("contas_financeiras")
+        .update({ saldo: newSaldo } as any)
+        .eq("id", contaId);
+        
+      if (updateErr) throw updateErr;
+      console.log(`[Balance] Account ${contaId} updated by ${delta}. New balance: ${newSaldo}`);
+    } catch (err) {
+      console.error("[Balance] Error updating account balance:", err);
     }
   };
 
@@ -268,10 +304,12 @@ export default function TransactionForm() {
       }
       setErrors({});
 
-      const tipoTransacao = form.tipo_transacao;
+        const todayStr = getLocalDateString();
+        const isFuture = (parsed.data as any).data > todayStr;
+        const tipoTransacao = form.tipo_transacao;
 
-      if (type === "receita") {
-        const status = form.efetivada ? "recebido" : "pendente";
+        if (type === "receita") {
+          const status = form.efetivada ? "recebido" : "pendente";
         if (tipoTransacao === "recorrente" && !isEditing) {
           const freq = form.frequencia as Frequencia;
           const { error } = await supabase.from("receitas").insert({
@@ -306,19 +344,46 @@ export default function TransactionForm() {
           tipo_transacao: tipoTransacao,
           status,
         };
+
         if (isEditing) {
           const { error } = await supabase.from("receitas").update(payload).eq("id", id!);
           if (error) throw error;
+
+          // Balance Sync
+          if (form.conta_id) {
+            const oldVal = (existing as any).valor;
+            const newVal = (parsed.data as any).valor;
+            const isNowSettled = status === "recebido";
+            const wasSettled = (existing as any).status === "recebido";
+
+            let delta = 0;
+            if (!wasSettled && isNowSettled) delta = newVal;
+            else if (wasSettled && !isNowSettled) delta = -oldVal;
+            else if (wasSettled && isNowSettled) delta = newVal - oldVal;
+            
+            if (delta !== 0 && !isFuture) await updateAccountBalance(form.conta_id, delta);
+          }
         } else {
           const { error } = await supabase.from("receitas").insert(payload);
           if (error) throw error;
+
+          // Balance Sync
+          if (status === "recebido" && form.conta_id && !isFuture) {
+            await updateAccountBalance(form.conta_id, (parsed.data as any).valor);
+          }
         }
       } else {
         // Despesa
         const status = form.efetivada ? "pago" : "pendente";
         if (tipoTransacao === "parcelada" && !isEditing) {
           const numParcelas = parseInt(form.numero_parcelas || "1") || 1;
-          const installments = generateInstallments((parsed.data as any).valor, numParcelas, (parsed.data as any).data);
+          const valorInserido = (parsed.data as any).valor;
+          const valorBase = form.parcelamento_tipo === "parcela" 
+            ? valorInserido * numParcelas 
+            : valorInserido;
+          
+          const installments = generateInstallments(valorBase, numParcelas, (parsed.data as any).data);
+          
           const { data: parent, error: parentErr } = await supabase.from("despesas").insert({
             descricao: (parsed.data as any).descricao,
             valor: installments[0].valor,
@@ -330,10 +395,15 @@ export default function TransactionForm() {
             tipo_transacao: "parcelada",
             numero_parcelas: numParcelas,
             parcela_atual: 1,
-            status: "pendente",
+            status: form.efetivada ? "pago" : "pendente",
             tipo: form.tipo,
           } as any).select("id").single();
           if (parentErr) throw parentErr;
+
+          // Balance Sync for first installment
+          if (form.efetivada && form.conta_id && !isFuture) {
+            await updateAccountBalance(form.conta_id, -installments[0].valor);
+          }
           if (installments.length > 1) {
             const children = installments.slice(1).map((inst) => ({
               descricao: (parsed.data as any).descricao,
@@ -390,16 +460,46 @@ export default function TransactionForm() {
         if (isEditing) {
           const { error } = await supabase.from("despesas").update(payload).eq("id", id!);
           if (error) throw error;
+
+          // Balance Sync
+          if (form.conta_id) {
+            const oldVal = (existing as any).valor;
+            const newVal = (parsed.data as any).valor;
+            const isNowSettled = status === "pago";
+            const wasSettled = (existing as any).status === "pago";
+            const isInvestment = form.tipo === "investment";
+
+            let delta = 0;
+            // For expenses, paid status subtracts from balance
+            if (!wasSettled && isNowSettled) delta = -newVal;
+            else if (wasSettled && !isNowSettled) delta = oldVal;
+            else if (wasSettled && isNowSettled) delta = oldVal - newVal;
+            
+            if (delta !== 0 && !isFuture) await updateAccountBalance(form.conta_id, delta);
+          }
         } else {
           const { error } = await supabase.from("despesas").insert(payload);
           if (error) throw error;
+
+          // Balance Sync
+          if (status === "pago" && form.conta_id && !isFuture) {
+            await updateAccountBalance(form.conta_id, -(parsed.data as any).valor);
+          }
         }
       }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.receitas() });
-      qc.invalidateQueries({ queryKey: queryKeys.despesas() });
-      qc.invalidateQueries({ queryKey: queryKeys.dashboard() });
+    onSuccess: async () => {
+      // Invalida as queries de forma mais precisa usando o userId
+      const userId = user?.id;
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.receitas(userId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.despesas(userId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.dashboard(userId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.accounts(userId) }),
+      ]);
+      // Refetch accounts immediately to update balance KPIs
+      await qc.refetchQueries({ queryKey: queryKeys.accounts(userId) });
+
       toast.success(isEditing
         ? `${type === "receita" ? "Receita" : "Despesa"} atualizada!`
         : `${type === "receita" ? "Receita" : "Despesa"} cadastrada!`
@@ -417,11 +517,11 @@ export default function TransactionForm() {
   });
 
   const accentColor = type === "receita"
-    ? "text-emerald-600 dark:text-emerald-400"
-    : "text-red-600 dark:text-red-400";
+    ? "text-primary"
+    : "text-destructive";
   const accentBg = type === "receita"
-    ? "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
-    : "bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600";
+    ? "bg-primary hover:bg-primary/90"
+    : "bg-destructive hover:bg-destructive/90";
   const title = isEditing
     ? type === "receita" ? "Editar Receita" : (form.tipo === "investment" ? "Editar Investimento" : "Editar Despesa")
     : type === "receita" ? "Nova Receita" : (form.tipo === "investment" ? "Novo Investimento" : "Nova Despesa");
@@ -472,7 +572,10 @@ export default function TransactionForm() {
           <DollarSign className={`h-5 w-5 shrink-0 ${accentColor}`} />
           <div className="flex-1">
             <p className="text-xs text-muted-foreground mb-0.5">
-              {form.tipo_transacao === "parcelada" ? "Valor Total (R$)" : "Valor (R$)"}
+              {form.tipo_transacao === "parcelada" 
+                ? (form.parcelamento_tipo === "total" ? "Valor Total (R$)" : "Valor por Parcela (R$)") 
+                : "Valor (R$)"
+              }
             </p>
             <Input
               type="number"
@@ -552,15 +655,51 @@ export default function TransactionForm() {
                       </div>
                     )}
                     {form.tipo_transacao === "parcelada" && type === "despesa" && (
-                      <div className="space-y-2">
+                      <div className="space-y-3 pt-1">
+                        <div className="flex flex-col gap-2">
+                          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Como deseja informar o valor?</p>
+                          <div className="grid grid-cols-2 gap-2">
+                             <button
+                                type="button"
+                                onClick={() => update({ parcelamento_tipo: "total" })}
+                                className={`rounded-lg border py-2 px-2 text-[10px] font-medium text-center transition-all ${
+                                  form.parcelamento_tipo === "total"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border text-muted-foreground hover:bg-muted/50"
+                                }`}
+                             >
+                               Valor Total
+                             </button>
+                             <button
+                                type="button"
+                                onClick={() => update({ parcelamento_tipo: "parcela" })}
+                                className={`rounded-lg border py-2 px-2 text-[10px] font-medium text-center transition-all ${
+                                  form.parcelamento_tipo === "parcela"
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-border text-muted-foreground hover:bg-muted/50"
+                                }`}
+                             >
+                               Valor da Parcela
+                             </button>
+                          </div>
+                        </div>
+
                         <div>
                           <p className="text-[10px] text-muted-foreground mb-1">Número de Parcelas</p>
                           <Input type="number" min="2" max="72" value={form.numero_parcelas || ""} onChange={(e) => update({ numero_parcelas: e.target.value })} placeholder="Ex: 12" className="h-9 text-xs" />
                         </div>
                         {form.valor && form.numero_parcelas && parseInt(form.numero_parcelas) > 1 && (
-                          <p className="text-xs text-muted-foreground">
-                            → {form.numero_parcelas}x de R$ {(parseFloat(form.valor) / parseInt(form.numero_parcelas)).toFixed(2)}
-                          </p>
+                          <div className="bg-muted/50 p-2 rounded-lg border border-border/50">
+                            {form.parcelamento_tipo === "total" ? (
+                              <p className="text-[11px] text-muted-foreground font-medium">
+                                → Serão geradas <span className="text-foreground">{form.numero_parcelas}x</span> de <span className="text-foreground font-bold">R$ {(parseFloat(form.valor) / parseInt(form.numero_parcelas)).toFixed(2)}</span>
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground font-medium">
+                                → Total da compra: <span className="text-foreground font-bold">R$ {(parseFloat(form.valor) * parseInt(form.numero_parcelas)).toFixed(2)}</span> em {form.numero_parcelas} parcelas.
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -591,7 +730,7 @@ export default function TransactionForm() {
           <div className="flex-1">
             <p className="text-sm font-medium">Situação do Pagamento</p>
             <p className="text-xs font-semibold">
-              {type === "receita" ? (form.efetivada ? <span className="text-emerald-600 dark:text-emerald-400">Pago (Recebido)</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>) : (form.efetivada ? <span className="text-emerald-600 dark:text-emerald-400">Pago</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>)}
+              {type === "receita" ? (form.efetivada ? <span className="text-primary">Pago (Recebido)</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>) : (form.efetivada ? <span className="text-primary">Pago</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>)}
             </p>
           </div>
           <Switch checked={form.efetivada} onCheckedChange={(v) => update({ efetivada: v })} />

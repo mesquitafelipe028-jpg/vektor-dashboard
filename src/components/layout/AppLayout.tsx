@@ -20,7 +20,7 @@ export default function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full overflow-x-hidden">
+      <div className="min-h-[100dvh] flex w-full overflow-x-hidden bg-background">
         {!isMobile && <AppSidebar />}
         <div className="flex-1 flex flex-col min-w-0">
           <header className="flex flex-col sticky top-0 z-50 bg-background border-b border-border" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -38,7 +38,7 @@ export default function AppLayout() {
           <main 
             className="flex-1 overflow-x-hidden p-4 sm:p-6 md:pb-6"
             style={{ 
-              paddingBottom: isMobile ? "calc(var(--mobile-nav-height) + var(--safe-area-bottom) + 1rem)" : "1.5rem" 
+              paddingBottom: isMobile ? "calc(var(--mobile-nav-height) + var(--safe-area-bottom))" : "1.5rem" 
             }}
           >
             <Outlet />

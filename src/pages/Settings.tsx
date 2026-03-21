@@ -95,6 +95,10 @@ export default function Settings() {
   const [confirmText, setConfirmText] = useState("");
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
+  // MEI Reset dialog state
+  const [meiResetOpen, setMeiResetOpen] = useState(false);
+  const [meiConfirmText, setMeiConfirmText] = useState("");
+
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
@@ -213,6 +217,33 @@ export default function Settings() {
     onError: () => toast.error("Erro ao limpar dados."),
   });
 
+  const deleteMeiData = useMutation({
+    mutationFn: async () => {
+      // Tables to clean up MEI specific data
+      const tasks = [
+        supabase.from("impostos_mei").delete().eq("user_id", user!.id),
+        (supabase as any).from("empresas").delete().eq("user_id", user!.id),
+        supabase.from("receitas").delete().eq("user_id", user!.id).eq("tipo_conta", "mei"),
+        supabase.from("despesas").delete().eq("user_id", user!.id).eq("tipo_conta", "mei"),
+        (supabase as any).from("contas_financeiras").delete().eq("user_id", user!.id).eq("classificacao", "mei"),
+      ];
+      
+      const results = await Promise.all(tasks);
+      const firstError = results.find(r => r.error);
+      if (firstError) throw firstError.error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      setMeiResetOpen(false);
+      setMeiConfirmText("");
+      toast.success("Dados MEI excluídos com sucesso!");
+    },
+    onError: (err) => {
+      console.error(err);
+      toast.error("Erro ao excluir dados MEI.");
+    },
+  });
+
   const handleLogout = async () => { await signOut(); navigate("/login"); };
 
   // Search filter
@@ -224,6 +255,7 @@ export default function Settings() {
   const showEmpresa = match("empresa", "cnpj", "razão social", "nome fantasia");
   const showNotif = match("notificação", "alerta", "vencimento", "recebimento", "lembrete");
   const showFinanceiro = match("financeiro", "moeda", "fechamento", "dia");
+  const showPrivacidade = match("privacidade", "dados", "ocultar", "mei", "excluir", "limpar");
   const showSistema = match("sistema", "exportar", "apagar", "excluir", "zero", "conta");
   const showSobre = match("sobre", "versão", "termos", "suporte");
 
@@ -454,6 +486,56 @@ export default function Settings() {
               />
             }
           />
+        </SettingsSection>
+      )}
+
+      {/* Dados e Privacidade */}
+      {showPrivacidade && (
+        <SettingsSection icon={Lock} title="Dados e Privacidade" index={sectionIdx++}>
+          <SettingsItem
+            icon={Monitor}
+            title="Ocultar funções MEI"
+            description="Esconde abas e filtros de negócio. Dados não são apagados."
+            rightComponent={
+              <Switch 
+                checked={preferences.ocultar_mei} 
+                onCheckedChange={(v) => updatePreference("ocultar_mei", v)} 
+              />
+            }
+          />
+
+          <SettingsItem icon={Trash2} title="Remover dados MEI" description="Exclui definitivamente registros de CNPJ, impostos e transações MEI.">
+            <AlertDialog open={meiResetOpen} onOpenChange={(open) => { setMeiResetOpen(open); if (!open) setMeiConfirmText(""); }}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="border-destructive text-destructive hover:bg-destructive/10">
+                  Limpar Dados MEI
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir dados empresariais?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação apagará permanentemente transações empresariais, guias DAS e dados do CNPJ. Suas finanças pessoais continuarão intactas. Digite <strong>EXCLUIR MEI</strong> para confirmar.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Input 
+                  placeholder='Digite "EXCLUIR MEI"' 
+                  value={meiConfirmText} 
+                  onChange={(e) => setMeiConfirmText(e.target.value)} 
+                />
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={meiConfirmText !== "EXCLUIR MEI" || deleteMeiData.isPending}
+                    onClick={(e) => { e.preventDefault(); deleteMeiData.mutate(); }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteMeiData.isPending ? "Excluindo..." : "Excluir dados MEI"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </SettingsItem>
         </SettingsSection>
       )}
 

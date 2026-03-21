@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TrendingDown, Pencil, Trash2, Filter, Search, X } from "lucide-react";
-import { formatCurrency, formatDate, expenseCategories as expenseCategoryNames } from "@/lib/utils";
+import { formatCurrency, formatDate, getLocalDateString, expenseCategories as expenseCategoryNames } from "@/lib/utils";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
@@ -62,12 +62,32 @@ export default function Expenses() {
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
+      // 1. Get the transaction data before deleting
+      const { data: item } = await supabase.from("despesas").select("*").eq("id", id).single();
+      
+      const todayStr = getLocalDateString();
+      const isFuture = item && item.data > todayStr;
+
+      if (item && item.status === "pago" && item.conta_id && !isFuture) {
+        // Update balance (add back the value since it was an expense)
+        const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", item.conta_id).single();
+        if (acc) {
+          await supabase.from("contas_financeiras").update({ saldo: (acc.saldo || 0) + item.valor } as any).eq("id", item.conta_id);
+        }
+      }
+
+      // 2. Delete the transaction
       const { error } = await supabase.from("despesas").delete().eq("id", id);
       if (error) throw error;
+      
+      // 3. Handle children
       await (supabase.from("despesas") as any).delete().eq("transacao_pai_id", id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
+      qc.invalidateQueries({ queryKey: ["contas_financeiras", user?.id] });
+      qc.invalidateQueries({ queryKey: ["dashboard", user?.id] });
+      qc.refetchQueries({ queryKey: ["contas_financeiras", user?.id] });
       toast.success("Despesa excluída!");
     },
     onError: () => toast.error("Erro ao excluir despesa."),
@@ -75,11 +95,37 @@ export default function Expenses() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      // 1. Get the transaction data before update
+      const { data: item } = await supabase.from("despesas").select("*").eq("id", id).single();
+      
+      if (item && item.conta_id) {
+        const todayStr = getLocalDateString();
+        const isFuture = item.data > todayStr;
+
+        const wasPaid = item.status === "pago";
+        const isPaid = status === "pago";
+        
+        let delta = 0;
+        if (!wasPaid && isPaid) delta = -item.valor;
+        else if (wasPaid && !isPaid) delta = item.valor;
+        
+        if (delta !== 0 && !isFuture) {
+          const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", item.conta_id).single();
+          if (acc) {
+            await supabase.from("contas_financeiras").update({ saldo: (acc.saldo || 0) + delta } as any).eq("id", item.conta_id);
+          }
+        }
+      }
+
+      // 2. Update status
       const { error } = await supabase.from("despesas").update({ status } as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
+      qc.invalidateQueries({ queryKey: ["contas_financeiras", user?.id] });
+      qc.invalidateQueries({ queryKey: ["dashboard", user?.id] });
+      qc.refetchQueries({ queryKey: ["contas_financeiras", user?.id] });
       toast.success("Status atualizado!");
     },
   });

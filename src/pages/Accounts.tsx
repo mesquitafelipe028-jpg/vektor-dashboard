@@ -215,11 +215,9 @@ export default function Accounts() {
           <p className="text-sm text-muted-foreground">Gerencie suas contas e saldos</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="mr-1 h-4 w-4" /> Nova Conta
-            </Button>
-          </DialogTrigger>
+          <Button onClick={() => { resetForm(); setOpen(true); }}>
+            <Plus className="mr-1 h-4 w-4" /> Nova Conta
+          </Button>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{editingAccount ? "Editar Conta" : "Criar Conta Financeira"}</DialogTitle>

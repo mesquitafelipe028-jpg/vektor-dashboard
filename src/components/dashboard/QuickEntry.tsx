@@ -22,6 +22,7 @@ type ParsedData = {
   valor: number;
   descricao: string;
   categoria: string | null;
+  status: "pago" | "recebido" | "pendente";
 };
 
 export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal" | "mei" }) {
@@ -85,6 +86,13 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
     // 3. Category
     const categoria = suggestCategory(descriptionText) || (type === "receita" ? "Outros" : "Outras Despesas");
 
+    // 4. Status
+    let status: "pago" | "recebido" | "pendente" = type === "receita" ? "recebido" : "pendente";
+    const paidKeywords = ["pago", "paguei", "débito", "debito", "pix", "dinheiro", "efetivado"];
+    if (type === "despesa" && paidKeywords.some(kw => lowerInput.includes(kw))) {
+      status = "pago";
+    }
+
     return {
       isValid: valor > 0 && descriptionText.length > 0,
       rawText: trimmed,
@@ -92,6 +100,7 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
       valor,
       descricao: descriptionText,
       categoria,
+      status,
     };
   }, []);
 
@@ -121,7 +130,7 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
         valor: data.valor,
         data: new Date().toISOString().slice(0, 10),
         tipo_transacao: "unica",
-        status: data.type === "receita" ? "recebido" : "pago",
+        status: data.status,
         tipo_conta: accounts.find(a => a.id === selectedContaId)?.classificacao || (financialView === "tudo" ? "mei" : financialView),
         conta_id: selectedContaId || null,
         user_id: user?.id,
@@ -174,8 +183,8 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
   return (
     <>
       <div className="relative w-full">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Zap className="h-4 w-4 text-muted-foreground" />
+        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+          <Zap className="h-4 w-4 text-primary animate-pulse" />
         </div>
         <Input
           ref={inputRef}
@@ -183,7 +192,7 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Registro Rápido: Ex: 'uber 23' ou 'recebi 300'"
-          className="pl-9 pr-12 h-10 border-dashed border-2 focus-visible:border-solid bg-muted/20"
+          className="pl-10 pr-12 h-11 border border-border/50 bg-muted/30 focus-visible:ring-primary/20 focus-visible:border-primary/30 rounded-xl transition-all shadow-inner"
           autoComplete="off"
         />
         <div className="absolute inset-y-0 right-0 pr-1 flex items-center">
@@ -215,11 +224,11 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
           <DialogHeader className="mb-4">
             <DialogTitle className="flex items-center gap-2 text-xl">
               {parsed?.type === "receita" ? (
-                <Badge variant="default" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 px-2.5 py-1">
+                <Badge variant="default" className="bg-primary/10 text-primary hover:bg-primary/20 px-2.5 py-1">
                   Receita Detectada
                 </Badge>
               ) : (
-                <Badge variant="destructive" className="bg-red-500/10 text-red-600 hover:bg-red-500/20 px-2.5 py-1">
+                <Badge variant="destructive" className="bg-destructive/10 text-destructive hover:bg-destructive/20 px-2.5 py-1">
                   Despesa Detectada
                 </Badge>
               )}
@@ -233,7 +242,7 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
             <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
                <div>
                   <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider font-semibold">Valor</p>
-                  <p className={`text-3xl font-bold font-heading ${parsed.type === "receita" ? "text-emerald-600" : "text-red-500"}`}>
+                  <p className={`text-3xl font-bold font-heading ${parsed.type === "receita" ? "text-primary" : "text-destructive"}`}>
                     {formatCurrency(parsed.valor)}
                   </p>
                </div>
@@ -281,7 +290,7 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
             <Button 
                 onClick={handleConfirm} 
                 disabled={insertData.isPending}
-                className={`w-full sm:w-auto text-white shadow-md ${parsed?.type === "receita" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}
+                className={`w-full sm:w-auto text-white shadow-md ${parsed?.type === "receita" ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"}`}
             >
               {insertData.isPending ? "Salvando..." : "Confirmar"}
             </Button>

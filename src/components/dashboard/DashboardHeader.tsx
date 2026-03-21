@@ -4,6 +4,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Plus, TrendingUp, TrendingDown, User, Briefcase, Layers } from "lucide-react";
 import { useFinancialView, type FinancialView } from "@/contexts/FinancialViewContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardHeaderProps {
   hasCnpj: boolean;
@@ -12,14 +13,20 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ hasCnpj, onSyncOpen }: DashboardHeaderProps) {
   const { view: financialView, setView: setFinancialView } = useFinancialView();
+  const { user } = useAuth();
   const navigate = useNavigate();
+
+  const userName = user?.user_metadata?.nome || "";
+  const firstName = userName.split(" ")[0];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Olá, bem-vindo ao Vektor</h1>
-          <p className="text-sm text-muted-foreground">Seu centro de controle financeiro.</p>
+          <h1 className="font-heading text-2xl font-bold mb-1">
+            Olá, {firstName ? `${firstName},` : ""} bem-vindo ao Vektor
+          </h1>
+          <p className="text-sm text-muted-foreground">Seu centro de controle financeiro</p>
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
@@ -46,25 +53,25 @@ export function DashboardHeader({ hasCnpj, onSyncOpen }: DashboardHeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground font-medium">Visualizar:</span>
+      <div className="flex items-center gap-3 bg-card/30 p-1.5 rounded-xl border border-white/5 w-fit">
+        <span className="text-[10px] uppercase font-bold text-muted-foreground px-2 tracking-wider">Visualizar</span>
         <ToggleGroup
           type="single"
           value={financialView}
           onValueChange={(v) => { if (v) setFinancialView(v as FinancialView); }}
-          className="bg-muted/50 rounded-lg p-1"
+          className="bg-background/20 rounded-lg p-0.5 border border-white/5"
         >
-          <ToggleGroupItem value="pessoal" aria-label="Pessoal" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+          <ToggleGroupItem value="pessoal" aria-label="Pessoal" className="gap-1.5 px-4 h-8 text-xs data-[state=on]:bg-primary/10 data-[state=on]:text-primary data-[state=on]:shadow-none rounded-md transition-all">
             <User className="h-3.5 w-3.5" />
             Pessoal
           </ToggleGroupItem>
           {hasCnpj && (
             <>
-              <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+              <ToggleGroupItem value="mei" aria-label="MEI" className="gap-1.5 px-4 h-8 text-xs data-[state=on]:bg-primary/10 data-[state=on]:text-primary data-[state=on]:shadow-none rounded-md transition-all">
                 <Briefcase className="h-3.5 w-3.5" />
                 MEI
               </ToggleGroupItem>
-              <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+              <ToggleGroupItem value="tudo" aria-label="Tudo" className="gap-1.5 px-4 h-8 text-xs data-[state=on]:bg-primary/10 data-[state=on]:text-primary data-[state=on]:shadow-none rounded-md transition-all">
                 <Layers className="h-3.5 w-3.5" />
                 Tudo
               </ToggleGroupItem>

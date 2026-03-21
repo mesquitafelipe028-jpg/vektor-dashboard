@@ -148,8 +148,8 @@ export function AppSidebar() {
   }, [search]);
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarContent className="gap-0">
+    <Sidebar collapsible="icon" className="bg-sidebar text-sidebar-foreground border-sidebar-border">
+      <SidebarContent className="gap-0 bg-sidebar">
         {/* Logo */}
         <div className="px-4 py-5 border-b border-sidebar-border">
           <LogoVektor size={collapsed ? "sm" : "md"} showText={!collapsed} textClassName="text-sidebar-primary-foreground" />

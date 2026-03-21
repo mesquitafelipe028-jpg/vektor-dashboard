@@ -10,6 +10,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import { SplashScreen } from "./components/branding/SplashScreen";
 import { FinancialViewProvider } from "./contexts/FinancialViewContext";
+import { PWAUpdateHandler } from "./components/pwa/PWAUpdateHandler";
 
 const RootRedirect = () => {
   const { user, loading } = useAuth();
@@ -17,20 +18,17 @@ const RootRedirect = () => {
   
   if (loading) return null;
   
-  // No RootRedirect, se não estiver logado ou se estiver na raiz, vamos para o Portal de Escolha
-  if (!user && location.pathname === "/") {
-     return <LandingGate />;
-  }
-
   if (!user) {
+    // If we're at the root, show the landing page
+    if (location.pathname === "/") return <LandingPage />;
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
   
-  // Se o usuário já está logado e acessa a raiz, mostramos o Portal também para ele escolher onde quer ir
-  return <LandingGate />;
+  return <Navigate to="/dashboard" replace />;
 };
 
 // Lazy-loaded pages
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 const LandingGate = lazy(() => import("./pages/LandingGate"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
@@ -60,6 +58,7 @@ const ClientForm = lazy(() => import("./pages/ClientForm"));
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Projects = lazy(() => import("./pages/Projects"));
 const StatementImport = lazy(() => import("./pages/StatementImport"));
+const Tutorial = lazy(() => import("./pages/Tutorial"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -90,48 +89,50 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <PWAUpdateHandler />
           {!splashDone && <SplashScreen onFinish={handleSplashFinish} />}
           <BrowserRouter>
             <AuthProvider>
-              <Suspense fallback={<PageFallback />}>
+              <FinancialViewProvider>
+                <Suspense fallback={<PageFallback />}>
                 <Routes>
                   <Route path="/" element={<RootRedirect />} />
+                  <Route path="/landing" element={<LandingGate />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/cadastro" element={<Signup />} />
-                  <Route element={<ProtectedRoute />}>
-                    <Route path="/onboarding" element={<Onboarding />} />
+                    <Route path="onboarding" element={<Onboarding />} />
                     <Route element={<AppLayout />}>
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/receitas" element={<Revenues />} />
-                      <Route path="/despesas" element={<Expenses />} />
-                      <Route path="/fluxo-de-caixa" element={<CashFlow />} />
-                      <Route path="/impostos" element={<Taxes />} />
-                      <Route path="/relatorios" element={<Reports />} />
+                      <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="receitas" element={<Revenues />} />
+                      <Route path="despesas" element={<Expenses />} />
+                      <Route path="fluxo-de-caixa" element={<CashFlow />} />
+                      <Route path="impostos" element={<Taxes />} />
+                      <Route path="relatorios" element={<Reports />} />
                       
-                      <Route path="/configuracoes" element={<Settings />} />
-                      <Route path="/clientes" element={<Clients />} />
-                      <Route path="/clientes/:id" element={<ClientDetails />} />
-                      <Route path="/metas" element={<Goals />} />
-                      <Route path="/analise-financeira" element={<FinancialAnalysis />} />
-                      <Route path="/calculadora-investimentos" element={<InvestmentCalculator />} />
+                      <Route path="configuracoes" element={<Settings />} />
+                      <Route path="clientes" element={<Clients />} />
+                      <Route path="clientes/:id" element={<ClientDetails />} />
+                      <Route path="metas" element={<Goals />} />
+                      <Route path="analise-financeira" element={<FinancialAnalysis />} />
+                      <Route path="calculadora-investimentos" element={<InvestmentCalculator />} />
                       
-                      <Route path="/receitas/nova" element={<TransactionForm />} />
-                      <Route path="/receitas/editar/:id" element={<TransactionForm />} />
-                      <Route path="/despesas/nova" element={<TransactionForm />} />
-                      <Route path="/despesas/editar/:id" element={<TransactionForm />} />
-                      <Route path="/clientes/novo" element={<ClientForm />} />
-                      <Route path="/clientes/editar/:id" element={<ClientForm />} />
-                      <Route path="/cartoes" element={<CreditCards />} />
-                      <Route path="/categorias" element={<Categories />} />
-                      <Route path="/contas" element={<Accounts />} />
-                      <Route path="/contas-a-receber" element={<Receivables />} />
-                      <Route path="/timeline" element={<Timeline />} />
-                      <Route path="/mais" element={<More />} />
-                      <Route path="/assinaturas" element={<Subscriptions />} />
-                      <Route path="/projetos" element={<Projects />} />
-                      <Route path="/importar-extrato" element={<StatementImport />} />
+                      <Route path="receitas/nova" element={<TransactionForm />} />
+                      <Route path="receitas/editar/:id" element={<TransactionForm />} />
+                      <Route path="despesas/nova" element={<TransactionForm />} />
+                      <Route path="despesas/editar/:id" element={<TransactionForm />} />
+                      <Route path="clientes/novo" element={<ClientForm />} />
+                      <Route path="clientes/editar/:id" element={<ClientForm />} />
+                      <Route path="cartoes" element={<CreditCards />} />
+                      <Route path="categorias" element={<Categories />} />
+                      <Route path="contas" element={<Accounts />} />
+                      <Route path="contas-a-receber" element={<Receivables />} />
+                      <Route path="timeline" element={<Timeline />} />
+                      <Route path="mais" element={<More />} />
+                      <Route path="assinaturas" element={<Subscriptions />} />
+                      <Route path="projetos" element={<Projects />} />
+                      <Route path="importar-extrato" element={<StatementImport />} />
+                      <Route path="tutorial" element={<Tutorial />} />
                     </Route>
-                  </Route>
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>

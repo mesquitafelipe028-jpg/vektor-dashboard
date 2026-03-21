@@ -99,6 +99,7 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
           cliente_id: clienteId || null,
           forma_pagamento: null,
           user_id: user!.id,
+          status: "recebido",
         });
         if (error) throw error;
       } else {
@@ -108,6 +109,7 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
           data,
           categoria: categoria || null,
           user_id: user!.id,
+          status: "pendente",
         });
         if (error) throw error;
       }

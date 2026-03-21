@@ -57,15 +57,21 @@ interface InvoiceTimelineProps {
 
 // Helpers
 function getPurchaseInvoicePeriod(purchaseDate: string, diaFechamento: number) {
-  const d = new Date(purchaseDate + "T12:00:00");
-  const day = d.getDate();
-  const y = d.getFullYear();
-  const m = d.getMonth();
-  if (day >= diaFechamento) {
-    const next = new Date(y, m + 1, 1);
-    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+  if (!purchaseDate) return "0000-00";
+  try {
+    const d = new Date(purchaseDate + "T12:00:00");
+    if (isNaN(d.getTime())) return "0000-00";
+    const day = d.getDate();
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    if (day >= diaFechamento) {
+      const next = new Date(y, m + 1, 1);
+      return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+    }
+    return `${y}-${String(m + 1).padStart(2, "0")}`;
+  } catch {
+    return "0000-00";
   }
-  return `${y}-${String(m + 1).padStart(2, "0")}`;
 }
 
 function getCurrentInvoicePeriod(diaFechamento: number) {
@@ -81,10 +87,17 @@ function getCurrentInvoicePeriod(diaFechamento: number) {
 }
 
 function formatMonthLabel(mesRef: string) {
-  const [y, m] = mesRef.split("-").map(Number);
-  const d = new Date(y, m - 1);
-  const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  return label.charAt(0).toUpperCase() + label.slice(1);
+  if (!mesRef || !mesRef.includes("-")) return "Mês Indefinido";
+  try {
+    const [y, m] = mesRef.split("-").map(Number);
+    if (isNaN(y) || isNaN(m)) return "Mês Indefinido";
+    const d = new Date(y, m - 1);
+    if (isNaN(d.getTime())) return "Mês Indefinido";
+    const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  } catch {
+    return "Mês Indefinido";
+  }
 }
 
 export function InvoiceTimeline({

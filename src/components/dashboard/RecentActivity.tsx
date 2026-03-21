@@ -28,6 +28,8 @@ interface ActivityItem {
   description: string;
   amount: number;
   date: string;
+  status: string;
+  statusLabel: string;
   icon: any;
   colorClass: string;
   bgClass: string;
@@ -45,8 +47,8 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
     receitas.forEach((r) => {
       let type: ActivityType = "receita";
       let icon = DollarSign;
-      let colorClass = "text-emerald-600 dark:text-emerald-400";
-      let bgClass = "bg-emerald-500/10";
+      let colorClass = "text-primary";
+      let bgClass = "bg-primary/10";
 
       // Transfer Check
       if (
@@ -56,14 +58,14 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
       ) {
         type = "transferencia";
         icon = Building2;
-        colorClass = "text-blue-600 dark:text-blue-400";
-        bgClass = "bg-blue-500/10";
+        colorClass = "text-primary";
+        bgClass = "bg-primary/10";
       } 
       // Billing/Cobranca Check
       else if (r.cliente_id && (r.status === "pendente" || r.status === "atrasado")) {
         type = "cobranca";
         icon = FileText;
-        colorClass = "text-amber-600 dark:text-amber-400";
+        colorClass = "text-amber-500";
         bgClass = "bg-amber-500/10";
       }
 
@@ -73,6 +75,8 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
         description: r.descricao,
         amount: r.valor,
         date: r.data,
+        status: r.status,
+        statusLabel: r.status === "recebido" ? "" : "Pendente",
         icon,
         colorClass,
         bgClass,
@@ -83,8 +87,8 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
     despesas.forEach((d) => {
       let type: ActivityType = "despesa";
       let icon = TrendingDown;
-      let colorClass = "text-red-600 dark:text-red-400";
-      let bgClass = "bg-red-500/10";
+      let colorClass = "text-destructive";
+      let bgClass = "bg-destructive/10";
 
       // Transfer Check
       if (
@@ -93,8 +97,8 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
       ) {
         type = "transferencia";
         icon = Building2;
-        colorClass = "text-blue-600 dark:text-blue-400";
-        bgClass = "bg-blue-500/10";
+        colorClass = "text-primary";
+        bgClass = "bg-primary/10";
       }
 
       unified.push({
@@ -103,6 +107,8 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
         description: d.descricao,
         amount: d.valor,
         date: d.data,
+        status: d.status,
+        statusLabel: d.status === "pago" ? "" : "Pendente",
         icon,
         colorClass,
         bgClass,
@@ -166,15 +172,20 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-0.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-0.5">
                           {getActivityLabel(activity.type)}
+                          {activity.statusLabel && (
+                            <span className="ml-1 px-1 rounded bg-muted text-[8px] font-bold text-muted-foreground uppercase">
+                              {activity.statusLabel}
+                            </span>
+                          )}
                         </p>
-                        <span className={`text-sm font-bold ${activity.type === 'receita' || activity.type === 'cobranca' ? 'text-emerald-600 dark:text-emerald-400' : (activity.type === 'transferencia' ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400')}`}>
+                        <span className={`text-sm font-bold tracking-tight ${activity.type === 'receita' || activity.type === 'cobranca' ? 'text-primary' : (activity.type === 'transferencia' ? 'text-primary' : 'text-destructive')} ${activity.statusLabel ? 'opacity-50' : ''}`}>
                           {activity.type === "receita" || activity.type === "cobranca" ? "+" : "-"}{formatCurrency(activity.amount)}
                         </span>
                       </div>
-                      <p className="text-sm font-medium text-foreground truncate">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{formatDate(activity.date)}</p>
+                      <p className={`text-sm font-semibold text-foreground truncate ${activity.statusLabel ? 'opacity-70' : ''}`}>{activity.description}</p>
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">{formatDate(activity.date)}</p>
                     </div>
                   </motion.div>
                 ))}

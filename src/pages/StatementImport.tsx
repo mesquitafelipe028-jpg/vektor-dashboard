@@ -17,11 +17,13 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Upload, FileText, CheckCircle, AlertTriangle, Sparkles,
-  TrendingUp, TrendingDown, Trash2, RefreshCw,
+  TrendingUp, TrendingDown, Trash2, RefreshCw, Building2,
 } from "lucide-react";
 import { formatCurrency, formatDate, expenseCategories } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useAccounts } from "@/hooks/useAccounts";
+import { queryKeys } from "@/lib/queryKeys";
 
 
 // UI component for Statement Import
@@ -36,6 +38,9 @@ export default function StatementImport() {
   const [transactions, setTransactions] = useState<ImportedTransaction[]>([]);
   const [importing, setImporting] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+
+  const { accounts } = useAccounts();
 
   const handleFileUpload = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -87,23 +92,32 @@ export default function StatementImport() {
     mutationFn: async () => {
       const toImport = transactions.filter((t) => t.selected);
       if (toImport.length === 0) throw new Error("Selecione ao menos uma transação");
+      if (!selectedAccountId) throw new Error("Selecione uma conta para importar");
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      const account = accounts.find(a => a.id === selectedAccountId);
+      const tipoConta = account?.classificacao || "pessoal";
 
       const receitas = toImport.filter((t) => t.tipo === "receita").map((t) => ({
-        user_id: user!.id,
+        user_id: user.id,
         descricao: t.descricao,
         valor: t.valor,
         data: t.data,
         categoria: t.categoria,
         status: "recebido",
+        conta_id: selectedAccountId,
+        tipo_conta: tipoConta,
       }));
 
       const despesas = toImport.filter((t) => t.tipo === "despesa").map((t) => ({
-        user_id: user!.id,
+        user_id: user.id,
         descricao: t.descricao,
         valor: t.valor,
         data: t.data,
         categoria: t.categoria,
         status: "pago",
+        conta_id: selectedAccountId,
+        tipo_conta: tipoConta,
       }));
 
       if (receitas.length > 0) {
@@ -118,9 +132,11 @@ export default function StatementImport() {
       return toImport.length;
     },
     onSuccess: (count) => {
-      qc.invalidateQueries({ queryKey: ["receitas"] });
-      qc.invalidateQueries({ queryKey: ["despesas"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      const userId = user?.id;
+      qc.invalidateQueries({ queryKey: queryKeys.receitas(userId) });
+      qc.invalidateQueries({ queryKey: queryKeys.despesas(userId) });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard(userId) });
+      qc.invalidateQueries({ queryKey: queryKeys.accounts(userId) });
       setImportedCount(count);
       setStep("done");
     },
@@ -201,11 +217,34 @@ export default function StatementImport() {
               {transactions.length} transações identificadas — revise antes de importar
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <div className="w-full sm:w-64">
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                <SelectTrigger className="bg-background">
+                  <div className="flex items-center gap-2 truncate">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Selecionar conta de destino" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.nome} {acc.classificacao === "mei" ? "(MEI)" : "(Pessoal)"}
+                    </SelectItem>
+                  ))}
+                  {accounts.length === 0 && (
+                    <SelectItem value="none" disabled>Nenhuma conta cadastrada</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
             <Button variant="outline" onClick={() => { setStep("upload"); setTransactions([]); }}>
               <RefreshCw className="mr-2 h-4 w-4" /> Novo Arquivo
             </Button>
-            <Button onClick={() => importSelected.mutate()} disabled={selectedCount === 0 || importSelected.isPending}>
+            <Button 
+              onClick={() => importSelected.mutate()} 
+              disabled={selectedCount === 0 || !selectedAccountId || importSelected.isPending}
+            >
               {importSelected.isPending ? "Importando..." : `Importar ${selectedCount} selecionadas`}
             </Button>
           </div>

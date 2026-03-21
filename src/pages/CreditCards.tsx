@@ -3,15 +3,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CreditCard, Plus, HelpCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { parsePDF, type ImportedTransaction } from "@/lib/statement-parser";
+import { Upload, FileText, CheckCircle, RefreshCw, Trash2, Sparkles, TrendingDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 // Icons and Utils
 import { expenseCategories } from "@/lib/utils";
@@ -24,6 +30,9 @@ import { Tables } from "@/integrations/supabase/types";
 import { CardDashboardItem } from "@/components/credit-cards/CardDashboardItem";
 import { InvoiceTimeline } from "@/components/credit-cards/InvoiceTimeline";
 import { PurchaseSimulator } from "@/components/credit-cards/PurchaseSimulator";
+import { PhysicalInvoice } from "@/components/credit-cards/PhysicalInvoice";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileDown } from "lucide-react";
 
 // Types mapping
 type Cartao = Tables<"cartoes_credito">;
@@ -72,6 +81,13 @@ export default function CreditCards() {
   const [compraForm, setCompraForm] = useState<CompraForm>(emptyCompraForm);
 
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+
+  // PDF Import states
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importedTransactions, setImportedTransactions] = useState<ImportedTransaction[]>([]);
+  const [isParsing, setIsParsing] = useState(false);
+  const [viewMode, setViewMode] = useState<"timeline" | "fatura">("timeline");
+  const [selectedMesRef, setSelectedMesRef] = useState<string>(new Date().toISOString().slice(0, 7));
 
   // ── Queries ──
   const { data: cartoes = [], isLoading: loadingCards } = useQuery({
@@ -131,6 +147,23 @@ export default function CreditCards() {
     const disponivel = Math.max(0, (activeCard.limite_total || 0) - totalUsado);
     return { limiteUsado: totalUsado, limiteDisponivel: disponivel };
   }, [activeCard, cardCompras, cardFaturas]);
+
+  const currentPeriod = useMemo(() => {
+    if (!activeCard) return new Date().toISOString().slice(0, 7);
+    const now = new Date();
+    const d = now.getDate();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    if (d >= (activeCard.dia_fechamento || 1)) {
+        const next = new Date(y, m + 1, 1);
+        return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+    }
+    return `${y}-${String(m + 1).padStart(2, "0")}`;
+  }, [activeCard]);
+
+  useMemo(() => {
+    if (currentPeriod && !selectedMesRef) setSelectedMesRef(currentPeriod);
+  }, [currentPeriod, selectedMesRef]);
 
   // ── Card mutations ──
   const saveCard = useMutation({
@@ -300,6 +333,51 @@ export default function CreditCards() {
     setCardForm(emptyCardForm);
   }, []);
 
+  const handlePDFUpload = async (file: File) => {
+    setIsParsing(true);
+    try {
+      const transactions = await parsePDF(file);
+      if (transactions.length === 0) {
+        toast.error("Nenhuma transação identificada no PDF.");
+      } else {
+        setImportedTransactions(transactions);
+        toast.success(`${transactions.length} transações identificadas!`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao processar o PDF.");
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const handleBulkImport = async () => {
+    const toImport = importedTransactions.filter(t => t.selected);
+    if (toImport.length === 0 || !activeCard) return;
+
+    try {
+      const inserts = toImport.map(t => ({
+        descricao: t.descricao,
+        valor: t.valor,
+        data: t.data,
+        categoria: t.categoria || null,
+        cartao_id: activeCard.id,
+        user_id: user!.id,
+      }));
+
+      const { error } = await supabase.from("compras_cartao").insert(inserts);
+      if (error) throw error;
+
+      qc.invalidateQueries({ queryKey: ["compras_cartao", user?.id] });
+      toast.success(`${toImport.length} compras importadas com sucesso!`);
+      setImportDialogOpen(false);
+      setImportedTransactions([]);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao importar transações.");
+    }
+  };
+
   const closeCompraDialog = useCallback(() => {
     setCompraDialogOpen(false);
     setEditingCompraId(null);
@@ -365,9 +443,10 @@ export default function CreditCards() {
 
         {/* Card Dialog */}
         <Dialog open={cardDialogOpen} onOpenChange={(v) => { if (!v) closeCardDialog(); else setCardDialogOpen(true); }}>
-            <DialogContent>
+            <DialogContent aria-describedby="new-card-description">
                 <DialogHeader>
                     <DialogTitle>{editingCardId ? "Editar Cartão" : "Novo Cartão"}</DialogTitle>
+                    <DialogDescription id="new-card-description" className="sr-only">Formulário para cadastrar ou editar detalhes do cartão de crédito.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
                     <div className="space-y-2">
@@ -427,6 +506,9 @@ export default function CreditCards() {
         </div>
         <div className="flex gap-2">
         {activeCard && <PurchaseSimulator cartaoDiaFechamento={activeCard.dia_fechamento || 1} />}
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)} disabled={!activeCard}>
+            <FileText className="mr-2 h-4 w-4" /> Importar PDF
+          </Button>
           <Button onClick={openNewCompra} disabled={!activeCard}>
             <Plus className="mr-2 h-4 w-4" /> Nova Compra
           </Button>
@@ -462,27 +544,78 @@ export default function CreditCards() {
 
       {/* Invoices Timeline */}
       {activeCard && (
-        <div className="mt-8 space-y-4">
-            <h2 className="font-heading text-xl font-bold mb-2 flex items-center gap-2 text-primary">
-                Faturas do Cartão
-            </h2>
-            <InvoiceTimeline
-                cartao={activeCard}
-                compras={cardCompras}
-                faturas={cardFaturas}
-                isMobile={isMobile}
-                onPayInvoice={(mesRef, total) => payInvoice.mutate({ mesRef, total })}
-                onEditCompra={openEditCompra}
-                onDeleteCompra={(id) => deleteCompra.mutate(id)}
-            />
-        </div>
+        <>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                <h2 className="font-heading text-xl font-bold flex items-center gap-2 text-primary">
+                    Faturas do Cartão
+                </h2>
+                <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
+                    <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-auto">
+                        <TabsList className="grid grid-cols-2 w-full sm:w-[240px] h-9">
+                            <TabsTrigger value="timeline" className="text-xs">Timeline</TabsTrigger>
+                            <TabsTrigger value="fatura" className="text-xs">Fatura Real</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                    {viewMode === "fatura" && (
+                        <Select value={selectedMesRef} onValueChange={setSelectedMesRef}>
+                            <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {Array.from(new Set(cardCompras.map(c => getPurchaseInvoicePeriod(c.data, activeCard.dia_fechamento || 1)))).sort().reverse().map(mes => (
+                                    <SelectItem key={mes} value={mes}>{formatMonthLabel(mes)}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                </div>
+            </div>
+
+            {viewMode === "timeline" ? (
+                <InvoiceTimeline
+                    cartao={activeCard}
+                    compras={cardCompras}
+                    faturas={cardFaturas}
+                    isMobile={isMobile}
+                    onPayInvoice={(mesRef, total) => payInvoice.mutate({ mesRef, total })}
+                    onEditCompra={openEditCompra}
+                    onDeleteCompra={(id) => deleteCompra.mutate(id)}
+                />
+            ) : (
+                <div className="max-w-4xl mx-auto py-4">
+                  <PhysicalInvoice
+                      cartao={activeCard}
+                      compras={cardCompras.filter(c => getPurchaseInvoicePeriod(c.data, activeCard.dia_fechamento || 1) === selectedMesRef)}
+                      mesRef={selectedMesRef}
+                      onEditCompra={openEditCompra}
+                      onDeleteCompra={(id) => deleteCompra.mutate(id)}
+                  />
+                  <div className="mt-4 flex justify-end gap-2 print:hidden">
+                    <Button variant="outline" size="sm" onClick={() => window.print()}>
+                      <FileDown className="mr-2 h-4 w-4" /> Exportar / Imprimir
+                    </Button>
+                    <Button 
+                      size="sm"
+                      onClick={() => payInvoice.mutate({ 
+                        mesRef: selectedMesRef, 
+                        total: cardCompras.filter(c => getPurchaseInvoicePeriod(c.data, activeCard.dia_fechamento || 1) === selectedMesRef).reduce((acc, c) => acc + c.valor, 0) 
+                      })}
+                      disabled={cardFaturas.find(f => f.mes_referencia === selectedMesRef)?.status === "paga"}
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" /> {cardFaturas.find(f => f.mes_referencia === selectedMesRef)?.status === "paga" ? "Fatura Paga" : "Confirmar Pagamento"}
+                    </Button>
+                  </div>
+                </div>
+            )}
+        </>
       )}
 
       {/* Card Dialog */}
       <Dialog open={cardDialogOpen} onOpenChange={(v) => { if (!v) closeCardDialog(); else setCardDialogOpen(true); }}>
-        <DialogContent>
+        <DialogContent aria-describedby="card-dialog-description">
             <DialogHeader>
                 <DialogTitle>{editingCardId ? "Editar Cartão" : "Novo Cartão"}</DialogTitle>
+                <DialogDescription id="card-dialog-description" className="sr-only">
+                  Formulário para gerenciar informações do seu cartão de crédito como limite e vencimento.
+                </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
                 <div className="space-y-2">
@@ -531,11 +664,14 @@ export default function CreditCards() {
 
       {/* Purchase Dialog */}
       <Dialog open={compraDialogOpen} onOpenChange={(v) => { if (!v) closeCompraDialog(); else setCompraDialogOpen(true); }}>
-        <DialogContent>
+        <DialogContent aria-describedby="purchase-dialog-description">
           <DialogHeader>
             <DialogTitle className="font-heading">
               {editingCompraId ? "Editar Compra / Parcela" : "Nova Compra Cartão"}
             </DialogTitle>
+            <DialogDescription id="purchase-dialog-description" className="sr-only">
+              Registre uma nova compra ou edite os detalhes de uma parcela existente.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {cartoes.length > 1 && (
@@ -615,6 +751,131 @@ export default function CreditCards() {
           >
             {saveCompra.isPending ? "Salvando..." : editingCompraId ? "Salvar Alterações" : "Registrar Compra"}
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={(v) => { if (!v) { setImportDialogOpen(false); setImportedTransactions([]); } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden" aria-describedby="import-dialog-description">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" /> Importar Fatura (PDF)
+            </DialogTitle>
+            <DialogDescription id="import-dialog-description" className="sr-only">
+              Suba o arquivo PDF da sua fatura para identificar e importar gastos automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto p-6 pt-2">
+            {importedTransactions.length === 0 ? (
+              <div 
+                className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${isParsing ? "opacity-50 pointer-events-none" : "hover:border-primary/50 hover:bg-primary/5"}`}
+                onClick={() => document.getElementById("pdf-input")?.click()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files[0];
+                  if (file && file.type === "application/pdf") handlePDFUpload(file);
+                }}
+                onDragOver={(e) => e.preventDefault()}
+              >
+                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Upload className={`h-8 w-8 text-primary ${isParsing ? "animate-bounce" : ""}`} />
+                </div>
+                <h3 className="font-heading text-lg font-semibold mb-2">
+                  {isParsing ? "Processando PDF..." : "Arraste sua fatura aqui"}
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-xs mb-4">
+                  Selecione o arquivo PDF da sua fatura para identificar as compras automaticamente.
+                </p>
+                <Button variant="outline" disabled={isParsing}>
+                   Selecionar Arquivo
+                </Button>
+                <input 
+                  id="pdf-input" 
+                  type="file" 
+                  accept=".pdf" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePDFUpload(file);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-muted-foreground">
+                    {importedTransactions.length} transações encontradas em <strong>{activeCard?.nome}</strong>
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={() => setImportedTransactions([])} className="text-xs h-7">
+                    <RefreshCw className="h-3 w-3 mr-1" /> Trocar arquivo
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  {importedTransactions.map((t) => (
+                    <div 
+                      key={t.id} 
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${t.selected ? "bg-card border-primary/20" : "bg-muted/30 opacity-60"}`}
+                    >
+                      <Checkbox 
+                        checked={t.selected} 
+                        onCheckedChange={() => {
+                          setImportedTransactions(prev => prev.map(item => item.id === t.id ? { ...item, selected: !item.selected } : item));
+                        }} 
+                      />
+                      <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                        <TrendingDown className="h-4 w-4 text-destructive" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <Input 
+                            value={t.descricao} 
+                            onChange={(e) => {
+                              setImportedTransactions(prev => prev.map(item => item.id === t.id ? { ...item, descricao: e.target.value } : item));
+                            }}
+                            className="h-7 text-xs border-transparent hover:border-input focus:border-primary shadow-none p-0 bg-transparent w-full"
+                          />
+                          <span className="font-bold text-sm ml-2 whitespace-nowrap">{formatCurrency(t.valor)}</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[10px] text-muted-foreground">{formatDate(t.data)}</span>
+                          <Badge variant="outline" className={`text-[8px] h-4 ${t.confidence === 'high' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                            {t.confidence === 'high' ? 'Alta Confiança' : 'Média Confiança'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => setImportedTransactions(prev => prev.filter(item => item.id !== t.id))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {importedTransactions.length > 0 && (
+            <div className="p-6 border-t bg-muted/20 flex flex-col gap-3">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-xs text-muted-foreground font-medium uppercase">Total selecionado</span>
+                <span className="font-bold text-lg text-primary">
+                  {formatCurrency(importedTransactions.filter(t => t.selected).reduce((acc, t) => acc + t.valor, 0))}
+                </span>
+              </div>
+              <Button 
+                className="w-full" 
+                onClick={() => handleBulkImport()} 
+                disabled={saveCompra.isPending || importedTransactions.filter(t => t.selected).length === 0}
+              >
+                {saveCompra.isPending ? "Importando..." : `Importar ${importedTransactions.filter(t => t.selected).length} transações`}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

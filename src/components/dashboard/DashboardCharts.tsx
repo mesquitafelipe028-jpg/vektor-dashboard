@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
+  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -11,9 +11,10 @@ const FALLBACK_COLOR = "hsl(220, 20%, 65%)";
 interface DashboardChartsProps {
   monthlyData: { month: string; receitas: number; despesas: number }[];
   categoryData: { name: string; value: number; fill?: string }[];
+  flowChartData?: { dia: number; receitas: number; despesas: number; saldo: number }[];
 }
 
-export default function DashboardCharts({ monthlyData, categoryData }: DashboardChartsProps) {
+export default function DashboardCharts({ monthlyData, categoryData, flowChartData = [] }: DashboardChartsProps) {
   const isMobile = useIsMobile();
   const animationDuration = isMobile ? 800 : 1500;
   const pieAnimationDuration = isMobile ? 600 : 1400;
@@ -166,6 +167,58 @@ export default function DashboardCharts({ monthlyData, categoryData }: Dashboard
           </div>
         </CardContent>
       </Card>
+
+      {flowChartData.length > 0 && (
+        <Card className="lg:col-span-2 shadow-md border-primary/5 bg-card/50 backdrop-blur-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-heading text-lg flex items-center justify-between">
+              <span>Fluxo de Caixa Diário</span>
+              <span className="text-[10px] text-muted-foreground font-normal uppercase tracking-widest bg-muted/50 px-2 py-0.5 rounded border border-border/50">Este Mês</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 sm:h-72 mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={flowChartData} margin={{ left: 0, right: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradSaldo" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/30" />
+                  <XAxis 
+                    dataKey="dia" 
+                    className="text-[10px] font-semibold text-muted-foreground" 
+                    axisLine={false} 
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    hide 
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(var(--background), 0.8)', 
+                      backdropFilter: 'blur(8px)',
+                      borderColor: 'hsl(var(--border))',
+                      borderRadius: '12px'
+                    }}
+                    formatter={(v: number) => [formatCurrency(v), "Saldo"]} 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="saldo" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#gradSaldo)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -16,8 +16,8 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === "development" && componentTagger(),
     VitePWA({
-      registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "pwa-192x192.svg", "pwa-512x512.svg"],
+      registerType: "prompt",
+      includeAssets: ["favicon.ico", "favicon.png", "pwa-192x192.svg", "pwa-512x512.svg"],
       manifest: {
         name: "Vektor - Clareza Financeira",
         short_name: "Vektor",
@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => ({
         background_color: "#f0f2f8",
         display: "standalone",
         orientation: "portrait-primary",
-        start_url: "/",
+        start_url: "/landing",
         scope: "/",
         shortcuts: [
           {
@@ -35,13 +35,6 @@ export default defineConfig(({ mode }) => ({
             description: "Acesse o painel financeiro completo",
             url: "/dashboard",
             icons: [{ src: "/pwa-192x192.svg", sizes: "192x192" }]
-          },
-          {
-            name: "Vektor Agente",
-            short_name: "Agente",
-            description: "Assistente de IA independente",
-            url: "/chat",
-            icons: [{ src: "/agent-icon.svg", sizes: "192x192" }]
           }
         ],
         icons: [

@@ -5,6 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAccounts } from "@/hooks/useAccounts";
 import { queryKeys } from "@/lib/queryKeys";
 import { calcularLimiteProporcional } from "@/lib/fiscal";
+import { getLocalDateString } from "@/lib/utils";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useFinancialView, type FinancialView as ViewType } from "@/contexts/FinancialViewContext";
 
 export type FinancialView = ViewType;
@@ -14,6 +16,7 @@ export function useFinancialData(overrideView?: FinancialView) {
   const view = overrideView || globalView;
   const { user } = useAuth();
   const { accounts, isLoading: loadingAccounts } = useAccounts();
+  const { preferences } = useUserPreferences();
 
   const { data: receitas = [], isLoading: loadingReceitas } = useQuery({
     queryKey: queryKeys.receitas(user?.id),
@@ -54,31 +57,38 @@ export function useFinancialData(overrideView?: FinancialView) {
   const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   const filteredData = useMemo(() => {
-    const rSet = view === "tudo" ? receitas : receitas.filter((r: any) => r.tipo_conta === view);
-    const dSet = view === "tudo" ? despesas : despesas.filter((d: any) => d.tipo_conta === view);
+    const rSet = view === "tudo" ? receitas : receitas.filter((r: any) => r.tipo_conta === view || !r.tipo_conta);
+    const dSet = view === "tudo" ? despesas : despesas.filter((d: any) => d.tipo_conta === view || !d.tipo_conta);
     
     // STRICT LOGIC: Only settled items
     const settledReceitas = rSet.filter(r => r.status === "recebido");
     const allSettledDespesas = dSet.filter(d => d.status === "pago");
     
     const settledInvestments = allSettledDespesas.filter((d: any) => d.tipo === "investment");
-    const settledDespesas = allSettledDespesas.filter((d: any) => d.tipo !== "investment");
+    
+    // Simplification: Include everything marked as 'pago' in the total monthly exits,
+    // as requested by the user to match the reality of their bank extract.
+    const settledDespesas = allSettledDespesas;
 
-    // Orphaned Balance
+    // Orphaned Balance - ONLY TODAY OR PAST
+    const todayStr = getLocalDateString();
+    // Simplified: If it's settled (pago/recebido), it affects the balance, regardless of date.
     const orphanRecs = settledReceitas.filter(r => !r.conta_id);
     const orphanDesps = settledDespesas.filter(d => !d.conta_id);
-    const orphanInvests = settledInvestments.filter(i => !i.conta_id);
+    // orphanInvests subtraction was removed because they are already included in orphanDesps (merged in settledDespesas)
     
     const orphanedBalance = orphanRecs.reduce((s, r) => s + r.valor, 0) - 
-                           orphanDesps.reduce((s, d) => s + d.valor, 0) -
-                           orphanInvests.reduce((s, i) => s + i.valor, 0);
+                           orphanDesps.reduce((s, d) => s + d.valor, 0);
 
     // Total Balance
     const accountsBalance = accounts
       .filter(a => view === "tudo" || a.classificacao === view)
       .reduce((s, a) => s + (a.saldo || 0), 0);
     
-    const saldoTotal = accounts.length > 0 ? accountsBalance : orphanedBalance;
+    // Saldo Total is the sum of account balances + orphaned activity
+    // NOTE: Linked transactions are reflected directly in account.saldo in DB.
+    // Orphaned transactions (settled but not linked) are added here for global consistency.
+    const saldoTotal = Number(accountsBalance) + Number(orphanedBalance);
 
     // Monthly stats
     const receitasMes = settledReceitas.filter((r) => r.data.startsWith(currentMonth));
@@ -113,8 +123,8 @@ export function useFinancialData(overrideView?: FinancialView) {
       faturamentoAnual,
       taxaPoupanca,
       orphanedBalance,
-      orphanedCount: orphanRecs.length + orphanDesps.length + orphanInvests.length,
-      hasCnpj: !!empresa?.cnpj,
+      orphanedCount: orphanRecs.length + orphanDesps.length,
+      hasCnpj: !!empresa?.cnpj && !preferences.ocultar_mei,
       raw: {
         receitas: rSet,
         despesas: dSet,
@@ -125,7 +135,7 @@ export function useFinancialData(overrideView?: FinancialView) {
   // Loading flags intentionally excluded - they cause unnecessary recomputes.
   // The data arrays (receitas, despesas, accounts) already change reference when data arrives.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receitas, despesas, accounts, empresa, view, currentMonth, currentYear]);
+  }, [receitas, despesas, accounts, empresa, view, currentMonth, currentYear, preferences.ocultar_mei]);
 
   return {
     ...filteredData,

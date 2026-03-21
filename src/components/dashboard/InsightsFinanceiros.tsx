@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { ShieldAlert, AlertTriangle, CheckCircle2, Flame, Lightbulb, PieChart } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 
 export interface InsightsFinanceirosProps {
   faturamentoMes: number;
@@ -24,24 +24,24 @@ interface Insight {
 }
 
 const insightColors: Record<InsightType, string> = {
-  success: "border-l-green-500 bg-green-500/5",
-  warning: "border-l-yellow-500 bg-yellow-500/5",
-  danger: "border-l-red-500 bg-red-500/5",
-  info: "border-l-blue-500 bg-blue-500/5",
+  success: "border-l-primary bg-primary/5",
+  warning: "border-l-warning bg-warning/5",
+  danger: "border-l-destructive bg-destructive/5",
+  info: "border-l-primary/50 bg-primary/5",
 };
 
 const insightIconColors: Record<InsightType, string> = {
-  success: "text-green-600",
-  warning: "text-yellow-600",
-  danger: "text-red-600",
-  info: "text-blue-600",
+  success: "text-primary",
+  warning: "text-warning",
+  danger: "text-destructive",
+  info: "text-primary/70",
 };
 
 const insightBadgeConfig: Record<InsightType, { label: string; badgeClass: string }> = {
   danger: { label: "Alerta", badgeClass: "bg-destructive/10 text-destructive border-destructive/30" },
-  warning: { label: "Atenção", badgeClass: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
-  success: { label: "Positivo", badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" },
-  info: { label: "Dica", badgeClass: "bg-blue-500/10 text-blue-700 border-blue-500/30" },
+  warning: { label: "Atenção", badgeClass: "bg-warning/10 text-warning-foreground border-warning/30" },
+  success: { label: "Positivo", badgeClass: "bg-primary/10 text-primary border-primary/30" },
+  info: { label: "Dica", badgeClass: "bg-primary/10 text-primary/80 border-primary/30" },
 };
 
 export function InsightsFinanceiros({
@@ -165,17 +165,19 @@ export function InsightsFinanceiros({
       </div>
 
       <div className="animate-fade-in transition-all duration-500 ease-in-out">
-        <Card className={`border-l-4 ${insightColors[currentInsight.type]}`}>
-          <CardContent className="p-4 flex items-start gap-3">
-            <currentInsight.icon className={`h-5 w-5 mt-0.5 shrink-0 ${insightIconColors[currentInsight.type]}`} />
+        <Card className={`border-l-4 shadow-sm hover:shadow-md transition-shadow ${insightColors[currentInsight.type]}`}>
+          <CardContent className="p-5 flex items-start gap-4">
+            <div className={cn("p-2 rounded-lg shrink-0", insightColors[currentInsight.type].replace('border-l-4', ''))}>
+              <currentInsight.icon className={`h-5 w-5 ${insightIconColors[currentInsight.type]}`} />
+            </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm font-semibold">{currentInsight.title}</p>
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${insightBadgeConfig[currentInsight.type].badgeClass}`}>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <p className="text-sm font-bold tracking-tight">{currentInsight.title}</p>
+                <Badge variant="outline" className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 ${insightBadgeConfig[currentInsight.type].badgeClass}`}>
                   {insightBadgeConfig[currentInsight.type].label}
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground">{currentInsight.description}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{currentInsight.description}</p>
             </div>
           </CardContent>
         </Card>

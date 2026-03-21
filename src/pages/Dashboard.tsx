@@ -3,7 +3,7 @@ import {
   TrendingUp, TrendingDown, Wallet, Receipt,
   Plus, ShieldCheck, AlertTriangle, ShieldAlert, Target,
   FileText, ArrowUpRight, ArrowDownRight, Building2, X, Bell,
-  Clock, Flame, User, Briefcase, Layers, Info, PiggyBank
+  Clock, Flame, User, Briefcase, Layers, Info, PiggyBank, CalendarIcon
 } from "lucide-react";
 import { AreaChart, Area, XAxis as AXAxis, YAxis as AYAxis, CartesianGrid as ACG, Tooltip as ATooltip, ResponsiveContainer as ARC } from "recharts";
 import { useQuery, useIsFetching } from "@tanstack/react-query";
@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -36,6 +36,7 @@ import { DashboardGoals } from "@/components/dashboard/DashboardGoals";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
+import { DashboardMetasChart } from "@/components/dashboard/DashboardMetasChart";
 import { CashFlowProjection } from "@/components/dashboard/CashFlowProjection";
 import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
@@ -286,10 +287,10 @@ export default function Dashboard() {
     }
 
     // Alertas de cobranças recorrentes/parceladas
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = getLocalDateString();
     const twoDaysLater = new Date();
     twoDaysLater.setDate(twoDaysLater.getDate() + 2);
-    const twoDaysStr = twoDaysLater.toISOString().slice(0, 10);
+    const twoDaysStr = getLocalDateString(twoDaysLater);
 
     // Receitas pendentes (cobranças)
     const receitasPendentes = raw.receitas.filter((r: any) => 
@@ -452,6 +453,8 @@ export default function Dashboard() {
       <Suspense fallback={<ChartsFallback />}>
         <DashboardCharts monthlyData={monthlyData} categoryData={categoryData} flowChartData={flowChartData} />
       </Suspense>
+
+      <DashboardMetasChart metas={metas} />
 
       <DashboardGoals 
         metaAtual={metaAtual} 

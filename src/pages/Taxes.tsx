@@ -29,7 +29,7 @@ import {
 import {
   LIMITE_MEI_ANUAL, DAS_VALOR_PADRAO, DAS_CONFIG, type ActivityType,
   type Imposto, getEffectiveStatus, statusConfig, alertColorMap, situacaoColor,
-  calcularLimiteProporcional
+  calcularLimiteProporcional, getRegime
 } from "@/lib/fiscal";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -162,7 +162,25 @@ export default function Taxes() {
       if (projected > limiteMei) return `Com base no seu faturamento médio mensal de ${formatCurrency(avgMonthly)}, a projeção anual é de ${formatCurrency(projected)}. Isso ultrapassa o limite MEI.`;
     }
     return null;
-  }, [percentLimit, faturamentoAnual, now]);
+  }, [percentLimit, faturamentoAnual, now, limiteMei]);
+
+  const missingDAS = useMemo(() => {
+    const currentComp = now.toLocaleDateString("pt-BR", { month: "long" }).charAt(0).toUpperCase() + now.toLocaleDateString("pt-BR", { month: "long" }).slice(1) + "/" + currentYear;
+    return !impostos.some(imp => imp.competencia === currentComp);
+  }, [impostos, now, currentYear]);
+
+  const overdueImpostos = useMemo(() => impostos.filter(imp => getEffectiveStatus(imp) === "vencido"), [impostos]);
+  const pendingImpostos = useMemo(() => impostos.filter(imp => getEffectiveStatus(imp) === "pendente"), [impostos]);
+
+  const healthStatus = useMemo(() => {
+    if (!empresa) return "unknown";
+    const isActive = empresa.situacao_cadastral?.toLowerCase().includes("ativa");
+    if (!isActive || percentLimit >= 100 || overdueImpostos.length > 0) return "danger";
+    if (percentLimit >= 80 || pendingImpostos.length > 0) return "warning";
+    return "success";
+  }, [empresa, percentLimit, overdueImpostos, pendingImpostos]);
+
+  const regime = useMemo(() => getRegime(empresa?.natureza_juridica), [empresa]);
 
   // ── Mutations ────────────────────────────────────────
   const resetForm = () => { setCompetencia(""); setVencimento(""); setValor(String(dasEstimado)); setEditingId(null); };
@@ -206,8 +224,8 @@ export default function Taxes() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Área Fiscal MEI</h1>
-          <p className="text-muted-foreground text-sm">Gerencie impostos e situação fiscal do seu MEI</p>
+          <h1 className="font-heading text-2xl font-bold">Fiscal & Conformidade</h1>
+          <p className="text-muted-foreground text-sm">Gerencie impostos e situação fiscal da sua empresa</p>
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
@@ -274,9 +292,52 @@ export default function Taxes() {
           <TabsTrigger value="guias-das">Guias DAS</TabsTrigger>
           <TabsTrigger value="faturamento">Faturamento</TabsTrigger>
         </TabsList>
-
+        
         {/* ─── TAB 1: Visão Geral ─── */}
         <TabsContent value="visao-geral" className="space-y-6">
+          {/* Health Summary Banner */}
+          {empresa && (
+            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
+              <div className={`p-4 rounded-xl border flex items-center justify-between ${
+                healthStatus === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300" :
+                healthStatus === "warning" ? "bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-300" :
+                "bg-destructive/10 border-destructive/20 text-destructive"
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                    healthStatus === "success" ? "bg-emerald-500 text-white" :
+                    healthStatus === "warning" ? "bg-amber-500 text-white" :
+                    "bg-destructive text-white"
+                  }`}>
+                    {healthStatus === "success" ? <Shield className="h-5 w-5" /> :
+                     healthStatus === "warning" ? <AlertTriangle className="h-5 w-5" /> :
+                     <ShieldAlert className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-bold">
+                      {healthStatus === "success" ? "Sua empresa está Saudável!" :
+                       healthStatus === "warning" ? "Atenção: Ação necessária" :
+                       "Risco Legal: Regularize agora"}
+                    </h3>
+                    <p className="text-sm opacity-90">
+                      {healthStatus === "success" ? "Todos os impostos em dia e situação cadastral ativa." :
+                       healthStatus === "warning" ? "Existem impostos pendentes ou faturamento próximo ao limite." :
+                       "Situação cadastral irregular ou impostos vencidos identificados."}
+                    </p>
+                  </div>
+                </div>
+                <div className="hidden sm:block">
+                   <Badge variant="outline" className={
+                     healthStatus === "success" ? "border-emerald-500 text-emerald-500" :
+                     healthStatus === "warning" ? "border-amber-500 text-amber-500" :
+                     "border-destructive text-destructive"
+                   }>
+                     {healthStatus === "success" ? "Compliance OK" : healthStatus === "warning" ? "Status: Alerta" : "Status: Crítico"}
+                   </Badge>
+                </div>
+              </div>
+            </motion.div>
+          )}
           {/* CNPJ Card */}
           {empresa ? (
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
@@ -326,67 +387,69 @@ export default function Taxes() {
             </motion.div>
           )}
 
-          {/* Limite Anual */}
-          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
-            <Card className={percentLimit >= 80 ? "border-amber-500/40" : ""}>
-              <CardHeader className="pb-3">
-                <CardTitle className="font-heading text-lg flex items-center gap-2">
-                  <Receipt className="h-5 w-5 text-primary" />
-                  Limite Anual MEI {currentYear}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-                  <div>
-                    <p className="text-2xl sm:text-3xl font-heading font-bold">{formatCurrency(faturamentoAnual)} <span className="text-base font-normal text-muted-foreground">/ {formatCurrency(limiteMei)}</span></p>
-                    <p className="text-sm text-muted-foreground mt-1">Disponível: <span className="font-semibold text-primary">{formatCurrency(limiteDisponivel)}</span></p>
+          {/* Limite Anual (MEI Only) */}
+          {regime === "MEI" && (
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+              <Card className={percentLimit >= 80 ? "border-amber-500/40" : ""}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="font-heading text-lg flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-primary" />
+                    Limite Anual MEI {currentYear}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+                    <div>
+                      <p className="text-2xl sm:text-3xl font-heading font-bold">{formatCurrency(faturamentoAnual)} <span className="text-base font-normal text-muted-foreground">/ {formatCurrency(limiteMei)}</span></p>
+                      <p className="text-sm text-muted-foreground mt-1">Disponível: <span className="font-semibold text-primary">{formatCurrency(limiteDisponivel)}</span></p>
+                    </div>
+                    <span className={`text-lg font-heading font-bold ${percentLimit >= 80 ? "text-amber-600" : "text-primary"}`}>{percentLimit.toFixed(1)}%</span>
                   </div>
-                  <span className={`text-lg font-heading font-bold ${percentLimit >= 80 ? "text-amber-600" : "text-primary"}`}>{percentLimit.toFixed(1)}%</span>
-                </div>
-                <div className="relative">
-                  <Progress value={percentLimit} className="h-4" />
-                  <div className="absolute top-0 h-4 border-l-2 border-amber-500/70" style={{ left: "80%" }} />
-                  <div className="absolute top-0 h-4 border-l-2 border-destructive/70" style={{ left: "90%" }} />
-                </div>
-                <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
-                  <span>0%</span><span className="text-amber-600">80%</span><span className="text-destructive">90%</span><span>100%</span>
-                </div>
-                {percentLimit >= 80 && (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                    <p className="text-sm text-amber-800 dark:text-amber-300">
-                      {percentLimit >= 100 ? "Seu faturamento ultrapassou o limite anual do MEI. Considere migrar de categoria." : `Atenção: ${percentLimit.toFixed(1)}% do limite utilizado. Planeje seus recebimentos.`}
-                    </p>
+                  <div className="relative">
+                    <Progress value={percentLimit} className="h-4" />
+                    <div className="absolute top-0 h-4 border-l-2 border-amber-500/70" style={{ left: "80%" }} />
+                    <div className="absolute top-0 h-4 border-l-2 border-destructive/70" style={{ left: "90%" }} />
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+                  <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+                    <span>0%</span><span className="text-amber-600">80%</span><span className="text-destructive">90%</span><span>100%</span>
+                  </div>
+                  {percentLimit >= 80 && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                      <p className="text-sm text-amber-800 dark:text-amber-300">
+                        {percentLimit >= 100 ? "Seu faturamento ultrapassou o limite anual do MEI. Considere migrar de categoria." : `Atenção: ${percentLimit.toFixed(1)}% do limite utilizado. Planeje seus recebimentos.`}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
-          {/* DAS do Mês */}
+          {/* Impostos do Mês */}
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="font-heading text-lg flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  Imposto MEI do Mês (DAS)
+                  {regime === "MEI" ? "Imposto MEI do Mês (DAS)" : "Impostos do Mês"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="rounded-lg border border-border/50 p-4 space-y-1">
-                    <p className="text-sm text-muted-foreground">Valor estimado do DAS</p>
-                    <p className="text-2xl font-heading font-bold text-primary">{formatCurrency(dasDoMes?.valor ?? DAS_VALOR_PADRAO)}</p>
+                    <p className="text-sm text-muted-foreground">{regime === "MEI" ? "Valor estimado do DAS" : "Valor Total Estimado"}</p>
+                    <p className="text-2xl font-heading font-bold text-primary">{formatCurrency(dasDoMes?.valor ?? (regime === "MEI" ? DAS_VALOR_PADRAO : 0))}</p>
                   </div>
                   <div className="rounded-lg border border-border/50 p-4 space-y-1">
                     <p className="text-sm text-muted-foreground">Vencimento</p>
                     <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground" /><p className="text-lg font-heading font-semibold">{vencimentoDAS}</p></div>
-                    <p className="text-xs text-muted-foreground">Todo dia 20 do mês</p>
+                    <p className="text-xs text-muted-foreground">{regime === "MEI" ? "Todo dia 20 do mês" : "Verifique as datas por tributo"}</p>
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button className="flex-1" onClick={() => window.open("https://www8.receita.fazenda.gov.br/simplesnacional/", "_blank")}>
-                    <ExternalLink className="mr-2 h-4 w-4" />Gerar DAS
+                  <Button className="flex-1" onClick={() => window.open(regime === "MEI" ? "https://www8.receita.fazenda.gov.br/simplesnacional/" : "https://www.gov.br/receitafederal/", "_blank")}>
+                    <ExternalLink className="mr-2 h-4 w-4" />{regime === "MEI" ? "Gerar DAS" : "Portal e-CAC"}
                   </Button>
                   {dasDoMes && getEffectiveStatus(dasDoMes) !== "pago" ? (
                     <Button variant="outline" className="flex-1" onClick={() => togglePagoMutation.mutate({ id: dasDoMes.id, currentStatus: dasDoMes.status })}>
@@ -402,42 +465,86 @@ export default function Taxes() {
             </Card>
           </motion.div>
 
-          {/* Histórico Resumido */}
-          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}>
+          {/* Histórico Recente e Sugestões */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Sugestão DAS */}
+            {missingDAS && regime === "MEI" && (
+                <motion.div initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }}>
+                    <Card className="border-primary/20 bg-primary/5">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                <Lightbulb className="h-4 w-4 text-primary" />
+                                Guia Pendente?
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p className="text-sm text-muted-foreground">Indentificamos que você ainda não gerou a guia de <strong>{now.toLocaleDateString("pt-BR", { month: "long" })}</strong>.</p>
+                            <Button size="sm" className="w-full" onClick={() => {
+                                setCompetencia(now.toLocaleDateString("pt-BR", { month: "long" }).charAt(0).toUpperCase() + now.toLocaleDateString("pt-BR", { month: "long" }).slice(1) + "/" + currentYear);
+                                setVencimento(`${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}-20`);
+                                setValor(String(dasEstimado));
+                                setOpen(true);
+                            }}>Gerar Agora</Button>
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            )}
+
+            {/* Simulador de ME (Aparece em 80%+) */}
+            {percentLimit >= 80 && regime === "MEI" && (
+                <motion.div initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }}>
+                    <Card className="border-amber-500/20 bg-amber-500/5">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-amber-600" />
+                                Planejando o Futuro ME
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-xs text-muted-foreground">Como ME (Simples Nacional), seu imposto inicial seria de aprox. <strong>6%</strong> sobre o faturamento. </p>
+                            <div className="p-2 bg-amber-500/10 rounded-lg text-xs font-mono">
+                                Projeção: {formatCurrency(faturamentoAnual * 0.06)} / ano
+                            </div>
+                            <Button variant="outline" size="sm" className="w-full text-xs">Ver Guia de Migração</Button>
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            )}
+          </div>
+
+          {/* Cofre de Documentos */}
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32 }}>
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 px-6 flex flex-row items-center justify-between">
                 <CardTitle className="font-heading text-lg flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" />
-                  Histórico Recente
+                  <Shield className="h-5 w-5 text-primary" />
+                  Cofre de Documentos
                 </CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 text-xs">
+                   <Plus className="mr-1 h-3 w-3" /> Adicionar
+                </Button>
               </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <p className="text-sm text-muted-foreground py-4">Carregando...</p>
-                ) : impostos.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Nenhuma guia DAS registrada ainda.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {impostos.slice(0, 6).map((imp, i) => {
-                      const effStatus = getEffectiveStatus(imp);
-                      const cfg = statusConfig[effStatus];
-                      return (
-                        <motion.div key={imp.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-base">{cfg.icon}</span>
-                            <span className="font-medium text-sm truncate">{imp.competencia}</span>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <Badge variant="outline" className={`text-xs cursor-pointer ${cfg.class}`} onClick={() => togglePagoMutation.mutate({ id: imp.id, currentStatus: effStatus === "vencido" ? "pendente" : imp.status })}>{cfg.label}</Badge>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
+              <CardContent className="px-6 pb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { name: "Certificado MEI (CCMEI)", date: "Jan/2026", icon: FileText },
+                    { name: "Declaração Anual (DASN)", date: "Pendente", icon: FileText, warning: true },
+                    { name: "Cartão CNPJ", date: "Ativo", icon: Shield },
+                  ].map((doc, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors group cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${doc.warning ? "bg-amber-100 text-amber-600" : "bg-primary/10 text-primary"}`}>
+                          <doc.icon className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{doc.name}</p>
+                          <p className={`text-[10px] ${doc.warning ? "text-amber-600 font-semibold" : "text-muted-foreground"}`}>Ref: {doc.date}</p>
+                        </div>
+                      </div>
+                      <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -561,7 +668,9 @@ export default function Taxes() {
           {/* Cumulative Revenue Chart */}
           <Card>
             <CardHeader>
-              <CardTitle className="font-heading text-lg">Faturamento Acumulado vs Limite MEI</CardTitle>
+              <CardTitle className="font-heading text-lg">
+                Faturamento Acumulado {regime === "MEI" && "vs Limite MEI"}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-52 sm:h-72">
@@ -574,7 +683,9 @@ export default function Taxes() {
                     <Legend />
                     <Bar dataKey="faturamento" name="Faturamento Mensal" fill="hsl(160, 60%, 38%)" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="acumulado" name="Acumulado" fill="hsl(200, 70%, 50%)" radius={[4, 4, 0, 0]} />
-                    <ReferenceLine y={limiteMei} stroke="hsl(0, 72%, 51%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: "Limite MEI", position: "top", fill: "hsl(0, 72%, 51%)", fontSize: 11 }} />
+                    {regime === "MEI" && (
+                      <ReferenceLine y={limiteMei} stroke="hsl(0, 72%, 51%)" strokeDasharray="6 4" strokeWidth={2} label={{ value: "Limite MEI", position: "top", fill: "hsl(0, 72%, 51%)", fontSize: 11 }} />
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </div>

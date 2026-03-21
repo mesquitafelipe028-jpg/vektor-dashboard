@@ -6,13 +6,35 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Financial Formatters
-export const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+export const formatCurrency = (value: number) => {
+  const formatted = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(Math.abs(value));
+  return value < 0 ? `-${formatted}` : formatted;
+};
 
 export const formatDate = (date: string) => {
-  const d = date.includes("T") ? new Date(date) : new Date(date + "T12:00:00");
-  return new Intl.DateTimeFormat("pt-BR").format(d);
+  if (!date) return "—";
+  try {
+    const d = date.includes("T") ? new Date(date) : new Date(date + "T12:00:00");
+    if (isNaN(d.getTime())) return "—";
+    return new Intl.DateTimeFormat("pt-BR").format(d);
+  } catch {
+    return "—";
+  }
 };
+
+/**
+ * Returns the local date string in YYYY-MM-DD format, 
+ * avoiding UTC drift issues.
+ */
+export function getLocalDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 // Financial Categories
 export const revenueCategories = [
@@ -47,7 +69,11 @@ const categoryKeywords: Record<string, string[]> = {
   "Marketing": ["google ads", "facebook ads", "meta ads", "instagram", "marketing", "anúncio", "campanha", "publicidade"],
   "Material de Escritório": ["papelaria", "impressora", "toner", "papel", "caneta", "escritório"],
   "Impostos": ["imposto", "das", "simples nacional", "inss", "irpf", "iss", "icms"],
+  "Investimentos": ["cdb", "rdb", "aplicação", "aporte", "investimento", "bolsa", "ações", "tesouro", "fii"],
 };
+
+export const IS_INVESTMENT_REGEX = /cdb|rdb|aplicação|aporte|investimento|bolsa|ações|tesouro|fii/i;
+export const IS_INTERNAL_TRANSFER_REGEX = /pagamento cartao|fatura cartao|liquidacao fatura|pagamento de fatura/i;
 
 export function suggestCategory(description: string): string | null {
   const lower = description.toLowerCase().trim();

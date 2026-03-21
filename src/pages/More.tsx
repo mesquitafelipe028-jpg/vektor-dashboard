@@ -2,15 +2,17 @@ import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, TrendingDown, ArrowLeftRight, Receipt, BarChart3,
   Target, Activity, Settings, LogOut, Calculator, CreditCard, Users, Tag,
-  ClipboardList, Clock, Wallet, Briefcase, Upload, Bot
+  ClipboardList, Clock, Wallet, Briefcase, Upload, HelpCircle, Sparkles, Lock
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const menuGroups = [
   {
     label: "Visão Geral",
     items: [
       { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", color: "bg-primary/10 text-primary" },
+      { label: "Vektor IA", icon: Sparkles, path: "/ai-chat", color: "bg-primary/10 text-primary", isLocked: true },
       { label: "Fluxo de Caixa", icon: ArrowLeftRight, path: "/fluxo-de-caixa", color: "bg-chart-2/10 text-chart-2" },
       { label: "Timeline", icon: Clock, path: "/timeline", color: "bg-chart-3/10 text-chart-3" },
     ],
@@ -54,6 +56,7 @@ const menuGroups = [
       { label: "Importar Extrato", icon: Upload, path: "/importar-extrato", color: "bg-muted text-muted-foreground" },
       { label: "Categorias", icon: Tag, path: "/categorias", color: "bg-chart-4/10 text-chart-4" },
       { label: "Configurações", icon: Settings, path: "/configuracoes", color: "bg-muted text-muted-foreground" },
+      { label: "Guia Vektor", icon: HelpCircle, path: "/tutorial", color: "bg-primary/10 text-primary" },
     ],
   },
 ];
@@ -75,12 +78,25 @@ export default function More() {
         <div key={group.label} className="space-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">{group.label}</h2>
           <div className="grid grid-cols-3 gap-3">
-            {group.items.map((item) => (
+            {group.items.map((item: any) => (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
-                className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 shadow-sm active:scale-95 transition-transform"
+                onClick={() => {
+                  if (item.isLocked) {
+                    toast.error("Vektor IA disponível no plano Inteligente.", {
+                      description: "Faça o upgrade para liberar o assistente financeiro.",
+                    });
+                  } else {
+                    navigate(item.path);
+                  }
+                }}
+                className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 shadow-sm active:scale-95 transition-transform relative overflow-hidden"
               >
+                {item.isLocked && (
+                  <div className="absolute top-1 right-1">
+                    <Lock className="h-3 w-3 text-muted-foreground/50" />
+                  </div>
+                )}
                 <div className={`flex items-center justify-center h-12 w-12 rounded-full ${item.color}`}>
                   <item.icon className="h-6 w-6" />
                 </div>

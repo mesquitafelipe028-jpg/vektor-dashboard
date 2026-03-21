@@ -29,8 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setUser(null);
       } else {
-        setSession(session);
-        setUser(session?.user ?? null);
+        // SEGURANÇA: Bloquear logins fantasmas (sem e-mail)
+        if (session?.user && !session.user.email) {
+          console.warn("Sessão fantasma detectada (sem e-mail). Desconectando...");
+          supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
       }
       setLoading(false);
     });
@@ -43,8 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(null);
           setUser(null);
         } else {
-          setSession(session);
-          setUser(session?.user ?? null);
+          // SEGURANÇA: Bloquear logins fantasmas em mudanças de estado
+          if (session?.user && !session.user.email) {
+            console.warn("Mudança para sessão fantasma detectada. Desconectando...");
+            supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+          } else {
+            setSession(session);
+            setUser(session?.user ?? null);
+          }
         }
         setLoading(false);
       }

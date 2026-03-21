@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 
 function LayoutSkeleton() {
   return (
@@ -38,11 +39,17 @@ export default function ProtectedRoute() {
   const location = useLocation();
 
   if (loading) return <LayoutSkeleton />;
-  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
+  if (!user || !user.email) return <Navigate to="/login" replace state={{ from: location }} />;
 
   // Redirect to onboarding if not completed (skip if already on /onboarding)
-  const onboardingDone = localStorage.getItem(`vektor_onboarding_done_${user.id}`);
-  if (!onboardingDone && location.pathname !== "/onboarding") {
+  const { preferences, isLoading: prefsLoading } = useUserPreferences();
+  const storageDone = localStorage.getItem(`vektor_onboarding_done_${user.id}`);
+  
+  if (prefsLoading) return <LayoutSkeleton />;
+
+  const isOnboardingDone = preferences.onboarding_completed || storageDone === "true";
+
+  if (!isOnboardingDone && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace state={{ from: location }} />;
   }
 

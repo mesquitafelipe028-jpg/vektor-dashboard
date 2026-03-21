@@ -23,6 +23,7 @@ import {
   parseSpreadsheet, 
   parsePDF 
 } from "@/lib/statement-parser";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 
 const TOTAL_STEPS = 5;
 
@@ -50,6 +51,7 @@ const slideVariants = {
 export default function Onboarding() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { updatePreference } = useUserPreferences();
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
 
@@ -171,6 +173,7 @@ export default function Onboarding() {
 
       localStorage.setItem(`vektor_onboarding_done_${user.id}`, "true");
       localStorage.setItem(`vektor_goal_${user.id}`, goal);
+      updatePreference("onboarding_completed", true);
       toast.success("Tudo pronto! Bem-vindo ao Vektor 🎉");
       navigate("/dashboard", { replace: true });
     } catch (err) {
@@ -184,6 +187,7 @@ export default function Onboarding() {
   const handleSkip = () => {
     if (!user) return;
     localStorage.setItem(`vektor_onboarding_done_${user.id}`, "true");
+    updatePreference("onboarding_completed", true);
     navigate("/dashboard", { replace: true });
   };
 
