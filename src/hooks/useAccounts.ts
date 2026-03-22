@@ -28,9 +28,11 @@ export function useAccounts() {
 
   const createAccount = useMutation({
     mutationFn: async (account: ContaFinanceiraInsert) => {
+      // Remover saldo do payload para evitar erro de coluna inexistente
+      const { saldo, ...payload } = account as any;
       const { data, error } = await supabase
         .from("contas_financeiras")
-        .insert(account as any) // as any needed because of partial match with insert type
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;
@@ -43,9 +45,11 @@ export function useAccounts() {
 
   const updateAccount = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ContaFinanceira> & { id: string }) => {
+      // Remover saldo do payload
+      const { saldo, ...payload } = updates as any;
       const { data, error } = await supabase
         .from("contas_financeiras")
-        .update(updates as any)
+        .update(payload)
         .eq("id", id)
         .select()
         .single();
