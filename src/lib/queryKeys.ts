@@ -11,4 +11,5 @@ export const queryKeys = {
   investimentos: (userId?: string) => ["investimentos", userId],
   dividendos: (userId?: string) => ["dividendos", userId],
   dashboard: (userId?: string) => ["dashboard", userId],
+  transactions: (userId?: string) => ["transactions", userId],
 };

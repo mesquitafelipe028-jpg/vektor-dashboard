@@ -393,8 +393,10 @@ export default function TransactionForm() {
         qc.invalidateQueries({ queryKey: queryKeys.despesas(userId) }),
         qc.invalidateQueries({ queryKey: queryKeys.dashboard(userId) }),
         qc.invalidateQueries({ queryKey: queryKeys.accounts(userId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.transactions(userId) }),
       ]);
       await qc.refetchQueries({ queryKey: queryKeys.accounts(userId) });
+      await qc.refetchQueries({ queryKey: queryKeys.transactions(userId) });
 
       toast.success(isEditing
         ? `${type === "receita" ? "Receita" : "Despesa"} atualizada!`

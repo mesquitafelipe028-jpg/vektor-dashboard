@@ -1,59 +1,32 @@
 -- ==========================================================
--- SCRIPT DE CORREÇÃO: LEDGER 2.0 & VIEW DE CONTAS
+-- SCRIPT DE CORREÇÃO DEFINITIVO (V2)
 -- Execute este script no SQL Editor do Supabase
 -- ==========================================================
 
--- 1. Tabelas Base
-CREATE TABLE IF NOT EXISTS public.transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    account_id UUID REFERENCES public.contas_financeiras(id) ON DELETE SET NULL,
-    description TEXT NOT NULL,
-    amount NUMERIC(12,2) NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
-    status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('pending', 'confirmed')),
-    date DATE NOT NULL DEFAULT CURRENT_DATE,
-    category TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    tipo_transacao TEXT DEFAULT 'unica',
-    frequencia TEXT,
-    data_inicio DATE,
-    data_fim DATE,
-    transacao_pai_id UUID REFERENCES public.transactions(id),
-    forma_pagamento TEXT,
-    cliente_id UUID REFERENCES public.clientes(id) ON DELETE SET NULL,
-    tipo_conta TEXT DEFAULT 'pessoal',
-    numero_parcelas INTEGER,
-    parcela_atual INTEGER,
-    tipo_despesa TEXT DEFAULT 'expense'
-);
+-- 1. Garantir que a coluna user_id existe em ledger_entries (se a tabela já existir)
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ledger_entries' AND column_name='user_id') THEN
+        ALTER TABLE public.ledger_entries ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+END $$;
 
-CREATE TABLE IF NOT EXISTS public.ledger_entries (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    account_id UUID NOT NULL REFERENCES public.contas_financeiras(id) ON DELETE CASCADE,
-    transaction_id UUID NOT NULL REFERENCES public.transactions(id) ON DELETE CASCADE,
-    amount NUMERIC(12,2) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE(transaction_id)
-);
-
--- 2. RLS & Políticas
+-- 2. Garantir tabelas e RLS
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ledger_entries ENABLE ROW LEVEL SECURITY;
 
 DO $$ 
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can manage own transactions' AND tablename = 'transactions') THEN
-        CREATE POLICY "Users can manage own transactions" ON public.transactions FOR ALL USING (auth.uid() = user_id);
-    END IF;
-    
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can manage own ledger' AND tablename = 'ledger_entries') THEN
         CREATE POLICY "Users can manage own ledger" ON public.ledger_entries FOR ALL USING (auth.uid() = user_id);
     END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can manage own transactions' AND tablename = 'transactions') THEN
+        CREATE POLICY "Users can manage own transactions" ON public.transactions FOR ALL USING (auth.uid() = user_id);
+    END IF;
 END $$;
 
--- 3. Remover coluna saldo se existir
+-- 3. Remover coluna saldo se existir em contas_financeiras
 DO $$ 
 BEGIN 
     IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='contas_financeiras' AND column_name='saldo') THEN
@@ -61,7 +34,7 @@ BEGIN
     END IF;
 END $$;
 
--- 4. Funções e Triggers (SECURITY DEFINER para garantir inserção no ledger)
+-- 4. Funções e Triggers (SECURITY DEFINER essencial para o ledger)
 CREATE OR REPLACE FUNCTION public.handle_transaction_ledger_sync()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -102,7 +75,8 @@ FROM
 GRANT SELECT ON public.v_accounts_with_balance TO authenticated;
 GRANT SELECT ON public.v_accounts_with_balance TO service_role;
 
--- 6. Populando dados legados (opcional se já tiver rodado)
+-- 6. Populando dados no Ledger baseado no histórico de transações
+-- Preenche o user_id baseado na transação original
 INSERT INTO public.ledger_entries (user_id, account_id, transaction_id, amount)
 SELECT 
     user_id, 
