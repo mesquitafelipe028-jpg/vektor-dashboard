@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Send, Zap, Banknote, Tag, ArrowRight, Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { suggestCategory, formatCurrency } from "@/lib/utils";
+import { suggestCategory, formatCurrency, getLocalDateString } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Building2, User as UserIcon } from "lucide-react";
@@ -131,7 +131,7 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
 
       try {
         const table = data.type === "receita" ? "receitas" : "despesas";
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = getLocalDateString();
 
         const payload = {
           descricao: data.descricao,

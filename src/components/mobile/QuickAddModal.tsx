@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TrendingUp, TrendingDown, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getLocalDateString } from "@/lib/utils";
 import { expenseCategories, revenueCategories } from "@/lib/utils";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/queryKeys";
@@ -51,7 +51,7 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
   const [showMore, setShowMore] = useState(false);
   const [descricao, setDescricao] = useState("");
   const [clienteId, setClienteId] = useState("");
-  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState(getLocalDateString());
 
   // Reset form when opened
   useEffect(() => {
@@ -64,7 +64,7 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
       setShowMore(false);
       setDescricao("");
       setClienteId("");
-      setData(new Date().toISOString().slice(0, 10));
+      setData(getLocalDateString());
     }
   }, [open]);
 

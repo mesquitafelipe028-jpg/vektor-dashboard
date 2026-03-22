@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Target } from "lucide-react";
+import { getLocalDateString } from "@/lib/utils";
 
 interface CreateGoalModalProps {
   open: boolean;
@@ -54,7 +55,7 @@ export function CreateGoalModal({
 
       const prazoDate = new Date();
       prazoDate.setFullYear(prazoDate.getFullYear() + (parseInt(prazoAnos) || 1));
-      const prazo = prazoDate.toISOString().slice(0, 10);
+      const prazo = getLocalDateString(prazoDate);
 
       const { error } = await (supabase as any).from("metas_financeiras").insert({
         user_id: user.id,

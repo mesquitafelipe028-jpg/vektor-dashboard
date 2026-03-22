@@ -11,7 +11,7 @@ import {
   MessageSquare, DollarSign,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
 import { StatusBadge } from "@/components/transaction/TransactionBadge";
 import { BillingReminderSheet } from "@/components/billing/BillingReminderSheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -83,11 +83,11 @@ export default function Receivables() {
     window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = getLocalDateString();
   const fimSemana = (() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
-    return d.toISOString().slice(0, 10);
+    return getLocalDateString(d);
   })();
 
   const groups = useMemo(() => {
@@ -103,7 +103,7 @@ export default function Receivables() {
       const limitDate = new Date(fimSemana + "T23:59:59");
       
       for (let i = 0; i < 60; i++) { // Aumentar prevenção de loop
-         const dStr = currentD.toISOString().slice(0, 10);
+         const dStr = getLocalDateString(currentD);
          
          if (dStr > hoje && dStr <= fimSemana) {
             const exists = items.some(e => (e.transacao_pai_id === p.id || e.id === p.id) && e.data === dStr);

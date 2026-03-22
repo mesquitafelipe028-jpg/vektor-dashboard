@@ -44,7 +44,7 @@ export async function processIncomingWhatsAppMessage(fromPhoneNumber: string, te
     valor: parsed.valor,
     descricao: parsed.descricao,
     categoria: parsed.categoria || (parsed.tipo === "receita" ? "Outros" : "Outras"),
-    data: new Date().toISOString().split("T")[0],
+    data: new Date().toLocaleDateString('pt-BR').split('/').reverse().join('-'),
     tipo_conta: "mei", // Padrão para integração
     tipo_transacao: "unica"
   };

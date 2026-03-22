@@ -25,7 +25,7 @@ import {
   Briefcase, Plus, Pencil, Trash2, TrendingUp, TrendingDown,
   CheckCircle2, Clock, BarChart3, Link as LinkIcon,
 } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -74,14 +74,14 @@ const emptyForm: ProjetoForm = {
   cliente: "",
   status: "ativo",
   valor_contrato: "",
-  data_inicio: new Date().toISOString().slice(0, 10),
+  data_inicio: getLocalDateString(),
   data_fim: "",
   descricao: "",
   cor: "#8b5cf6",
 };
 
 type LancamentoForm = { tipo: "receita" | "despesa"; descricao: string; valor: string; data: string };
-const emptyLancamento: LancamentoForm = { tipo: "receita", descricao: "", valor: "", data: new Date().toISOString().slice(0, 10) };
+const emptyLancamento: LancamentoForm = { tipo: "receita", descricao: "", valor: "", data: getLocalDateString() };
 
 const statusLabels: Record<StatusProjeto, string> = {
   ativo: "Ativo",
@@ -165,7 +165,7 @@ export default function Projects() {
       descricao: form.descricao || null,
       cor: form.cor,
       lancamentos: editingId ? (projetos.find((p) => p.id === editingId)?.lancamentos ?? []) : [],
-      created_at: editingId ? (projetos.find((p) => p.id === editingId)?.created_at ?? new Date().toISOString()) : new Date().toISOString(),
+      created_at: editingId ? (projetos.find((p) => p.id === editingId)?.created_at ?? getLocalDateString()) : getLocalDateString(),
     };
     if (editingId) {
       saveProjetos(user!.id, projetos.map((p) => (p.id === editingId ? updated : p)));

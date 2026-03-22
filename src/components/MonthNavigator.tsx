@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getLocalDateString } from "@/lib/utils";
 
 interface MonthNavigatorProps {
   month: string; // "YYYY-MM"
@@ -20,8 +21,7 @@ function formatLabel(month: string): string {
 }
 
 export function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return getLocalDateString().slice(0, 7);
 }
 
 export default function MonthNavigator({ month, onChange }: MonthNavigatorProps) {

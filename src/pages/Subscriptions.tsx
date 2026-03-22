@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Pencil, Trash2, RepeatIcon, AlertTriangle, Calendar, TrendingDown } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getLocalDateString } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -102,6 +102,7 @@ function toYearlyValue(valor: number, freq: FrequenciaAssinatura): number {
 
 function getDaysUntilNextCharge(diaCobranca: number): number {
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const thisCycleDate = new Date(today.getFullYear(), today.getMonth(), diaCobranca);
   if (thisCycleDate <= today) {
     thisCycleDate.setMonth(thisCycleDate.getMonth() + 1);
@@ -159,7 +160,7 @@ export default function Subscriptions() {
         ativa: form.ativa,
         cor: form.cor || "#8b5cf6",
         icone: null,
-        created_at: new Date().toISOString(),
+        created_at: getLocalDateString(),
       };
 
       if (editingId) {

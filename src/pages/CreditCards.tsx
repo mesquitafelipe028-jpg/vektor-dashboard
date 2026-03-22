@@ -17,7 +17,7 @@ import { parsePDF, type ImportedTransaction } from "@/lib/statement-parser";
 import { Upload, FileText, CheckCircle, RefreshCw, Trash2, Sparkles, TrendingDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
 
 // Icons and Utils
 import { expenseCategories } from "@/lib/utils";
@@ -43,7 +43,7 @@ type CardForm = { nome: string; limite_total: string; dia_fechamento: string; di
 const emptyCardForm: CardForm = { nome: "", limite_total: "", dia_fechamento: "1", dia_vencimento: "10", tipo_conta: "pessoal", banco: "" };
 
 type CompraForm = { descricao: string; valor: string; data: string; categoria: string; cartao_id: string; parcelas: string };
-const emptyCompraForm: CompraForm = { descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "", cartao_id: "", parcelas: "1" };
+const emptyCompraForm: CompraForm = { descricao: "", valor: "", data: getLocalDateString(), categoria: "", cartao_id: "", parcelas: "1" };
 
 // Helper format month label
 function formatMonthLabel(mesRef: string) {
@@ -87,7 +87,7 @@ export default function CreditCards() {
   const [importedTransactions, setImportedTransactions] = useState<ImportedTransaction[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [viewMode, setViewMode] = useState<"timeline" | "fatura">("timeline");
-  const [selectedMesRef, setSelectedMesRef] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [selectedMesRef, setSelectedMesRef] = useState<string>(getLocalDateString().slice(0, 7));
 
   // ── Queries ──
   const { data: cartoes = [], isLoading: loadingCards } = useQuery({
@@ -149,7 +149,7 @@ export default function CreditCards() {
   }, [activeCard, cardCompras, cardFaturas]);
 
   const currentPeriod = useMemo(() => {
-    if (!activeCard) return new Date().toISOString().slice(0, 7);
+    if (!activeCard) return getLocalDateString().slice(0, 7);
     const now = new Date();
     const d = now.getDate();
     const y = now.getFullYear();
@@ -292,7 +292,7 @@ export default function CreditCards() {
         const { error } = await supabase.from("faturas_cartao").update({
           status: "paga",
           valor_total: total,
-          data_pagamento: new Date().toISOString().slice(0, 10),
+          data_pagamento: getLocalDateString(),
         }).eq("id", existing.id);
         if (error) throw error;
       } else {
@@ -301,7 +301,7 @@ export default function CreditCards() {
           mes_referencia: mesRef,
           valor_total: total,
           status: "paga",
-          data_pagamento: new Date().toISOString().slice(0, 10),
+          data_pagamento: getLocalDateString(),
           user_id: user!.id,
         } as any);
         if (error) throw error;
@@ -311,7 +311,7 @@ export default function CreditCards() {
       const { error: expError } = await supabase.from("despesas").insert({
         descricao: `Fatura ${activeCard.nome} - ${formatMonthLabel(mesRef)}`,
         valor: total,
-        data: new Date().toISOString().slice(0, 10),
+        data: getLocalDateString(),
         categoria: "Cartão de Crédito",
         user_id: user!.id,
       });

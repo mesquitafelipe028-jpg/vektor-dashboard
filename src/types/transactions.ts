@@ -1,4 +1,5 @@
 import { Tables } from "@/integrations/supabase/types";
+import { getLocalDateString } from "@/lib/utils";
 
 // Extended types for transaction columns added via migration
 // (types.ts is auto-generated and read-only, so we extend here)
@@ -84,7 +85,7 @@ export function generateRecurringDates(
       }
     }
     if (end && current > end) break;
-    dates.push(current.toISOString().slice(0, 10));
+    dates.push(getLocalDateString(current));
   }
   return dates;
 }
@@ -105,7 +106,7 @@ export function generateInstallments(
       valor: i === numParcelas - 1
         ? Math.round((valorTotal - valorParcela * (numParcelas - 1)) * 100) / 100
         : valorParcela,
-      data: d.toISOString().slice(0, 10),
+      data: getLocalDateString(d),
       parcela: i + 1,
     });
   }

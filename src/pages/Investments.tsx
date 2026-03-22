@@ -88,6 +88,7 @@ import { useStockQuotes, type QuoteResult } from "@/hooks/useStockQuotes";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, isAfter, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getLocalDateString } from "@/lib/utils";
 
 const fmt = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1009,7 +1010,7 @@ function CarteiraTab({
     quantidade: "",
     preco_medio: "",
     preco_atual: "",
-    data_compra: new Date().toISOString().split("T")[0],
+    data_compra: getLocalDateString(),
     nota: "",
   });
 
@@ -1041,7 +1042,7 @@ function CarteiraTab({
       // Save nota after add - we'll match by nome since we don't have the id yet
       setNotas(prev => ({ ...prev, [`__pending_${form.nome}`]: form.nota }));
     }
-    setForm({ nome: "", tipo: "acao", quantidade: "", preco_medio: "", preco_atual: "", data_compra: new Date().toISOString().split("T")[0], nota: "" });
+    setForm({ nome: "", tipo: "acao", quantidade: "", preco_medio: "", preco_atual: "", data_compra: getLocalDateString(), nota: "" });
     setOpenDialog(false);
   };
 
@@ -1352,7 +1353,7 @@ function DividendosTab({
   const [form, setForm] = useState({
     ativo_id: "",
     valor: "",
-    data_recebimento: new Date().toISOString().split("T")[0],
+    data_recebimento: getLocalDateString(),
     tipo: "dividendo",
   });
   const [mesFiltro, setMesFiltro] = useState<string>("todos");
@@ -1365,7 +1366,7 @@ function DividendosTab({
       data_recebimento: form.data_recebimento,
       tipo: form.tipo,
     });
-    setForm({ ativo_id: "", valor: "", data_recebimento: new Date().toISOString().split("T")[0], tipo: "dividendo" });
+    setForm({ ativo_id: "", valor: "", data_recebimento: getLocalDateString(), tipo: "dividendo" });
     setOpenDialog(false);
   };
 

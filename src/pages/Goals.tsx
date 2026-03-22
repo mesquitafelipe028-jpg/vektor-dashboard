@@ -18,7 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
 import {
   Target, Plus, Pencil, Trash2, TrendingUp, Trophy, Rocket,
   PiggyBank, History, ArrowUpRight, ArrowDownLeft,
@@ -63,7 +63,7 @@ export default function Goals() {
   // Deposit/Withdraw form
   const [txValor, setTxValor] = useState("");
   const [txDesc, setTxDesc] = useState("");
-  const [txData, setTxData] = useState(new Date().toISOString().slice(0, 10));
+  const [txData, setTxData] = useState(getLocalDateString());
 
   const { data: metas = [], isLoading } = useQuery({
     queryKey: ["metas_financeiras", user?.id],
@@ -121,7 +121,7 @@ export default function Goals() {
   const resetTxForm = () => {
     setTxValor("");
     setTxDesc("");
-    setTxData(new Date().toISOString().slice(0, 10));
+    setTxData(getLocalDateString());
   };
 
   const addDeposit = useMutation({
@@ -214,7 +214,7 @@ export default function Goals() {
     });
   };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateString();
 
   const getStatus = (meta: Meta) => {
     const pct = meta.valor_alvo > 0 ? (meta.valor_atual / meta.valor_alvo) * 100 : 0;

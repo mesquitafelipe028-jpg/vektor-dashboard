@@ -12,7 +12,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getLocalDateString } from "@/lib/utils";
 
 interface Receita {
   data: string;
@@ -46,7 +46,7 @@ function addDays(date: Date, days: number) {
 }
 
 function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return getLocalDateString(d);
 }
 
 function formatShortDate(dateStr: string) {

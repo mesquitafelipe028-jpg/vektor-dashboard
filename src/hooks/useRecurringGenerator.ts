@@ -36,7 +36,7 @@ function getNextDate(currentDate: string, freq: Frequencia): string {
     case "mensal": d.setMonth(d.getMonth() + 1); break;
     case "anual": d.setFullYear(d.getFullYear() + 1); break;
   }
-  return d.toISOString().slice(0, 10);
+  return getLocalDateString(d);
 }
 
 async function generateNext(table: "receitas" | "despesas", userId: string) {
@@ -50,7 +50,7 @@ async function generateNext(table: "receitas" | "despesas", userId: string) {
 
   if (error || !parents?.length) return;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateString();
 
   for (const parent of parents) {
     const p = parent as any;

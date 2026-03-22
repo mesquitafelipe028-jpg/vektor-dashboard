@@ -10,7 +10,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getLocalDateString } from "@/lib/utils";
 import { Calculator } from "lucide-react";
 
 interface SimulatorProps {
@@ -20,7 +20,7 @@ interface SimulatorProps {
 export function PurchaseSimulator({ cartaoDiaFechamento }: SimulatorProps) {
   const [valorTotal, setValorTotal] = useState("");
   const [parcelas, setParcelas] = useState("1");
-  const [dataCompra, setDataCompra] = useState(new Date().toISOString().slice(0, 10));
+  const [dataCompra, setDataCompra] = useState(getLocalDateString());
 
   const simulacao = useMemo(() => {
     const valorNum = parseFloat(valorTotal);

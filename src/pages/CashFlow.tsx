@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { ArrowLeftRight, TrendingUp, TrendingDown, CalendarClock, ChevronDown, Repeat, AlertTriangle, Info } from "lucide-react";
 import { motion } from "framer-motion";
@@ -29,10 +29,10 @@ export default function CashFlow() {
   const receitas = (raw.receitas as unknown as ReceitaExtended[]) || [];
   const despesas = (raw.despesas as unknown as DespesaExtended[]) || [];
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = getLocalDateString();
   const end30 = new Date();
   end30.setDate(end30.getDate() + 30);
-  const endStr = end30.toISOString().slice(0, 10);
+  const endStr = getLocalDateString(end30);
 
   // --- PROJECTION ENGINE ---
   const projections = useMemo(() => {
@@ -55,7 +55,7 @@ export default function CashFlow() {
         const existingDates = new Set(list.filter(item => item.transacao_pai_id === p.id || item.id === p.id).map(item => item.data));
         
         for (let i = 0; i < 60; i++) {
-          const dStr = currentD.toISOString().slice(0, 10);
+          const dStr = getLocalDateString(currentD);
           if (dStr > hoje && dStr <= endStr && !existingDates.has(dStr)) {
             items.push({ date: dStr, descricao: p.descricao, tipo, valor: p.valor, isProjected: true });
           }
@@ -93,7 +93,7 @@ export default function CashFlow() {
     for (let i = 0; i <= 30; i++) {
       const d = new Date(now);
       d.setDate(d.getDate() + i);
-      const dStr = d.toISOString().slice(0, 10);
+      const dStr = getLocalDateString(d);
       
       const dayMovements = projections.filter(p => p.date === dStr);
       dayMovements.forEach(m => {

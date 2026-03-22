@@ -1,5 +1,7 @@
 import { DespesaExtended, ReceitaExtended } from "@/types/transactions";
 import { ContaFinanceira } from "@/types/accounts";
+import { formatInTimeZone } from "date-fns-tz";
+import { ptBR } from "date-fns/locale";
 
 export interface FinancialStats {
   saldoTotal: number;
@@ -157,17 +159,15 @@ export class FinanceService {
     view: FinancialView,
     count = 6
   ): MonthlyData[] {
-    const now = new Date();
+    const today = new Date(); // browser local is fine for relative month calc
     const rFiltered = this.filterByView(receitas, view).filter((r) => r.status === "recebido");
     const dFiltered = this.filterByView(despesas, view).filter((d) => d.status === "pago");
 
     return Array.from({ length: count }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (count - 1 - i), 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = d
-        .toLocaleDateString("pt-BR", { month: "short" })
-        .replace(".", "")
-        .replace(/^\w/, (c) => c.toUpperCase());
+      const d = new Date(today.getFullYear(), today.getMonth() - (count - 1 - i), 1);
+      const key = formatInTimeZone(d, "America/Sao_Paulo", "yyyy-MM");
+      const labelRaw = formatInTimeZone(d, "America/Sao_Paulo", "MMM", { locale: ptBR });
+      const label = labelRaw.charAt(0).toUpperCase() + labelRaw.slice(1).replace(".", "");
 
       const rec = rFiltered.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
       const desp = dFiltered.filter((d) => d.data.startsWith(key)).reduce((s, d) => s + d.valor, 0);

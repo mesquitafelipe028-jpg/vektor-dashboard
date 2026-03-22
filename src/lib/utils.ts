@@ -1,5 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { formatInTimeZone } from "date-fns-tz";
+import { parseISO } from "date-fns";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -14,12 +16,14 @@ export const formatCurrency = (value: number) => {
   return value < 0 ? `-${formatted}` : formatted;
 };
 
+export const TIMEZONE = "America/Sao_Paulo";
+
 export const formatDate = (date: string) => {
   if (!date) return "—";
   try {
-    const d = date.includes("T") ? new Date(date) : new Date(date + "T12:00:00");
+    const d = date.includes("T") ? parseISO(date) : parseISO(`${date}T12:00:00`);
     if (isNaN(d.getTime())) return "—";
-    return new Intl.DateTimeFormat("pt-BR").format(d);
+    return formatInTimeZone(d, TIMEZONE, "dd/MM/yyyy");
   } catch {
     return "—";
   }
@@ -27,13 +31,11 @@ export const formatDate = (date: string) => {
 
 /**
  * Returns the local date string in YYYY-MM-DD format, 
- * avoiding UTC drift issues.
+ * strictly respecting the America/Sao_Paulo timezone.
  */
-export function getLocalDateString(date: Date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+export function getLocalDateString(date: Date | string = new Date()): string {
+  const d = typeof date === "string" ? parseISO(date) : date;
+  return formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
 }
 
 // Financial Categories

@@ -10,6 +10,7 @@ import { FinanceService, type FinancialView } from "@/lib/financeService";
 import { calcularLimiteProporcional } from "@/lib/fiscal";
 import { type DespesaExtended, type ReceitaExtended } from "@/types/transactions";
 import { type ContaFinanceira } from "@/types/accounts";
+import { getLocalDateString } from "@/lib/utils";
 
 interface FinancialDataState {
   saldoTotal: number;
@@ -74,9 +75,9 @@ export function FinancialDataProvider({ children }: { children: React.ReactNode 
 
   // 1. Memoize raw results based on the view
   const processedData = useMemo(() => {
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const currentYear = String(now.getFullYear());
+    const today = getLocalDateString();
+    const currentMonth = today.slice(0, 7); // YYYY-MM
+    const currentYear = today.slice(0, 4); // YYYY
 
     // We calculate for the global view. Components can still override local if needed,
     // but the global context handles the default app state.

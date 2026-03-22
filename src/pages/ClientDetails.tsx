@@ -19,7 +19,7 @@ import {
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
 import { TransactionTypeBadge, StatusBadge } from "@/components/transaction/TransactionBadge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
@@ -84,7 +84,7 @@ export default function ClientDetails() {
       .filter((r) => r.status === "pendente" || r.status === "atrasado")
       .reduce((s, r) => s + r.valor, 0);
     const ultimoPagamento = receitas.find((r) => r.status === "recebido")?.data ?? null;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = getLocalDateString();
     const pendentes = receitas.filter((r) => r.status === "pendente" || r.status === "atrasado");
     
     // Get actual next charge from pending or from projections
@@ -101,7 +101,7 @@ export default function ClientDetails() {
 
   // --- Future projections for recurring charges ---
   const projections = useMemo(() => {
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = getLocalDateString();
     const parentRecurrentes = receitas.filter(
       (r) => r.tipo_transacao === "recorrente" && !r.transacao_pai_id && r.frequencia
     );
@@ -115,7 +115,7 @@ export default function ClientDetails() {
       );
       let currentD = new Date(r.data + "T00:00:00");
       for (let i = 0; i < 60; i++) {
-        const dStr = currentD.toISOString().slice(0, 10);
+        const dStr = getLocalDateString(currentD);
         if (dStr > hoje && !existingDates.has(dStr)) {
           allProjections.push({
             id: r.id,

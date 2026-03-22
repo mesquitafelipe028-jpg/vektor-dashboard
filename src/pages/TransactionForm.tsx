@@ -64,10 +64,10 @@ const despesaSchema = z.object({
 const emptyForm: FormData = {
   descricao: "",
   valor: "",
-  data: new Date().toISOString().slice(0, 10),
+  data: getLocalDateString(),
   tipo_transacao: "unica",
   frequencia: "",
-  data_inicio: new Date().toISOString().slice(0, 10),
+  data_inicio: getLocalDateString(),
   data_fim: "",
   tipo_conta: "mei",
   conta_id: "",
