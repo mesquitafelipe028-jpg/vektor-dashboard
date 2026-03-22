@@ -15,7 +15,7 @@ import { BankLogo, banks } from "@/lib/banks";
 import {
   Plus, Trash2, Pencil, Banknote, Smartphone, PiggyBank, CreditCard,
   TrendingUp, Wallet, Building2, CircleDollarSign, Landmark, ShieldCheck,
-  Gem, Star, Briefcase, Heart, Zap, LucideIcon,
+  Gem, Star, Briefcase, Heart, Zap, LucideIcon, ArrowRightLeft,
 } from "lucide-react";
 import type { AccountType, AccountClassification, ContaFinanceiraInsert } from "@/types/accounts";
 
@@ -64,67 +64,52 @@ export default function Accounts() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [shouldUpdateBalance, setShouldUpdateBalance] = useState(true);
 
+  // Transfer state
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferOrigin, setTransferOrigin] = useState("");
+  const [transferDest, setTransferDest] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferDescription, setTransferDescription] = useState("Transferência entre contas");
+
   // Fetch transactions without account link
   const { data: orphanedData } = useQuery({
     queryKey: ["orphaned_transactions", user?.id],
     queryFn: async () => {
-      const { data: recs } = await supabase.from("receitas").select("valor, status").is("conta_id", null);
-      const { data: desps } = await supabase.from("despesas").select("valor, status").is("conta_id", null);
+      const { data } = await supabase
+        .from("transactions")
+        .select("amount, type, status")
+        .is("account_id", null)
+        .eq("user_id", user!.id);
       
-      const balance = (recs?.filter(r => r.status === "recebido").reduce((s, r) => s + r.valor, 0) || 0) -
-                      (desps?.filter(d => d.status === "pago").reduce((s, d) => s + d.valor, 0) || 0);
+      const recs = data?.filter(t => t.type === "income") || [];
+      const desps = data?.filter(t => t.type === "expense") || [];
       
-      return { count: (recs?.length || 0) + (desps?.length || 0), balance };
+      const balance = (recs?.filter(r => r.status === "confirmed").reduce((s, r) => s + r.amount, 0) || 0) -
+                      (desps?.filter(d => d.status === "confirmed").reduce((s, d) => s + d.amount, 0) || 0);
+      
+      return { count: (data?.length || 0), balance };
     },
     enabled: !!user,
-  });
-
-  const handleSyncTransactions = async (accountId: string) => {
+  });  const handleSyncTransactions = async (accountId: string) => {
     if (!user) return;
     setIsSyncing(true);
     try {
-      // 1. Update all orphaned transactions to this account
-      const { error: err1 } = await supabase
-        .from("receitas")
-        .update({ conta_id: accountId } as any)
+      // 1. Update all orphaned transactions to this account in the unified table
+      const { error } = await supabase
+        .from("transactions")
+        .update({ account_id: accountId } as any)
         .eq("user_id", user.id)
-        .is("conta_id", null);
+        .is("account_id", null);
       
-      const { error: err2 } = await supabase
-        .from("despesas")
-        .update({ conta_id: accountId } as any)
-        .eq("user_id", user.id)
-        .is("conta_id", null);
-      
-      if (err1 || err2) {
-        const error = err1 || err2;
-        if (error.message?.includes("column \"conta_id\" does not exist")) {
-           throw new Error("A coluna 'conta_id' não existe. Rode o SQL do Walkthrough!");
-        }
-        throw error;
-      }
+      if (error) throw error;
 
-      // 2. Update the account balance in the database ONLY IF requested
-      if (shouldUpdateBalance) {
-        const account = accounts.find(a => a.id === accountId);
-        if (account) {
-          const newSaldo = (account.saldo || 0) + (orphanedData?.balance || 0);
-          const { error: err3 } = await supabase
-            .from("contas_financeiras" as any)
-            .update({ saldo: newSaldo } as any)
-            .eq("id", accountId)
-            .eq("user_id", user.id);
-          
-          if (err3) throw err3;
-        }
-      }
+      // 2. Balance update is now automatic via Ledger/Trigger
       
       queryClient.invalidateQueries({ queryKey: ["contas_financeiras"] });
-      queryClient.invalidateQueries({ queryKey: ["receitas"] });
-      queryClient.invalidateQueries({ queryKey: ["despesas"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["orphaned_transactions"] });
       
-      toast.success("Transações vinculadas e saldo atualizado!");
+      toast.success("Transações vinculadas! O saldo foi atualizado automaticamente via ledger.");
     } catch (err: any) {
       toast.error("Erro na sincronização: " + err.message);
     } finally {
@@ -132,6 +117,62 @@ export default function Accounts() {
     }
   };
 
+  const handleTransfer = async () => {
+    if (!user || !transferOrigin || !transferDest || !transferAmount) return;
+    if (transferOrigin === transferDest) {
+      toast.error("Origem e destino devem ser diferentes");
+      return;
+    }
+
+    const amount = parseFloat(transferAmount);
+    if (amount <= 0) {
+      toast.error("Valor deve ser maior que zero");
+      return;
+    }
+
+    try {
+      const date = new Date().toISOString().split('T')[0];
+      const originAcc = accounts.find(a => a.id === transferOrigin);
+      const destAcc = accounts.find(a => a.id === transferDest);
+
+      // Create expense in origin
+      const { error: err1 } = await supabase.from("transactions").insert({
+        user_id: user.id,
+        account_id: transferOrigin,
+        description: `${transferDescription} -> ${destAcc?.nome}`,
+        amount,
+        type: "expense",
+        category: "Transferência",
+        status: "confirmed",
+        date,
+      } as any);
+      if (err1) throw err1;
+
+      // Create income in destination
+      const { error: err2 } = await supabase.from("transactions").insert({
+        user_id: user.id,
+        account_id: transferDest,
+        description: `${transferDescription} <- ${originAcc?.nome}`,
+        amount,
+        type: "income",
+        category: "Transferência",
+        status: "confirmed",
+        date,
+      } as any);
+      if (err2) throw err2;
+
+      toast.success("Transferência realizada com sucesso!");
+      setTransferDialogOpen(false);
+      setTransferAmount("");
+      setTransferOrigin("");
+      setTransferDest("");
+      
+      queryClient.invalidateQueries({ queryKey: ["contas_financeiras"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    } catch (err: any) {
+      toast.error("Erro na transferência: " + err.message);
+    }
+  };
   // Form state
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<AccountType>("banco");
@@ -174,7 +215,6 @@ export default function Accounts() {
       nome: nome.trim(),
       tipo,
       banco_id: showBankSelector && bancoId ? bancoId : null,
-      saldo: parseFloat(saldo) || 0,
       cor,
       icone,
       classificacao,
@@ -185,7 +225,23 @@ export default function Accounts() {
         await updateAccount.mutateAsync({ id: editingAccount.id, ...payload });
         toast.success("Conta atualizada!");
       } else {
-        await createAccount.mutateAsync(payload as ContaFinanceiraInsert);
+        const newAccount = await createAccount.mutateAsync(payload as ContaFinanceiraInsert);
+        
+        // Se houver saldo inicial, criar uma transação de ajuste
+        const initialBalance = parseFloat(saldo) || 0;
+        if (initialBalance !== 0) {
+          await supabase.from("transactions").insert({
+            user_id: user.id,
+            account_id: newAccount.id,
+            description: "Saldo Inicial",
+            amount: Math.abs(initialBalance),
+            type: initialBalance > 0 ? "income" : "expense",
+            category: "Outros",
+            status: "confirmed",
+            date: new Date().toISOString().split('T')[0],
+          } as any);
+        }
+        
         toast.success("Conta criada com sucesso!");
       }
       resetForm();
@@ -214,10 +270,14 @@ export default function Accounts() {
           <h1 className="text-2xl font-bold text-foreground">Contas Financeiras</h1>
           <p className="text-sm text-muted-foreground">Gerencie suas contas e saldos</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <Button onClick={() => { resetForm(); setOpen(true); }}>
-            <Plus className="mr-1 h-4 w-4" /> Nova Conta
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
+            <ArrowRightLeft className="mr-1 h-4 w-4" /> Transferir
           </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <Button onClick={() => { resetForm(); setOpen(true); }}>
+              <Plus className="mr-1 h-4 w-4" /> Nova Conta
+            </Button>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{editingAccount ? "Editar Conta" : "Criar Conta Financeira"}</DialogTitle>
@@ -367,6 +427,7 @@ export default function Accounts() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
 
       {/* List */}
       {isLoading ? (
@@ -489,6 +550,47 @@ export default function Accounts() {
         </div>
       </div>
     )}
+
+    <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Transferência entre Contas</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Conta de Origem</Label>
+            <Select value={transferOrigin} onValueChange={setTransferOrigin}>
+              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+              <SelectContent>
+                {accounts.map(acc => (
+                  <SelectItem key={acc.id} value={acc.id}>{acc.nome} ({new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(acc.saldo)})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Conta de Destino</Label>
+            <Select value={transferDest} onValueChange={setTransferDest}>
+              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+              <SelectContent>
+                {accounts.map(acc => (
+                  <SelectItem key={acc.id} value={acc.id}>{acc.nome} ({new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(acc.saldo)})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Valor da Transferência</Label>
+            <Input type="number" step="0.01" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} placeholder="0,00" />
+          </div>
+          <div className="space-y-2">
+            <Label>Descrição</Label>
+            <Input value={transferDescription} onChange={(e) => setTransferDescription(e.target.value)} />
+          </div>
+          <Button className="w-full mt-4" onClick={handleTransfer}>Confirmar Transferência</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 );
 }

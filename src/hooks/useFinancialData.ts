@@ -19,35 +19,46 @@ export function useFinancialData(overrideView?: FinancialView) {
   const view = overrideView || globalView;
 
   // If we are using the global view, just return the context data
-  // which is already memoized and deferred.
   if (!overrideView || overrideView === globalView) {
     return contextData;
   }
 
   // If there's an overrideView, we perform a local calculation
-  // (rare case, but kept for flexibility).
   const { user } = useAuth();
   const { accounts = [] as ContaFinanceira[] } = useAccounts();
   const { preferences } = useUserPreferences();
 
-  const { data: receitas = [] as ReceitaExtended[] } = useQuery({
-    queryKey: queryKeys.receitas(user?.id),
+  const { data: allTransactions = [] } = useQuery({
+    queryKey: ["transactions", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("receitas").select("*, clientes(nome)").order("data", { ascending: false });
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*, clientes(nome)")
+        .order("date", { ascending: false });
       if (error) throw error;
-      return data as ReceitaExtended[];
+      
+      return (data ?? []).map(t => ({
+        ...t,
+        valor: t.amount,
+        descricao: t.description,
+        data: t.date,
+        status: t.type === "income" 
+          ? (t.status === "confirmed" ? "recebido" : "pendente")
+          : (t.status === "confirmed" ? "pago" : "pendente"),
+        tipo: t.tipo_despesa
+      }));
     },
-    enabled: false, // Already fetched by context
+    enabled: false, // Usually fetched by context, but available if needed
   });
-  const { data: despesas = [] as DespesaExtended[] } = useQuery({
-    queryKey: queryKeys.despesas(user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
-      if (error) throw error;
-      return data as DespesaExtended[];
-    },
-    enabled: false, // Already fetched by context
-  });
+
+  const receitas = useMemo(() => 
+    allTransactions.filter(t => t.type === "income") as ReceitaExtended[], 
+  [allTransactions]);
+
+  const despesas = useMemo(() => 
+    allTransactions.filter(t => t.type === "expense") as DespesaExtended[], 
+  [allTransactions]);
+
   const { data: empresa } = useQuery({
     queryKey: queryKeys.empresa(user?.id),
     queryFn: async () => {
@@ -79,7 +90,6 @@ export function useFinancialData(overrideView?: FinancialView) {
       currentYear
     );
 
-    // MEI Limit (requires empresa data)
     const limiteMei = calcularLimiteProporcional(empresa?.data_abertura);
 
     return {

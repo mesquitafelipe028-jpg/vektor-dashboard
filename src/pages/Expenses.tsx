@@ -62,36 +62,15 @@ export default function Expenses() {
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
-      console.log(`[Expenses] Deleting transaction ${id}`);
-      const { data: item } = await supabase.from("despesas").select("*").eq("id", id).single();
-      
-      if (!item) throw new Error("Transação não encontrada.");
-
-      const todayStr = getLocalDateString();
-      const isFuture = item.data > todayStr;
-
-      if (item.status === "pago" && item.conta_id && !isFuture) {
-        console.log(`[Expenses] Reverting balance for account ${item.conta_id} due to deletion`);
-        const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", item.conta_id).single();
-        if (acc) {
-          const newSaldo = (acc.saldo || 0) + item.valor;
-          const { error: updErr } = await supabase.from("contas_financeiras").update({ saldo: newSaldo } as any).eq("id", item.conta_id);
-          if (updErr) console.error("[Expenses] Balance update error:", updErr);
-          else console.log(`[Expenses] Balance updated to ${newSaldo}`);
-        }
-      }
-
-      const { error } = await supabase.from("despesas").delete().eq("id", id);
+      console.log(`[Expenses] Deleting transaction ${id} via Ledger System`);
+      const { error } = await supabase.from("transactions").delete().eq("id", id);
       if (error) throw error;
-      
-      await (supabase.from("despesas") as any).delete().eq("transacao_pai_id", id);
       console.log("[Expenses] Deletion complete.");
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
-      qc.invalidateQueries({ queryKey: ["contas_financeiras", user?.id] });
+      qc.invalidateQueries({ queryKey: ["transactions", user?.id] });
+      qc.invalidateQueries({ queryKey: ["contas_financeiras"] });
       qc.invalidateQueries({ queryKey: ["dashboard", user?.id] });
-      qc.refetchQueries({ queryKey: ["contas_financeiras", user?.id] });
       toast.success("Despesa excluída!");
     },
     onError: (e: any) => {
@@ -102,39 +81,15 @@ export default function Expenses() {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      console.log(`[Expenses] Updating status for ${id} to ${status}`);
-      const { data: item } = await supabase.from("despesas").select("*").eq("id", id).single();
-      
-      if (item && item.conta_id) {
-        const todayStr = getLocalDateString();
-        const isFuture = item.data > todayStr;
-
-        const wasPaid = item.status === "pago";
-        const isPaid = status === "pago";
-        
-        let delta = 0;
-        if (!wasPaid && isPaid) delta = -item.valor;
-        else if (wasPaid && !isPaid) delta = item.valor;
-        
-        if (delta !== 0 && !isFuture) {
-          console.log(`[Expenses] Adjusting balance for ${item.conta_id} by ${delta}`);
-          const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", item.conta_id).single();
-          if (acc) {
-            const newSaldo = (acc.saldo || 0) + delta;
-            await supabase.from("contas_financeiras").update({ saldo: newSaldo } as any).eq("id", item.conta_id);
-            console.log(`[Expenses] Balance updated to ${newSaldo}`);
-          }
-        }
-      }
-
-      const { error } = await supabase.from("despesas").update({ status } as any).eq("id", id);
+      console.log(`[Expenses] Updating status for ${id} to ${status} (Ledger)`);
+      const newStatus = status === "pago" ? "confirmed" : "pending";
+      const { error } = await supabase.from("transactions").update({ status: newStatus } as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
-      qc.invalidateQueries({ queryKey: ["contas_financeiras", user?.id] });
+      qc.invalidateQueries({ queryKey: ["transactions", user?.id] });
+      qc.invalidateQueries({ queryKey: ["contas_financeiras"] });
       qc.invalidateQueries({ queryKey: ["dashboard", user?.id] });
-      qc.refetchQueries({ queryKey: ["contas_financeiras", user?.id] });
       toast.success("Status atualizado!");
     },
     onError: (e: any) => {

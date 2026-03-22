@@ -41,25 +41,37 @@ export function FinancialDataProvider({ children }: { children: React.ReactNode 
   const { preferences } = useUserPreferences();
   const { view: globalView } = useFinancialView();
 
-  const { data: receitas = [] as ReceitaExtended[], isLoading: loadingReceitas } = useQuery({
-    queryKey: queryKeys.receitas(user?.id),
+  const { data: allTransactions = [], isLoading: loadingTransactions } = useQuery({
+    queryKey: ["transactions", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("receitas").select("*, clientes(nome)").order("data", { ascending: false });
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*, clientes(nome)")
+        .order("date", { ascending: false });
       if (error) throw error;
-      return data as ReceitaExtended[];
+      
+      // Mapear para o formato legado esperado pelo restante do app
+      return (data ?? []).map(t => ({
+        ...t,
+        valor: t.amount,
+        descricao: t.description,
+        data: t.date,
+        status: t.type === "income" 
+          ? (t.status === "confirmed" ? "recebido" : "pendente")
+          : (t.status === "confirmed" ? "pago" : "pendente"),
+        tipo: t.tipo_despesa // campo legado
+      }));
     },
     enabled: !!user,
   });
 
-  const { data: despesas = [] as DespesaExtended[], isLoading: loadingDespesas } = useQuery({
-    queryKey: queryKeys.despesas(user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
-      if (error) throw error;
-      return data as DespesaExtended[];
-    },
-    enabled: !!user,
-  });
+  const receitas = useMemo(() => 
+    allTransactions.filter(t => t.type === "income") as ReceitaExtended[], 
+  [allTransactions]);
+
+  const despesas = useMemo(() => 
+    allTransactions.filter(t => t.type === "expense") as DespesaExtended[], 
+  [allTransactions]);
 
   const { data: empresa } = useQuery({
     queryKey: queryKeys.empresa(user?.id),
@@ -71,7 +83,7 @@ export function FinancialDataProvider({ children }: { children: React.ReactNode 
     enabled: !!user,
   });
 
-  const loading = loadingAccounts || loadingReceitas || loadingDespesas;
+  const loading = loadingAccounts || loadingTransactions;
 
   // 1. Memoize raw results based on the view
   const processedData = useMemo(() => {

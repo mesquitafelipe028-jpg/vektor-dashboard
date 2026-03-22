@@ -12,12 +12,17 @@ export function useAccounts() {
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("contas_financeiras")
+        .from("v_accounts_with_balance")
         .select("*")
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as ContaFinanceira[];
+      
+      // Mapear ledger_balance para saldo para compatibilidade
+      return (data ?? []).map(acc => ({
+        ...acc,
+        saldo: acc.ledger_balance
+      })) as unknown as ContaFinanceira[];
     },
   });
 

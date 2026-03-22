@@ -37,50 +37,31 @@ export default function Timeline() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [sortBy, setSortBy] = useState("data-desc");
 
-  const { data: receitas = [] } = useQuery({
-    queryKey: ["timeline_receitas"],
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["timeline_transactions", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("receitas")
-        .select("id, descricao, valor, data, categoria, status, clientes(nome)")
-        .order("data", { ascending: false })
-        .limit(200);
+        .from("transactions")
+        .select("id, type, description, amount, date, category, status, clientes(nome)")
+        .order("date", { ascending: false })
+        .limit(400);
       if (error) throw error;
-      return (data as any[]).map((r) => ({
-        id: r.id,
-        type: "receita" as const,
-        description: r.descricao,
-        amount: r.valor,
-        date: r.data,
-        category: r.categoria,
-        clientName: r.clientes?.nome,
-        status: r.status,
+      return (data as any[]).map((t) => ({
+        id: t.id,
+        type: t.type === "income" ? ("receita" as const) : ("despesa" as const),
+        description: t.description,
+        amount: t.amount,
+        date: t.date,
+        category: t.category,
+        clientName: t.clientes?.nome,
+        status: t.status === "confirmed" ? (t.type === "income" ? "recebido" : "pago") : "pendente",
       }));
     },
     enabled: !!user,
   });
 
-  const { data: despesas = [] } = useQuery({
-    queryKey: ["timeline_despesas"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("despesas")
-        .select("id, descricao, valor, data, categoria, status")
-        .order("data", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      return (data as any[]).map((d) => ({
-        id: d.id,
-        type: "despesa" as const,
-        description: d.descricao,
-        amount: d.valor,
-        date: d.data,
-        category: d.categoria,
-        status: d.status,
-      }));
-    },
-    enabled: !!user,
-  });
+  const receitas = useMemo(() => transactions.filter(e => e.type === "receita"), [transactions]);
+  const despesas = useMemo(() => transactions.filter(e => e.type === "despesa"), [transactions]);
 
   const { data: compras = [] } = useQuery({
     queryKey: ["timeline_compras_cartao"],

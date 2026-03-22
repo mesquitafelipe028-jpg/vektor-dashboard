@@ -85,6 +85,7 @@ import {
 } from "recharts";
 import { useInvestments, type InvestimentoAtivoInsert, type InvestimentoDividendoInsert } from "@/hooks/useInvestments";
 import { useStockQuotes, type QuoteResult } from "@/hooks/useStockQuotes";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, isAfter, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -212,6 +213,7 @@ export default function Investments() {
   const { toast } = useToast();
   const { ativos, addAtivo, deleteAtivo, dividendos, addDividendo, deleteDividendo } = useInvestments();
   const { quotes, isLoading: quotesLoading, lastUpdated: quotesLastUpdated, fetchQuotes } = useStockQuotes();
+  const { accounts } = useAccounts();
 
   // Auto-fetch quotes when ativos load
   const hasFetchedRef = useRef(false);
@@ -979,17 +981,19 @@ function CarteiraTab({
   quotesLoading,
   quotesLastUpdated,
   onRefreshQuotes,
+  accounts,
 }: {
   ativos: any[];
   dividendos: any[];
   isLoading: boolean;
   openDialog: boolean;
   setOpenDialog: (v: boolean) => void;
-  onAdd: (a: InvestimentoAtivoInsert) => void;
+  onAdd: (a: InvestimentoAtivoInsert, accountId?: string) => void;
   onDelete: (id: string) => void;
   quotesLoading?: boolean;
   quotesLastUpdated?: Date | null;
   onRefreshQuotes?: () => void;
+  accounts: any[];
 }) {
   const [filtro, setFiltro] = useState<string>("todos");
   const [visibleCols, setVisibleCols] = useState<string[]>(() => {
@@ -1037,12 +1041,12 @@ function CarteiraTab({
       preco_medio: parseFloat(form.preco_medio),
       preco_atual: parseFloat(form.preco_atual) || parseFloat(form.preco_medio),
       data_compra: form.data_compra,
-    });
+    }, form.accountId);
     if (form.nota) {
       // Save nota after add - we'll match by nome since we don't have the id yet
       setNotas(prev => ({ ...prev, [`__pending_${form.nome}`]: form.nota }));
     }
-    setForm({ nome: "", tipo: "acao", quantidade: "", preco_medio: "", preco_atual: "", data_compra: getLocalDateString(), nota: "" });
+    setForm({ nome: "", tipo: "acao", quantidade: "", preco_medio: "", preco_atual: "", data_compra: getLocalDateString(), nota: "", accountId: "" });
     setOpenDialog(false);
   };
 
@@ -1182,6 +1186,23 @@ function CarteiraTab({
                   <Label>Nota / Tag <span className="text-muted-foreground font-normal">— opcional</span></Label>
                   <Input placeholder="Ex: longo prazo, dividendos" value={form.nota} onChange={(e) => setForm({ ...form, nota: e.target.value })} />
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Vincular à Conta <span className="text-muted-foreground font-normal">— opcional</span></Label>
+                  <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione uma conta (débito)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Nenhuma (não registrar no ledger)</SelectItem>
+                      {accounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    Se selecionado, registrará uma saída nesta conta com o valor total (Qtd x PM).
+                  </p>
+                </div>
+
                 <Button className="w-full" onClick={handleSubmit}>Adicionar</Button>
               </div>
             </DialogContent>
@@ -1338,6 +1359,7 @@ function DividendosTab({
   setOpenDialog,
   onAdd,
   onDelete,
+  accounts,
 }: {
   dividendos: any[];
   ativos: any[];
@@ -1347,14 +1369,16 @@ function DividendosTab({
   patrimonio: number;
   openDialog: boolean;
   setOpenDialog: (v: boolean) => void;
-  onAdd: (d: InvestimentoDividendoInsert) => void;
+  onAdd: (d: InvestimentoDividendoInsert, accountId?: string) => void;
   onDelete: (id: string) => void;
+  accounts: any[];
 }) {
   const [form, setForm] = useState({
     ativo_id: "",
     valor: "",
     data_recebimento: getLocalDateString(),
     tipo: "dividendo",
+    accountId: "",
   });
   const [mesFiltro, setMesFiltro] = useState<string>("todos");
 
@@ -1365,8 +1389,8 @@ function DividendosTab({
       valor: parseFloat(form.valor),
       data_recebimento: form.data_recebimento,
       tipo: form.tipo,
-    });
-    setForm({ ativo_id: "", valor: "", data_recebimento: getLocalDateString(), tipo: "dividendo" });
+    }, form.accountId);
+    setForm({ ativo_id: "", valor: "", data_recebimento: getLocalDateString(), tipo: "dividendo", accountId: "" });
     setOpenDialog(false);
   };
 
@@ -1658,6 +1682,23 @@ function DividendosTab({
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Vincular à Conta <span className="text-muted-foreground font-normal">— opcional</span></Label>
+                  <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione uma conta (crédito)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Nenhuma (não registrar no ledger)</SelectItem>
+                      {accounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    Se selecionado, registrará uma entrada nesta conta com o valor do dividendo.
+                  </p>
+                </div>
+
                 <Button className="w-full" onClick={handleSubmit}>Registrar</Button>
               </div>
             </DialogContent>

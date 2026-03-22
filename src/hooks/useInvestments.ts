@@ -28,13 +28,36 @@ export function useInvestments() {
   });
 
   const addAtivo = useMutation({
-    mutationFn: async (ativo: Omit<InvestimentoAtivoInsert, "user_id">) => {
-      const { error } = await supabase
+    mutationFn: async ({ ativo, accountId }: { ativo: Omit<InvestimentoAtivoInsert, "user_id">, accountId?: string }) => {
+      const { data: newAtivo, error } = await supabase
         .from("investimento_ativos")
-        .insert({ ...ativo, user_id: userId! } as InvestimentoAtivoInsert);
+        .insert({ ...ativo, user_id: userId! } as InvestimentoAtivoInsert)
+        .select()
+        .single();
+      
       if (error) throw error;
+
+      // Se uma conta foi selecionada, criar transação de despesa (aporte)
+      if (accountId && newAtivo) {
+        const { error: txError } = await supabase.from("transactions").insert({
+          description: `Aporte: ${newAtivo.nome}`,
+          amount: Number(newAtivo.quantidade) * Number(newAtivo.preco_medio),
+          date: newAtivo.data_compra || new Date().toISOString().split('T')[0],
+          category: "Investimentos",
+          type: "expense",
+          status: "confirmed",
+          account_id: accountId,
+          user_id: userId!,
+        } as any);
+        
+        if (txError) throw txError;
+      }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_ativos"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investimento_ativos"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["contas_financeiras"] });
+    },
   });
 
   const updateAtivo = useMutation({
@@ -76,13 +99,43 @@ export function useInvestments() {
   });
 
   const addDividendo = useMutation({
-    mutationFn: async (div: Omit<InvestimentoDividendoInsert, "user_id">) => {
-      const { error } = await supabase
+    mutationFn: async ({ dividendo, accountId }: { dividendo: Omit<InvestimentoDividendoInsert, "user_id">, accountId?: string }) => {
+      const { data: newDiv, error } = await supabase
         .from("investimento_dividendos")
-        .insert({ ...div, user_id: userId! } as InvestimentoDividendoInsert);
+        .insert({ ...dividendo, user_id: userId! } as InvestimentoDividendoInsert)
+        .select()
+        .single();
+        
       if (error) throw error;
+
+      // Se uma conta foi selecionada, criar transação de receita (provento)
+      if (accountId && newDiv) {
+        // Buscar nome do ativo se possível para a descrição
+        const { data: ativo } = await supabase
+          .from("investimento_ativos")
+          .select("nome")
+          .eq("id", newDiv.ativo_id)
+          .maybeSingle();
+
+        const { error: txError } = await supabase.from("transactions").insert({
+          description: `Dividendo/Rendimento: ${ativo?.nome || 'Ativo'}`,
+          amount: newDiv.valor,
+          date: newDiv.data_recebimento,
+          category: "Investimentos",
+          type: "income",
+          status: "confirmed",
+          account_id: accountId,
+          user_id: userId!,
+        } as any);
+        
+        if (txError) throw txError;
+      }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investimento_dividendos"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["investimento_dividendos"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["contas_financeiras"] });
+    },
   });
 
   const deleteDividendo = useMutation({

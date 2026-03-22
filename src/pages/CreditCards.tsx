@@ -22,6 +22,7 @@ import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
 // Icons and Utils
 import { expenseCategories } from "@/lib/utils";
 import { banks } from "@/lib/banks";
+import { useAccounts } from "@/hooks/useAccounts";
 
 // Types
 import { Tables } from "@/integrations/supabase/types";
@@ -88,6 +89,14 @@ export default function CreditCards() {
   const [isParsing, setIsParsing] = useState(false);
   const [viewMode, setViewMode] = useState<"timeline" | "fatura">("timeline");
   const [selectedMesRef, setSelectedMesRef] = useState<string>(getLocalDateString().slice(0, 7));
+
+  // Payment states
+  const [payInvoiceDialogOpen, setPayInvoiceDialogOpen] = useState(false);
+  const [paymentMesRef, setPaymentMesRef] = useState("");
+  const [paymentTotal, setPaymentTotal] = useState(0);
+  const [paymentAccountId, setPaymentAccountId] = useState("");
+
+  const { accounts = [] } = useAccounts();
 
   // ── Queries ──
   const { data: cartoes = [], isLoading: loadingCards } = useQuery({
@@ -283,7 +292,7 @@ export default function CreditCards() {
 
   // ── Pay invoice ──
   const payInvoice = useMutation({
-    mutationFn: async ({ mesRef, total }: { mesRef: string; total: number }) => {
+    mutationFn: async ({ mesRef, total, accountId }: { mesRef: string; total: number; accountId: string }) => {
       if (!activeCard) return;
 
       // Upsert fatura
@@ -307,23 +316,27 @@ export default function CreditCards() {
         if (error) throw error;
       }
 
-      // Register as expense
-      const { error: expError } = await supabase.from("despesas").insert({
-        descricao: `Fatura ${activeCard.nome} - ${formatMonthLabel(mesRef)}`,
-        valor: total,
-        data: getLocalDateString(),
-        categoria: "Cartão de Crédito",
+      // NOVO: Registrar na tabela de transactions (Ledger)
+      const { error: txError } = await supabase.from("transactions").insert({
+        description: `Fatura ${activeCard.nome} - ${formatMonthLabel(mesRef)}`,
+        amount: total,
+        date: getLocalDateString(),
+        category: "Cartão de Crédito",
+        type: "expense",
+        status: "confirmed",
+        account_id: accountId,
         user_id: user!.id,
-      });
-      if (expError) throw expError;
+      } as any);
+      
+      if (txError) throw txError;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["faturas_cartao", user?.id] });
-      qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("Fatura paga e despesa registrada!");
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["contas_financeiras"] });
+      toast.success("Fatura paga e despesa registrada no ledger!");
     },
-    onError: () => toast.error("Erro ao pagar fatura"),
+    onError: (e: any) => toast.error("Erro ao pagar fatura: " + e.message),
   });
 
   // ── Dialog helpers ──
@@ -414,6 +427,25 @@ export default function CreditCards() {
     setCompraForm({ ...emptyCompraForm, cartao_id: activeCard?.id ?? "" });
     setEditingCompraId(null);
     setCompraDialogOpen(true);
+  };
+
+  const handleOpenPayInvoice = (mesRef: string, total: number) => {
+    setPaymentMesRef(mesRef);
+    setPaymentTotal(total);
+    setPayInvoiceDialogOpen(true);
+    // Auto-select first bank account
+    if (accounts.length > 0 && !paymentAccountId) {
+      setPaymentAccountId(accounts[0].id);
+    }
+  };
+
+  const confirmPayment = () => {
+    if (!paymentAccountId) {
+      toast.error("Selecione uma conta para pagar");
+      return;
+    }
+    payInvoice.mutate({ mesRef: paymentMesRef, total: paymentTotal, accountId: paymentAccountId });
+    setPayInvoiceDialogOpen(false);
   };
 
   // ── No cards state ──
@@ -575,7 +607,7 @@ export default function CreditCards() {
                     compras={cardCompras}
                     faturas={cardFaturas}
                     isMobile={isMobile}
-                    onPayInvoice={(mesRef, total) => payInvoice.mutate({ mesRef, total })}
+                    onPayInvoice={handleOpenPayInvoice}
                     onEditCompra={openEditCompra}
                     onDeleteCompra={(id) => deleteCompra.mutate(id)}
                 />
@@ -594,10 +626,7 @@ export default function CreditCards() {
                     </Button>
                     <Button 
                       size="sm"
-                      onClick={() => payInvoice.mutate({ 
-                        mesRef: selectedMesRef, 
-                        total: cardCompras.filter(c => getPurchaseInvoicePeriod(c.data, activeCard.dia_fechamento || 1) === selectedMesRef).reduce((acc, c) => acc + c.valor, 0) 
-                      })}
+                      onClick={() => handleOpenPayInvoice(selectedMesRef, cardCompras.filter(c => getPurchaseInvoicePeriod(c.data, activeCard.dia_fechamento || 1) === selectedMesRef).reduce((acc, c) => acc + c.valor, 0))}
                       disabled={cardFaturas.find(f => f.mes_referencia === selectedMesRef)?.status === "paga"}
                     >
                       <CheckCircle className="mr-2 h-4 w-4" /> {cardFaturas.find(f => f.mes_referencia === selectedMesRef)?.status === "paga" ? "Fatura Paga" : "Confirmar Pagamento"}
@@ -751,6 +780,37 @@ export default function CreditCards() {
           >
             {saveCompra.isPending ? "Salvando..." : editingCompraId ? "Salvar Alterações" : "Registrar Compra"}
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={payInvoiceDialogOpen} onOpenChange={setPayInvoiceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pagar Fatura - {formatMonthLabel(paymentMesRef)}</DialogTitle>
+            <DialogDescription>
+              Selecione a conta que será utilizada para o pagamento de {formatCurrency(paymentTotal)}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Conta de Origem</Label>
+              <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.nome} (Saldo: {formatCurrency(acc.saldo)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full mt-4" onClick={confirmPayment} disabled={payInvoice.isPending}>
+              {payInvoice.isPending ? "Processando..." : "Confirmar e Pagar"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -74,11 +74,20 @@ export default function Taxes() {
   });
 
   const { data: receitas = [] } = useQuery({
-    queryKey: queryKeys.receitas(user?.id),
+    queryKey: ["transactions", "income", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("receitas").select("*");
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("type", "income");
       if (error) throw error;
-      return data;
+      
+      // Mapear amount -> valor e date -> data para o componente
+      return (data || []).map(t => ({
+        ...t,
+        valor: t.amount,
+        data: t.date
+      }));
     },
     enabled: !!user,
   });

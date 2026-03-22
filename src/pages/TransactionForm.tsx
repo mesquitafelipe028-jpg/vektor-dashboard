@@ -209,13 +209,22 @@ export default function TransactionForm() {
   });
 
   // Load existing record for editing
-  const table = type === "receita" ? "receitas" : "despesas";
   const { data: existing } = useQuery({
-    queryKey: [table, id],
+    queryKey: ["transactions", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from(table).select("*").eq("id", id!).single();
+      const { data, error } = await supabase.from("transactions").select("*").eq("id", id!).single();
       if (error) throw error;
-      return data;
+      
+      // Mapear para formato esperado pelo form
+      return {
+        ...data,
+        valor: data.amount,
+        descricao: data.description,
+        data: data.date,
+        status: data.type === "income" 
+          ? (data.status === "confirmed" ? "recebido" : "pendente")
+          : (data.status === "confirmed" ? "pago" : "pendente"),
+      };
     },
     enabled: !!user && !!id,
   });
@@ -267,29 +276,7 @@ export default function TransactionForm() {
     }
   };
 
-  const updateAccountBalance = async (contaId: string, delta: number) => {
-    if (!contaId || delta === 0) return;
-    try {
-      const { data: acc, error: fetchErr } = await supabase
-        .from("contas_financeiras")
-        .select("saldo")
-        .eq("id", contaId)
-        .single();
-      
-      if (fetchErr) throw fetchErr;
-      
-      const newSaldo = (acc?.saldo || 0) + delta;
-      const { error: updateErr } = await supabase
-        .from("contas_financeiras")
-        .update({ saldo: newSaldo } as any)
-        .eq("id", contaId);
-        
-      if (updateErr) throw updateErr;
-      console.log(`[Balance] Account ${contaId} updated by ${delta}. New balance: ${newSaldo}`);
-    } catch (err) {
-      console.error("[Balance] Error updating account balance:", err);
-    }
-  };
+  // Removido: updateAccountBalance (agora gerenciado via Ledger no Banco de Dados)
 
   const suggestedCat = type === "despesa" ? suggestCategory(form.descricao) : null;
 
@@ -299,7 +286,7 @@ export default function TransactionForm() {
     mutationFn: async () => {
       if (isSubmittingManual) return;
       setIsSubmittingManual(true);
-      console.log(`[Mutation] Starting ${isEditing ? "UPDATE" : "INSERT"} for ${type}`);
+      console.log(`[Mutation] Starting ${isEditing ? "UPDATE" : "INSERT"} for ${type} using Ledger System`);
 
       try {
         const schema = type === "receita" ? receitaSchema : despesaSchema;
@@ -320,195 +307,78 @@ export default function TransactionForm() {
         }
         setErrors({});
 
-        const todayStr = getLocalDateString();
-        const isFuture = (parsed.data as any).data > todayStr;
-        const tipoTransacao = form.tipo_transacao;
+        const amount = (parsed.data as any).valor;
+        const status = form.efetivada ? "confirmed" : "pending";
+        const commonPayload = {
+          user_id: user!.id,
+          description: (parsed.data as any).descricao,
+          amount,
+          date: (parsed.data as any).data,
+          status,
+          type: type === "receita" ? "income" : "expense",
+          account_id: form.conta_id || null,
+          category: form.categoria || null,
+          tipo_conta: form.tipo_conta || "pessoal",
+          tipo_transacao: form.tipo_transacao,
+          forma_pagamento: form.forma_pagamento || null,
+          cliente_id: form.cliente_id || null,
+          tipo_despesa: form.tipo, // 'expense' ou 'investment'
+        };
 
-        if (type === "receita") {
-          const status = form.efetivada ? "recebido" : "pendente";
+        if (form.tipo_transacao === "recorrente" && !isEditing) {
+          console.log("[Mutation] Creating RECURRING transaction");
+          const { error } = await supabase.from("transactions").insert({
+            ...commonPayload,
+            frequencia: form.frequencia,
+            data_inicio: form.data_inicio || (parsed.data as any).data,
+            data_fim: form.data_fim || null,
+          } as any);
+          if (error) throw error;
+          return;
+        }
+
+        if (form.tipo_transacao === "parcelada" && type === "despesa" && !isEditing) {
+          console.log("[Mutation] Creating INSTALLMENT transaction set");
+          const numParcelas = parseInt(form.numero_parcelas || "1") || 1;
+          const valorBase = form.parcelamento_tipo === "parcela" 
+            ? amount * numParcelas 
+            : amount;
           
-          if (tipoTransacao === "recorrente" && !isEditing) {
-            console.log("[Mutation] Creating RECURRING revenue");
-            const freq = form.frequencia as Frequencia;
-            const { error } = await supabase.from("receitas").insert({
-              descricao: (parsed.data as any).descricao,
-              valor: (parsed.data as any).valor,
-              data: form.data_inicio || (parsed.data as any).data,
-              forma_pagamento: (parsed.data as any).forma_pagamento || null,
-              cliente_id: (parsed.data as any).cliente_id || null,
-              categoria: form.categoria || null,
-              tipo_conta: form.tipo_conta || "mei",
-              conta_id: form.conta_id || null,
-              user_id: user!.id,
-              tipo_transacao: "recorrente",
-              frequencia: freq,
-              data_inicio: form.data_inicio || (parsed.data as any).data,
-              data_fim: form.data_fim || null,
-              status,
-            } as any);
-            if (error) throw error;
-            return;
-          }
-
-          const payload: any = {
-            descricao: (parsed.data as any).descricao,
-            valor: (parsed.data as any).valor,
-            data: (parsed.data as any).data,
-            forma_pagamento: (parsed.data as any).forma_pagamento || null,
-            cliente_id: (parsed.data as any).cliente_id || null,
-            categoria: form.categoria || null,
-            tipo_conta: form.tipo_conta || "mei",
-            conta_id: form.conta_id || null,
-            user_id: user!.id,
-            tipo_transacao: tipoTransacao,
-            status,
-          };
-
-          if (isEditing) {
-            console.log(`[Mutation] Updating existing revenue ${id}`);
-            const { error } = await supabase.from("receitas").update(payload).eq("id", id!);
-            if (error) throw error;
-
-            if (form.conta_id) {
-              const oldVal = (existing as any).valor;
-              const newVal = (parsed.data as any).valor;
-              const isNowSettled = status === "recebido";
-              const wasSettled = (existing as any).status === "recebido";
-
-              let delta = 0;
-              if (!wasSettled && isNowSettled) delta = newVal;
-              else if (wasSettled && !isNowSettled) delta = -oldVal;
-              else if (wasSettled && isNowSettled) delta = newVal - oldVal;
-              
-              if (delta !== 0 && !isFuture) await updateAccountBalance(form.conta_id, delta);
-            }
-          } else {
-            console.log("[Mutation] Inserting NEW revenue");
-            const { error } = await supabase.from("receitas").insert(payload);
-            if (error) throw error;
-
-            if (status === "recebido" && form.conta_id && !isFuture) {
-              await updateAccountBalance(form.conta_id, (parsed.data as any).valor);
-            }
-          }
-        } else {
-          // Despesa
-          const status = form.efetivada ? "pago" : "pendente";
+          const installments = generateInstallments(valorBase, numParcelas, (parsed.data as any).data);
           
-          if (tipoTransacao === "parcelada" && !isEditing) {
-            console.log("[Mutation] Creating INSTALLMENT expense");
-            const numParcelas = parseInt(form.numero_parcelas || "1") || 1;
-            const valorInserido = (parsed.data as any).valor;
-            const valorBase = form.parcelamento_tipo === "parcela" 
-              ? valorInserido * numParcelas 
-              : valorInserido;
-            
-            const installments = generateInstallments(valorBase, numParcelas, (parsed.data as any).data);
-            
-            const { data: parent, error: parentErr } = await supabase.from("despesas").insert({
-              descricao: (parsed.data as any).descricao,
-              valor: installments[0].valor,
-              data: installments[0].data,
-              categoria: (parsed.data as any).categoria || null,
-              tipo_conta: form.tipo_conta || "mei",
-              conta_id: form.conta_id || null,
-              user_id: user!.id,
-              tipo_transacao: "parcelada",
+          const { data: parent, error: parentErr } = await supabase.from("transactions").insert({
+            ...commonPayload,
+            amount: installments[0].valor,
+            date: installments[0].data,
+            numero_parcelas: numParcelas,
+            parcela_atual: 1,
+          } as any).select("id").single();
+          if (parentErr) throw parentErr;
+
+          if (installments.length > 1) {
+            const children = installments.slice(1).map((inst) => ({
+              ...commonPayload,
+              amount: inst.valor,
+              date: inst.data,
               numero_parcelas: numParcelas,
-              parcela_atual: 1,
-              status: form.efetivada ? "pago" : "pendente",
-              tipo: form.tipo,
-            } as any).select("id").single();
-            if (parentErr) throw parentErr;
-
-            if (form.efetivada && form.conta_id && !isFuture) {
-              await updateAccountBalance(form.conta_id, -installments[0].valor);
-            }
-
-            if (installments.length > 1) {
-              const children = installments.slice(1).map((inst) => ({
-                descricao: (parsed.data as any).descricao,
-                valor: inst.valor,
-                data: inst.data,
-                categoria: (parsed.data as any).categoria || null,
-                tipo_conta: form.tipo_conta || "mei",
-                conta_id: form.conta_id || null,
-                user_id: user!.id,
-                tipo_transacao: "parcelada",
-                numero_parcelas: numParcelas,
-                parcela_atual: inst.parcela,
-                transacao_pai_id: parent.id,
-                status: "pendente",
-                tipo: form.tipo,
-              } as any));
-              const { error } = await supabase.from("despesas").insert(children);
-              if (error) throw error;
-            }
-            return;
-          }
-
-          if (tipoTransacao === "recorrente" && !isEditing) {
-            console.log("[Mutation] Creating RECURRING expense");
-            const freq = form.frequencia as Frequencia;
-            const { error } = await supabase.from("despesas").insert({
-              descricao: (parsed.data as any).descricao,
-              valor: (parsed.data as any).valor,
-              data: form.data_inicio || (parsed.data as any).data,
-              categoria: (parsed.data as any).categoria || null,
-              tipo_conta: form.tipo_conta || "mei",
-              conta_id: form.conta_id || null,
-              user_id: user!.id,
-              tipo_transacao: "recorrente",
-              frequencia: freq,
-              data_inicio: form.data_inicio || (parsed.data as any).data,
-              data_fim: form.data_fim || null,
-              status,
-              tipo: form.tipo,
-            } as any);
+              parcela_atual: inst.parcela,
+              transacao_pai_id: parent.id,
+              status: "pending", // parcelas futuras sempre pendentes
+            } as any));
+            const { error } = await supabase.from("transactions").insert(children);
             if (error) throw error;
-            return;
           }
+          return;
+        }
 
-          const payload: any = {
-            descricao: (parsed.data as any).descricao,
-            valor: (parsed.data as any).valor,
-            data: (parsed.data as any).data,
-            categoria: (parsed.data as any).categoria || null,
-            tipo_conta: form.tipo_conta || "mei",
-            conta_id: form.conta_id || null,
-            user_id: user!.id,
-            tipo_transacao: tipoTransacao,
-            status,
-            tipo: form.tipo,
-          };
-
-          if (isEditing) {
-            console.log(`[Mutation] Updating existing expense ${id}`);
-            const { error } = await supabase.from("despesas").update(payload).eq("id", id!);
-            if (error) throw error;
-
-            if (form.conta_id) {
-              const oldVal = (existing as any).valor;
-              const newVal = (parsed.data as any).valor;
-              const isNowSettled = status === "pago";
-              const wasSettled = (existing as any).status === "pago";
-
-              let delta = 0;
-              if (!wasSettled && isNowSettled) delta = -newVal;
-              else if (wasSettled && !isNowSettled) delta = oldVal;
-              else if (wasSettled && isNowSettled) delta = oldVal - newVal;
-              
-              if (delta !== 0 && !isFuture) await updateAccountBalance(form.conta_id, delta);
-            }
-          } else {
-            console.log("[Mutation] Inserting NEW expense");
-            const { error } = await supabase.from("despesas").insert(payload);
-            if (error) throw error;
-
-            if (status === "pago" && form.conta_id && !isFuture) {
-              await updateAccountBalance(form.conta_id, -(parsed.data as any).valor);
-            }
-          }
+        if (isEditing) {
+          console.log(`[Mutation] Updating existing transaction ${id}`);
+          const { error } = await supabase.from("transactions").update(commonPayload).eq("id", id!);
+          if (error) throw error;
+        } else {
+          console.log("[Mutation] Inserting NEW transaction");
+          const { error } = await supabase.from("transactions").insert(commonPayload);
+          if (error) throw error;
         }
       } catch (err) {
         setIsSubmittingManual(false);
