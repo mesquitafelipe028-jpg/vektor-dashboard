@@ -303,7 +303,15 @@ export default function TransactionForm() {
 
       try {
         const schema = type === "receita" ? receitaSchema : despesaSchema;
-        const parsed = schema.safeParse({ ...form, valor: parseFloat(form.valor) });
+        
+        let sanitizedValor = form.valor.trim();
+        if (sanitizedValor.includes(".") && sanitizedValor.includes(",")) {
+          sanitizedValor = sanitizedValor.replace(/\./g, "").replace(",", ".");
+        } else if (sanitizedValor.includes(",")) {
+          sanitizedValor = sanitizedValor.replace(",", ".");
+        }
+        
+        const parsed = schema.safeParse({ ...form, valor: parseFloat(sanitizedValor) });
         if (!parsed.success) {
           const fe: Record<string, string> = {};
           parsed.error.issues.forEach((i) => (fe[String(i.path[0])] = i.message));
@@ -835,6 +843,7 @@ export default function TransactionForm() {
             </motion.div>
           )}
         </AnimatePresence>
+        {errors.categoria && <p className="text-xs text-destructive px-4 mt-1">{errors.categoria}</p>}
         <Separator />
 
         {/* Conta Financeira */}
@@ -865,6 +874,7 @@ export default function TransactionForm() {
             </Select>
           </div>
         </div>
+        {errors.conta_id && <p className="text-xs text-destructive px-4 mt-1">{errors.conta_id}</p>}
 
         <div className="pb-8" />
       </div>
