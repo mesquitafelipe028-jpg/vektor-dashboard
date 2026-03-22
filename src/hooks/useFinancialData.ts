@@ -45,7 +45,8 @@ export function useFinancialData(overrideView?: FinancialView) {
         status: t.type === "income" 
           ? (t.status === "confirmed" ? "recebido" : "pendente")
           : (t.status === "confirmed" ? "pago" : "pendente"),
-        tipo: t.tipo_despesa
+        tipo: t.tipo_despesa,
+        conta_id: t.account_id
       }));
     },
     enabled: false, // Usually fetched by context, but available if needed

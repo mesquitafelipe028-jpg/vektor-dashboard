@@ -59,7 +59,8 @@ export function FinancialDataProvider({ children }: { children: React.ReactNode 
         status: t.type === "income" 
           ? (t.status === "confirmed" ? "recebido" : "pendente")
           : (t.status === "confirmed" ? "pago" : "pendente"),
-        tipo: t.tipo_despesa // campo legado
+        tipo: t.tipo_despesa, // campo legado
+        conta_id: t.account_id // essencial para evitar duplicidade no calculateStats
       }));
     },
     enabled: !!user,
