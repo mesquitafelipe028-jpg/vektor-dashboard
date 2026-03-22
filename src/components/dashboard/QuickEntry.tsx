@@ -127,39 +127,27 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
     mutationFn: async (data: ParsedData) => {
       if (isSubmittingManual) return;
       setIsSubmittingManual(true);
-      console.log(`[QuickEntry] Starting ${data.type} insertion`);
-
-      try {
-        const table = data.type === "receita" ? "receitas" : "despesas";
+      console.log(`[QuickEntry] Starting ${data.type} insertion`);      try {
         const todayStr = getLocalDateString();
 
         const payload = {
-          descricao: data.descricao,
-          valor: data.valor,
-          data: todayStr,
+          description: data.descricao,
+          amount: data.valor,
+          date: todayStr,
           tipo_transacao: "unica",
-          status: data.status,
+          status: "confirmed", // QuickEntry normally assumes confirmed status
           tipo_conta: accounts.find(a => a.id === selectedContaId)?.classificacao || (financialView === "tudo" ? "mei" : financialView),
-          conta_id: selectedContaId || null,
+          account_id: selectedContaId || null,
           user_id: user?.id,
-          ...(data.type === "despesa" && { categoria: data.categoria }),
+          type: data.type === "receita" ? "income" : "expense",
+          tipo_despesa: data.type === "receita" ? "income" : "expense", // maintain legacy field compat
+          category: data.categoria
         };
 
-        const { error } = await supabase.from(table).insert([payload]);
+        const { error } = await supabase.from("transactions").insert([payload]);
         if (error) throw error;
-
-        // Balance Sync
-        const isSettled = data.status === "recebido" || data.status === "pago";
-        if (isSettled && selectedContaId) {
-          console.log(`[QuickEntry] Syncing balance for account ${selectedContaId}`);
-          const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", selectedContaId).single();
-          if (acc) {
-            const delta = data.type === "receita" ? data.valor : -data.valor;
-            const newSaldo = (acc.saldo || 0) + delta;
-            await supabase.from("contas_financeiras").update({ saldo: newSaldo } as any).eq("id", selectedContaId);
-            console.log(`[QuickEntry] Balance updated to ${newSaldo}`);
-          }
-        }
+        
+        // Note: Balance Sync is now automatic via Ledger Trigger
       } catch (err) {
         setIsSubmittingManual(false);
         throw err;
@@ -167,10 +155,9 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
     },
     onSuccess: (_, variables) => {
       console.log("[QuickEntry] Success! Invalidating queries...");
-      qc.invalidateQueries({ queryKey: queryKeys.receitas() });
-      qc.invalidateQueries({ queryKey: queryKeys.despesas() });
-      qc.invalidateQueries({ queryKey: queryKeys.dashboard() });
-      qc.invalidateQueries({ queryKey: queryKeys.accounts() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions(user?.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard(user?.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.accounts(user?.id) });
       
       toast.success(`${variables.type === "receita" ? "Receita" : "Despesa"} registrada com sucesso!`);
       setText("");

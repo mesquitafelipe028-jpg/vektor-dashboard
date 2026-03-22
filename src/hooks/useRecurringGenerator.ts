@@ -17,10 +17,9 @@ export function useRecurringGenerator(userId: string | undefined) {
 
     (async () => {
       try {
-        await generateNext("receitas", userId);
-        await generateNext("despesas", userId);
-        qc.invalidateQueries({ queryKey: ["receitas", userId] });
-        qc.invalidateQueries({ queryKey: ["despesas", userId] });
+        await generateNext(userId);
+        qc.invalidateQueries({ queryKey: queryKeys.transactions(userId) });
+        qc.invalidateQueries({ queryKey: queryKeys.accounts(userId) });
       } catch (e) {
         console.error("[RecurringGenerator]", e);
       }
@@ -39,10 +38,10 @@ function getNextDate(currentDate: string, freq: Frequencia): string {
   return getLocalDateString(d);
 }
 
-async function generateNext(table: "receitas" | "despesas", userId: string) {
-  // Get all recurring parent transactions (no transacao_pai_id)
+async function generateNext(userId: string) {
+  // Get all recurring parent transactions in the unified table
   const { data: parents, error } = await supabase
-    .from(table)
+    .from("transactions")
     .select("*")
     .eq("user_id", userId)
     .eq("tipo_transacao", "recorrente" as any)
@@ -62,13 +61,13 @@ async function generateNext(table: "receitas" | "despesas", userId: string) {
 
     // Find the latest child (or parent itself)
     const { data: children } = await supabase
-      .from(table)
-      .select("data")
+      .from("transactions")
+      .select("date")
       .eq("transacao_pai_id", p.id)
-      .order("data", { ascending: false })
+      .order("date", { ascending: false })
       .limit(1);
 
-    const latestDate = children?.length ? children[0].data : p.data;
+    const latestDate = children?.length ? children[0].date : p.date;
     let nextDate = getNextDate(latestDate!, freq);
 
     // Generate all missing occurrences up to today
@@ -77,36 +76,34 @@ async function generateNext(table: "receitas" | "despesas", userId: string) {
 
       // Check if already exists for this date
       const { data: existing } = await supabase
-        .from(table)
+        .from("transactions")
         .select("id")
         .eq("transacao_pai_id", p.id)
-        .eq("data", nextDate)
+        .eq("date", nextDate)
         .limit(1);
 
       if (!existing?.length) {
         const newRecord: any = {
-          descricao: p.descricao,
-          valor: p.valor,
-          data: nextDate,
+          description: p.description,
+          amount: p.amount,
+          date: nextDate,
           user_id: userId,
           tipo_transacao: "recorrente",
           frequencia: freq,
           transacao_pai_id: p.id,
           data_inicio: p.data_inicio,
           data_fim: p.data_fim,
-          status: "pendente",
+          status: "pending", // Occurrences start as pending
           tipo_conta: p.tipo_conta || "mei",
+          type: p.type,
+          account_id: p.account_id,
+          category: p.category,
+          forma_pagamento: p.forma_pagamento,
+          cliente_id: p.cliente_id,
+          tipo_despesa: p.tipo_despesa
         };
 
-        // Table-specific fields
-        if (table === "receitas") {
-          newRecord.forma_pagamento = p.forma_pagamento;
-          newRecord.cliente_id = p.cliente_id;
-        } else {
-          newRecord.categoria = p.categoria;
-        }
-
-        await supabase.from(table).insert(newRecord);
+        await supabase.from("transactions").insert(newRecord);
       }
 
       nextDate = getNextDate(nextDate, freq);

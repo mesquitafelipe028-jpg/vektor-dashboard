@@ -98,45 +98,28 @@ export default function StatementImport() {
       const account = accounts.find(a => a.id === selectedAccountId);
       const tipoConta = account?.classificacao || "pessoal";
 
-      const receitas = toImport.filter((t) => t.tipo === "receita").map((t) => ({
+      const transactionsToInsert = toImport.map((t) => ({
         user_id: user.id,
-        descricao: t.descricao,
-        valor: t.valor,
-        data: t.data,
-        categoria: t.categoria,
-        status: "recebido",
-        conta_id: selectedAccountId,
+        description: t.descricao,
+        amount: t.valor,
+        date: t.data,
+        category: t.categoria,
+        status: "confirmed",
+        account_id: selectedAccountId,
+        type: t.tipo === "receita" ? "income" : "expense",
         tipo_conta: tipoConta,
       }));
 
-      const despesas = toImport.filter((t) => t.tipo === "despesa").map((t) => ({
-        user_id: user.id,
-        descricao: t.descricao,
-        valor: t.valor,
-        data: t.data,
-        categoria: t.categoria,
-        status: "pago",
-        conta_id: selectedAccountId,
-        tipo_conta: tipoConta,
-      }));
-
-      if (receitas.length > 0) {
-        const { error } = await supabase.from("receitas").insert(receitas as any);
-        if (error) throw error;
-      }
-      if (despesas.length > 0) {
-        const { error } = await supabase.from("despesas").insert(despesas as any);
-        if (error) throw error;
-      }
+      const { error } = await supabase.from("transactions").insert(transactionsToInsert);
+      if (error) throw error;
 
       return toImport.length;
     },
     onSuccess: (count) => {
       const userId = user?.id;
-      qc.invalidateQueries({ queryKey: queryKeys.receitas(userId) });
-      qc.invalidateQueries({ queryKey: queryKeys.despesas(userId) });
-      qc.invalidateQueries({ queryKey: queryKeys.dashboard(userId) });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions(userId) });
       qc.invalidateQueries({ queryKey: queryKeys.accounts(userId) });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard(userId) });
       setImportedCount(count);
       setStep("done");
     },

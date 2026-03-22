@@ -138,28 +138,21 @@ export default function Onboarding() {
         classificacao: goal === "mei" ? "pj" : "pf",
       }).select().single();
 
-      // 2. Save Imported Transactions
+      // 2. Save Imported Transactions in the unified table
       if (accData && importedTx.length > 0) {
-        const receitas = importedTx.filter(t => t.tipo === "receita").map(t => ({
+        const transactionsToInsert = importedTx.map(t => ({
           user_id: user.id,
-          descricao: t.descricao,
-          valor: t.valor,
-          data: t.data,
-          categoria: t.categoria,
-          conta_id: accData.id,
-          status: "recebido"
-        }));
-        const despesas = importedTx.filter(t => t.tipo === "despesa").map(t => ({
-          user_id: user.id,
-          descricao: t.descricao,
-          valor: t.valor,
-          data: t.data,
-          categoria: t.categoria,
-          status: "pago"
+          description: t.descricao,
+          amount: t.valor,
+          date: t.data,
+          category: t.categoria,
+          account_id: accData.id,
+          status: "confirmed",
+          type: t.tipo === "receita" ? "income" : "expense"
         }));
 
-        if (receitas.length > 0) await supabase.from("receitas").insert(receitas);
-        if (despesas.length > 0) await supabase.from("despesas").insert(despesas);
+        const { error } = await supabase.from("transactions").insert(transactionsToInsert);
+        if (error) throw error;
       }
 
       // 3. Mark Premium if selected

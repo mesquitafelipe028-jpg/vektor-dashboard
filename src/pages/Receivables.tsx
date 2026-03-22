@@ -34,19 +34,22 @@ export default function Receivables() {
     queryKey: ["receivables"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("receitas")
+        .from("transactions")
         .select("*, clientes(nome, telefone, email)")
-        .order("data", { ascending: true });
+        .eq("type", "income")
+        .not("cliente_id", "is", null)
+        .order("date", { ascending: true });
       if (error) throw error;
       return (data as any[])
         .filter((r: any) => 
-          !!r.cliente_id && (
-            r.status !== "recebido" || 
-            (r.tipo_transacao === "recorrente" && !r.transacao_pai_id)
-          )
+          r.status !== "confirmed" || 
+          (r.tipo_transacao === "recorrente" && !r.transacao_pai_id)
         )
         .map((r: any) => ({
           ...r,
+          valor: r.amount,
+          descricao: r.description,
+          data: r.date,
           cliente_nome: r.clientes?.nome,
           cliente_telefone: r.clientes?.telefone,
           cliente_email: r.clientes?.email,
@@ -58,14 +61,15 @@ export default function Receivables() {
   const markPaid = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("receitas")
-        .update({ status: "recebido" } as any)
+        .from("transactions")
+        .update({ status: "confirmed" } as any)
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["receivables"] });
-      qc.invalidateQueries({ queryKey: ["receitas"] });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions(user?.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.accounts(user?.id) });
       toast.success("Pagamento registrado!");
     },
   });

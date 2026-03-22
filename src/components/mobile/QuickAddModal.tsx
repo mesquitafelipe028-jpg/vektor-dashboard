@@ -91,28 +91,19 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
       const numVal = parseFloat(valor);
       if (!numVal || numVal <= 0) throw new Error("Valor inválido");
 
-      if (tipo === "receita") {
-        const { error } = await supabase.from("receitas").insert({
-          descricao: descricao || categoria || "Receita rápida",
-          valor: numVal,
-          data,
-          cliente_id: clienteId || null,
-          forma_pagamento: null,
-          user_id: user!.id,
-          status: "recebido",
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("despesas").insert({
-          descricao: descricao || categoria || "Despesa rápida",
-          valor: numVal,
-          data,
-          categoria: categoria || null,
-          user_id: user!.id,
-          status: "pendente",
-        });
-        if (error) throw error;
-      }
+      const payload = {
+        user_id: user!.id,
+        description: descricao || categoria || (tipo === "receita" ? "Receita rápida" : "Despesa rápida"),
+        amount: numVal,
+        date: data,
+        type: tipo === "receita" ? "income" : "expense",
+        status: "confirmed", // QuickAdd assumes the money was already moved
+        category: categoria || null,
+        cliente_id: tipo === "receita" ? (clienteId || null) : null,
+      };
+
+      const { error } = await supabase.from("transactions").insert(payload);
+      if (error) throw error;
 
       // Save prefs
       const p = getPrefs();
@@ -121,9 +112,9 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
       savePrefs(p);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.receitas() });
-      qc.invalidateQueries({ queryKey: queryKeys.despesas() });
-      qc.invalidateQueries({ queryKey: queryKeys.dashboard() });
+      qc.invalidateQueries({ queryKey: queryKeys.transactions(user?.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard(user?.id) });
+      qc.invalidateQueries({ queryKey: queryKeys.accounts(user?.id) });
       toast.success("Transação registrada com sucesso");
       onOpenChange(false);
     },

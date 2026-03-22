@@ -54,49 +54,28 @@ export function QuickSyncModal({
     try {
       if (!user) throw new Error("Usuário não autenticado");
 
-      // 1. Update orphaned transactions
-      const { error: err1 } = await supabase
-        .from("receitas")
-        .update({ conta_id: selectedAccountId } as any)
+      // 1. Update orphaned transactions in the unified table
+      const { error } = await supabase
+        .from("transactions")
+        .update({ account_id: selectedAccountId } as any)
         .eq("user_id", user.id)
-        .is("conta_id", null);
+        .is("account_id", null);
       
-      const { error: err2 } = await supabase
-        .from("despesas")
-        .update({ conta_id: selectedAccountId } as any)
-        .eq("user_id", user.id)
-        .is("conta_id", null);
-
-      if (err1 || err2) {
-        const error = err1 || err2;
-        if (error.message?.includes("column \"conta_id\" does not exist")) {
-          throw new Error("A coluna 'conta_id' não existe no seu banco de dados. Por favor, rode o script SQL que está no Walkthrough.");
+      if (error) {
+        if (error.message?.includes("column \"account_id\" does not exist")) {
+          throw new Error("Erro de esquema: a coluna 'account_id' não foi encontrada.");
         }
         throw error;
       }
 
-      // 2. Update account balance if requested
-      if (shouldUpdateBalance) {
-        const account = accounts.find((a) => a.id === selectedAccountId);
-        if (account) {
-          const newSaldo = (account.saldo || 0) + orphanedBalance;
-          const { error: err3 } = await supabase
-            .from("contas_financeiras" as any)
-            .update({ saldo: newSaldo } as any)
-            .eq("id", selectedAccountId)
-            .eq("user_id", user.id);
-          
-          if (err3) throw err3;
-        }
-      }
+      // Note: Step 2 (Account Balance update) is now automatic via Ledger Trigger
 
       toast.success("Histórico vinculado com sucesso!");
       
       // Invalidate all related queries
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.receitas() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.despesas() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts(user.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(user.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard(user.id) });
       queryClient.invalidateQueries({ queryKey: ["orphaned_transactions"] });
       
       onOpenChange(false);
