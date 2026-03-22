@@ -45,18 +45,20 @@ interface FormData {
 }
 
 const receitaSchema = z.object({
-  descricao: z.string().trim().min(1, "Descrição obrigatória").max(200),
-  valor: z.number().positive("Valor deve ser positivo"),
-  data: z.string().min(1, "Data obrigatória"),
-  forma_pagamento: z.string().optional(),
-  cliente_id: z.string().optional(),
+  descricao: z.string().trim().min(3, "Descrição muito curta (mín. 3 caracteres)").max(200),
+  valor: z.number({ invalid_type_error: "Valor inválido" }).positive("Valor deve ser superior a zero"),
+  data: z.string().min(1, "Data é obrigatória"),
+  forma_pagamento: z.string().optional().nullable(),
+  cliente_id: z.string().optional().nullable(),
+  conta_id: z.string().min(1, "Selecione uma conta para vincular a transação"),
 });
 
 const despesaSchema = z.object({
-  descricao: z.string().trim().min(1, "Descrição obrigatória").max(200),
-  valor: z.number().positive("Valor deve ser positivo"),
-  data: z.string().min(1, "Data obrigatória"),
-  categoria: z.string().optional(),
+  descricao: z.string().trim().min(3, "Descrição muito curta (mín. 3 caracteres)").max(200),
+  valor: z.number({ invalid_type_error: "Valor inválido" }).positive("Valor deve ser superior a zero"),
+  data: z.string().min(1, "Data é obrigatória"),
+  categoria: z.string().min(1, "Selecione uma categoria"),
+  conta_id: z.string().min(1, "Selecione uma conta para vincular a transação"),
 });
 
 const emptyForm: FormData = {
@@ -177,6 +179,7 @@ export default function TransactionForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
 
   const { categories: dbCategories } = useCategories(type);
   const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
@@ -294,15 +297,20 @@ export default function TransactionForm() {
 
   const upsert = useMutation({
     mutationFn: async () => {
-      const schema = type === "receita" ? receitaSchema : despesaSchema;
-      const parsed = schema.safeParse({ ...form, valor: parseFloat(form.valor) });
-      if (!parsed.success) {
-        const fe: Record<string, string> = {};
-        parsed.error.issues.forEach((i) => (fe[String(i.path[0])] = i.message));
-        setErrors(fe);
-        throw new Error("validation");
-      }
-      setErrors({});
+      if (isSubmittingManual) return;
+      setIsSubmittingManual(true);
+      console.log(`[Mutation] Starting ${isEditing ? "UPDATE" : "INSERT"} for ${type}`);
+
+      try {
+        const schema = type === "receita" ? receitaSchema : despesaSchema;
+        const parsed = schema.safeParse({ ...form, valor: parseFloat(form.valor) });
+        if (!parsed.success) {
+          const fe: Record<string, string> = {};
+          parsed.error.issues.forEach((i) => (fe[String(i.path[0])] = i.message));
+          setErrors(fe);
+          throw new Error("validation");
+        }
+        setErrors({});
 
         const todayStr = getLocalDateString();
         const isFuture = (parsed.data as any).data > todayStr;
@@ -310,186 +318,197 @@ export default function TransactionForm() {
 
         if (type === "receita") {
           const status = form.efetivada ? "recebido" : "pendente";
-        if (tipoTransacao === "recorrente" && !isEditing) {
-          const freq = form.frequencia as Frequencia;
-          const { error } = await supabase.from("receitas").insert({
+          
+          if (tipoTransacao === "recorrente" && !isEditing) {
+            console.log("[Mutation] Creating RECURRING revenue");
+            const freq = form.frequencia as Frequencia;
+            const { error } = await supabase.from("receitas").insert({
+              descricao: (parsed.data as any).descricao,
+              valor: (parsed.data as any).valor,
+              data: form.data_inicio || (parsed.data as any).data,
+              forma_pagamento: (parsed.data as any).forma_pagamento || null,
+              cliente_id: (parsed.data as any).cliente_id || null,
+              categoria: form.categoria || null,
+              tipo_conta: form.tipo_conta || "mei",
+              conta_id: form.conta_id || null,
+              user_id: user!.id,
+              tipo_transacao: "recorrente",
+              frequencia: freq,
+              data_inicio: form.data_inicio || (parsed.data as any).data,
+              data_fim: form.data_fim || null,
+              status,
+            } as any);
+            if (error) throw error;
+            return;
+          }
+
+          const payload: any = {
             descricao: (parsed.data as any).descricao,
             valor: (parsed.data as any).valor,
-            data: form.data_inicio || (parsed.data as any).data,
+            data: (parsed.data as any).data,
             forma_pagamento: (parsed.data as any).forma_pagamento || null,
             cliente_id: (parsed.data as any).cliente_id || null,
             categoria: form.categoria || null,
             tipo_conta: form.tipo_conta || "mei",
             conta_id: form.conta_id || null,
             user_id: user!.id,
-            tipo_transacao: "recorrente",
-            frequencia: freq,
-            data_inicio: form.data_inicio || (parsed.data as any).data,
-            data_fim: form.data_fim || null,
+            tipo_transacao: tipoTransacao,
             status,
-          } as any);
-          if (error) throw error;
-          return;
-        }
-        const payload: any = {
-          descricao: (parsed.data as any).descricao,
-          valor: (parsed.data as any).valor,
-          data: (parsed.data as any).data,
-          forma_pagamento: (parsed.data as any).forma_pagamento || null,
-          cliente_id: (parsed.data as any).cliente_id || null,
-          categoria: form.categoria || null,
-          tipo_conta: form.tipo_conta || "mei",
-          conta_id: form.conta_id || null,
-          user_id: user!.id,
-          tipo_transacao: tipoTransacao,
-          status,
-        };
+          };
 
-        if (isEditing) {
-          const { error } = await supabase.from("receitas").update(payload).eq("id", id!);
-          if (error) throw error;
+          if (isEditing) {
+            console.log(`[Mutation] Updating existing revenue ${id}`);
+            const { error } = await supabase.from("receitas").update(payload).eq("id", id!);
+            if (error) throw error;
 
-          // Balance Sync
-          if (form.conta_id) {
-            const oldVal = (existing as any).valor;
-            const newVal = (parsed.data as any).valor;
-            const isNowSettled = status === "recebido";
-            const wasSettled = (existing as any).status === "recebido";
+            if (form.conta_id) {
+              const oldVal = (existing as any).valor;
+              const newVal = (parsed.data as any).valor;
+              const isNowSettled = status === "recebido";
+              const wasSettled = (existing as any).status === "recebido";
 
-            let delta = 0;
-            if (!wasSettled && isNowSettled) delta = newVal;
-            else if (wasSettled && !isNowSettled) delta = -oldVal;
-            else if (wasSettled && isNowSettled) delta = newVal - oldVal;
-            
-            if (delta !== 0 && !isFuture) await updateAccountBalance(form.conta_id, delta);
+              let delta = 0;
+              if (!wasSettled && isNowSettled) delta = newVal;
+              else if (wasSettled && !isNowSettled) delta = -oldVal;
+              else if (wasSettled && isNowSettled) delta = newVal - oldVal;
+              
+              if (delta !== 0 && !isFuture) await updateAccountBalance(form.conta_id, delta);
+            }
+          } else {
+            console.log("[Mutation] Inserting NEW revenue");
+            const { error } = await supabase.from("receitas").insert(payload);
+            if (error) throw error;
+
+            if (status === "recebido" && form.conta_id && !isFuture) {
+              await updateAccountBalance(form.conta_id, (parsed.data as any).valor);
+            }
           }
         } else {
-          const { error } = await supabase.from("receitas").insert(payload);
-          if (error) throw error;
-
-          // Balance Sync
-          if (status === "recebido" && form.conta_id && !isFuture) {
-            await updateAccountBalance(form.conta_id, (parsed.data as any).valor);
-          }
-        }
-      } else {
-        // Despesa
-        const status = form.efetivada ? "pago" : "pendente";
-        if (tipoTransacao === "parcelada" && !isEditing) {
-          const numParcelas = parseInt(form.numero_parcelas || "1") || 1;
-          const valorInserido = (parsed.data as any).valor;
-          const valorBase = form.parcelamento_tipo === "parcela" 
-            ? valorInserido * numParcelas 
-            : valorInserido;
+          // Despesa
+          const status = form.efetivada ? "pago" : "pendente";
           
-          const installments = generateInstallments(valorBase, numParcelas, (parsed.data as any).data);
-          
-          const { data: parent, error: parentErr } = await supabase.from("despesas").insert({
-            descricao: (parsed.data as any).descricao,
-            valor: installments[0].valor,
-            data: installments[0].data,
-            categoria: (parsed.data as any).categoria || null,
-            tipo_conta: form.tipo_conta || "mei",
-            conta_id: form.conta_id || null,
-            user_id: user!.id,
-            tipo_transacao: "parcelada",
-            numero_parcelas: numParcelas,
-            parcela_atual: 1,
-            status: form.efetivada ? "pago" : "pendente",
-            tipo: form.tipo,
-          } as any).select("id").single();
-          if (parentErr) throw parentErr;
-
-          // Balance Sync for first installment
-          if (form.efetivada && form.conta_id && !isFuture) {
-            await updateAccountBalance(form.conta_id, -installments[0].valor);
-          }
-          if (installments.length > 1) {
-            const children = installments.slice(1).map((inst) => ({
+          if (tipoTransacao === "parcelada" && !isEditing) {
+            console.log("[Mutation] Creating INSTALLMENT expense");
+            const numParcelas = parseInt(form.numero_parcelas || "1") || 1;
+            const valorInserido = (parsed.data as any).valor;
+            const valorBase = form.parcelamento_tipo === "parcela" 
+              ? valorInserido * numParcelas 
+              : valorInserido;
+            
+            const installments = generateInstallments(valorBase, numParcelas, (parsed.data as any).data);
+            
+            const { data: parent, error: parentErr } = await supabase.from("despesas").insert({
               descricao: (parsed.data as any).descricao,
-              valor: inst.valor,
-              data: inst.data,
+              valor: installments[0].valor,
+              data: installments[0].data,
               categoria: (parsed.data as any).categoria || null,
               tipo_conta: form.tipo_conta || "mei",
               conta_id: form.conta_id || null,
               user_id: user!.id,
               tipo_transacao: "parcelada",
               numero_parcelas: numParcelas,
-              parcela_atual: inst.parcela,
-              transacao_pai_id: parent.id,
-              status: "pendente",
+              parcela_atual: 1,
+              status: form.efetivada ? "pago" : "pendente",
               tipo: form.tipo,
-            } as any));
-            const { error } = await supabase.from("despesas").insert(children);
-            if (error) throw error;
+            } as any).select("id").single();
+            if (parentErr) throw parentErr;
+
+            if (form.efetivada && form.conta_id && !isFuture) {
+              await updateAccountBalance(form.conta_id, -installments[0].valor);
+            }
+
+            if (installments.length > 1) {
+              const children = installments.slice(1).map((inst) => ({
+                descricao: (parsed.data as any).descricao,
+                valor: inst.valor,
+                data: inst.data,
+                categoria: (parsed.data as any).categoria || null,
+                tipo_conta: form.tipo_conta || "mei",
+                conta_id: form.conta_id || null,
+                user_id: user!.id,
+                tipo_transacao: "parcelada",
+                numero_parcelas: numParcelas,
+                parcela_atual: inst.parcela,
+                transacao_pai_id: parent.id,
+                status: "pendente",
+                tipo: form.tipo,
+              } as any));
+              const { error } = await supabase.from("despesas").insert(children);
+              if (error) throw error;
+            }
+            return;
           }
-          return;
-        }
-        if (tipoTransacao === "recorrente" && !isEditing) {
-          const freq = form.frequencia as Frequencia;
-          const { error } = await supabase.from("despesas").insert({
+
+          if (tipoTransacao === "recorrente" && !isEditing) {
+            console.log("[Mutation] Creating RECURRING expense");
+            const freq = form.frequencia as Frequencia;
+            const { error } = await supabase.from("despesas").insert({
+              descricao: (parsed.data as any).descricao,
+              valor: (parsed.data as any).valor,
+              data: form.data_inicio || (parsed.data as any).data,
+              categoria: (parsed.data as any).categoria || null,
+              tipo_conta: form.tipo_conta || "mei",
+              conta_id: form.conta_id || null,
+              user_id: user!.id,
+              tipo_transacao: "recorrente",
+              frequencia: freq,
+              data_inicio: form.data_inicio || (parsed.data as any).data,
+              data_fim: form.data_fim || null,
+              status,
+              tipo: form.tipo,
+            } as any);
+            if (error) throw error;
+            return;
+          }
+
+          const payload: any = {
             descricao: (parsed.data as any).descricao,
             valor: (parsed.data as any).valor,
-            data: form.data_inicio || (parsed.data as any).data,
+            data: (parsed.data as any).data,
             categoria: (parsed.data as any).categoria || null,
             tipo_conta: form.tipo_conta || "mei",
             conta_id: form.conta_id || null,
             user_id: user!.id,
-            tipo_transacao: "recorrente",
-            frequencia: freq,
-            data_inicio: form.data_inicio || (parsed.data as any).data,
-            data_fim: form.data_fim || null,
+            tipo_transacao: tipoTransacao,
             status,
             tipo: form.tipo,
-          } as any);
-          if (error) throw error;
-          return;
-        }
-        const payload: any = {
-          descricao: (parsed.data as any).descricao,
-          valor: (parsed.data as any).valor,
-          data: (parsed.data as any).data,
-          categoria: (parsed.data as any).categoria || null,
-          tipo_conta: form.tipo_conta || "mei",
-          conta_id: form.conta_id || null,
-          user_id: user!.id,
-          tipo_transacao: tipoTransacao,
-          status,
-          tipo: form.tipo,
-        };
-        if (isEditing) {
-          const { error } = await supabase.from("despesas").update(payload).eq("id", id!);
-          if (error) throw error;
+          };
 
-          // Balance Sync
-          if (form.conta_id) {
-            const oldVal = (existing as any).valor;
-            const newVal = (parsed.data as any).valor;
-            const isNowSettled = status === "pago";
-            const wasSettled = (existing as any).status === "pago";
-            const isInvestment = form.tipo === "investment";
+          if (isEditing) {
+            console.log(`[Mutation] Updating existing expense ${id}`);
+            const { error } = await supabase.from("despesas").update(payload).eq("id", id!);
+            if (error) throw error;
 
-            let delta = 0;
-            // For expenses, paid status subtracts from balance
-            if (!wasSettled && isNowSettled) delta = -newVal;
-            else if (wasSettled && !isNowSettled) delta = oldVal;
-            else if (wasSettled && isNowSettled) delta = oldVal - newVal;
-            
-            if (delta !== 0 && !isFuture) await updateAccountBalance(form.conta_id, delta);
-          }
-        } else {
-          const { error } = await supabase.from("despesas").insert(payload);
-          if (error) throw error;
+            if (form.conta_id) {
+              const oldVal = (existing as any).valor;
+              const newVal = (parsed.data as any).valor;
+              const isNowSettled = status === "pago";
+              const wasSettled = (existing as any).status === "pago";
 
-          // Balance Sync
-          if (status === "pago" && form.conta_id && !isFuture) {
-            await updateAccountBalance(form.conta_id, -(parsed.data as any).valor);
+              let delta = 0;
+              if (!wasSettled && isNowSettled) delta = -newVal;
+              else if (wasSettled && !isNowSettled) delta = oldVal;
+              else if (wasSettled && isNowSettled) delta = oldVal - newVal;
+              
+              if (delta !== 0 && !isFuture) await updateAccountBalance(form.conta_id, delta);
+            }
+          } else {
+            console.log("[Mutation] Inserting NEW expense");
+            const { error } = await supabase.from("despesas").insert(payload);
+            if (error) throw error;
+
+            if (status === "pago" && form.conta_id && !isFuture) {
+              await updateAccountBalance(form.conta_id, -(parsed.data as any).valor);
+            }
           }
         }
+      } catch (err) {
+        setIsSubmittingManual(false);
+        throw err;
       }
     },
     onSuccess: async () => {
-      // Invalida as queries de forma mais precisa usando o userId
+      console.log("[Mutation] Success! Invalidating queries...");
       const userId = user?.id;
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.receitas(userId) }),
@@ -497,7 +516,6 @@ export default function TransactionForm() {
         qc.invalidateQueries({ queryKey: queryKeys.dashboard(userId) }),
         qc.invalidateQueries({ queryKey: queryKeys.accounts(userId) }),
       ]);
-      // Refetch accounts immediately to update balance KPIs
       await qc.refetchQueries({ queryKey: queryKeys.accounts(userId) });
 
       toast.success(isEditing
@@ -507,11 +525,12 @@ export default function TransactionForm() {
       navigate(backPath);
     },
     onError: (e: any) => {
+      setIsSubmittingManual(false);
       if (e.message !== "validation") {
         toast.error(`Erro ao salvar ${type}.`, {
           description: e.message || "Erro desconhecido"
         });
-        console.error("Erro ao salvar:", e);
+        console.error("[Mutation] Error:", e);
       }
     },
   });
@@ -541,10 +560,10 @@ export default function TransactionForm() {
         <Button
           size="sm"
           onClick={() => upsert.mutate()}
-          disabled={upsert.isPending}
+          disabled={upsert.isPending || isSubmittingManual}
           className={`${accentBg} text-white px-5 rounded-full text-sm`}
         >
-          {upsert.isPending ? "..." : "Salvar"}
+          {upsert.isPending || isSubmittingManual ? "..." : "Salvar"}
         </Button>
       </div>
 

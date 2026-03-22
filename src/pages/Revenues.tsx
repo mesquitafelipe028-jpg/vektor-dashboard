@@ -72,40 +72,47 @@ export default function Revenues() {
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
-      // 1. Get the transaction data before deleting
+      console.log(`[Revenues] Deleting transaction ${id}`);
       const { data: item } = await supabase.from("receitas").select("*").eq("id", id).single();
       
-      const todayStr = getLocalDateString();
-      const isFuture = item && item.data > todayStr;
+      if (!item) throw new Error("Transação não encontrada.");
 
-      if (item && item.status === "recebido" && item.conta_id && !isFuture) {
-        // Update balance (subtract the value since it was a revenue being removed)
+      const todayStr = getLocalDateString();
+      const isFuture = item.data > todayStr;
+
+      if (item.status === "recebido" && item.conta_id && !isFuture) {
+        console.log(`[Revenues] Reverting balance for account ${item.conta_id} due to deletion`);
         const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", item.conta_id).single();
         if (acc) {
-          await supabase.from("contas_financeiras").update({ saldo: (acc.saldo || 0) - item.valor } as any).eq("id", item.conta_id);
+          const newSaldo = (acc.saldo || 0) - item.valor;
+          const { error: updErr } = await supabase.from("contas_financeiras").update({ saldo: newSaldo } as any).eq("id", item.conta_id);
+          if (updErr) console.error("[Revenues] Balance update error:", updErr);
+          else console.log(`[Revenues] Balance updated to ${newSaldo}`);
         }
       }
 
-      // 2. Delete the transaction
       const { error } = await supabase.from("receitas").delete().eq("id", id);
       if (error) throw error;
       
-      // 3. Handle children
       await (supabase.from("receitas") as any).delete().eq("transacao_pai_id", id);
+      console.log("[Revenues] Deletion complete.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["receitas", user?.id] });
       qc.invalidateQueries({ queryKey: ["contas_financeiras", user?.id] });
-      qc.invalidateQueries({ queryKey: ["dashboard", user?.id] });
+      qc.invalidQueries({ queryKey: ["dashboard", user?.id] });
       qc.refetchQueries({ queryKey: ["contas_financeiras", user?.id] });
       toast.success("Receita excluída!");
     },
-    onError: () => toast.error("Erro ao excluir receita."),
+    onError: (e: any) => {
+      console.error("[Revenues] Delete error:", e);
+      toast.error("Erro ao excluir receita.");
+    },
   });
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      // 1. Get the transaction data before update
+      console.log(`[Revenues] Updating status for ${id} to ${status}`);
       const { data: item } = await supabase.from("receitas").select("*").eq("id", id).single();
       
       if (item && item.conta_id) {
@@ -120,14 +127,16 @@ export default function Revenues() {
         else if (wasPaid && !isPaid) delta = -item.valor;
         
         if (delta !== 0 && !isFuture) {
+          console.log(`[Revenues] Adjusting balance for ${item.conta_id} by ${delta}`);
           const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", item.conta_id).single();
           if (acc) {
-            await supabase.from("contas_financeiras").update({ saldo: (acc.saldo || 0) + delta } as any).eq("id", item.conta_id);
+            const newSaldo = (acc.saldo || 0) + delta;
+            await supabase.from("contas_financeiras").update({ saldo: newSaldo } as any).eq("id", item.conta_id);
+            console.log(`[Revenues] Balance updated to ${newSaldo}`);
           }
         }
       }
 
-      // 2. Update status
       const { error } = await supabase.from("receitas").update({ status } as any).eq("id", id);
       if (error) throw error;
     },
@@ -138,6 +147,10 @@ export default function Revenues() {
       qc.refetchQueries({ queryKey: ["contas_financeiras", user?.id] });
       toast.success("Status atualizado!");
     },
+    onError: (e: any) => {
+      console.error("[Revenues] Status update error:", e);
+      toast.error("Erro ao atualizar status.");
+    }
   });
 
   const hasFilters = filterClientId && filterClientId !== "all";

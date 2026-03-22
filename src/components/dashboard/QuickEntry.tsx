@@ -121,35 +121,66 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
     }
   };
 
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+
   const insertData = useMutation({
     mutationFn: async (data: ParsedData) => {
-      const table = data.type === "receita" ? "receitas" : "despesas";
+      if (isSubmittingManual) return;
+      setIsSubmittingManual(true);
+      console.log(`[QuickEntry] Starting ${data.type} insertion`);
 
-      const payload = {
-        descricao: data.descricao,
-        valor: data.valor,
-        data: new Date().toISOString().slice(0, 10),
-        tipo_transacao: "unica",
-        status: data.status,
-        tipo_conta: accounts.find(a => a.id === selectedContaId)?.classificacao || (financialView === "tudo" ? "mei" : financialView),
-        conta_id: selectedContaId || null,
-        user_id: user?.id,
-        ...(data.type === "despesa" && { categoria: data.categoria }), // Despesas use category field primarily
-      };
+      try {
+        const table = data.type === "receita" ? "receitas" : "despesas";
+        const todayStr = new Date().toISOString().slice(0, 10);
 
-      const { error } = await supabase.from(table).insert([payload]);
-      if (error) throw error;
+        const payload = {
+          descricao: data.descricao,
+          valor: data.valor,
+          data: todayStr,
+          tipo_transacao: "unica",
+          status: data.status,
+          tipo_conta: accounts.find(a => a.id === selectedContaId)?.classificacao || (financialView === "tudo" ? "mei" : financialView),
+          conta_id: selectedContaId || null,
+          user_id: user?.id,
+          ...(data.type === "despesa" && { categoria: data.categoria }),
+        };
+
+        const { error } = await supabase.from(table).insert([payload]);
+        if (error) throw error;
+
+        // Balance Sync
+        const isSettled = data.status === "recebido" || data.status === "pago";
+        if (isSettled && selectedContaId) {
+          console.log(`[QuickEntry] Syncing balance for account ${selectedContaId}`);
+          const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", selectedContaId).single();
+          if (acc) {
+            const delta = data.type === "receita" ? data.valor : -data.valor;
+            const newSaldo = (acc.saldo || 0) + delta;
+            await supabase.from("contas_financeiras").update({ saldo: newSaldo } as any).eq("id", selectedContaId);
+            console.log(`[QuickEntry] Balance updated to ${newSaldo}`);
+          }
+        }
+      } catch (err) {
+        setIsSubmittingManual(false);
+        throw err;
+      }
     },
     onSuccess: (_, variables) => {
+      console.log("[QuickEntry] Success! Invalidating queries...");
       qc.invalidateQueries({ queryKey: queryKeys.receitas() });
       qc.invalidateQueries({ queryKey: queryKeys.despesas() });
       qc.invalidateQueries({ queryKey: queryKeys.dashboard() });
+      qc.invalidateQueries({ queryKey: queryKeys.accounts() });
+      
       toast.success(`${variables.type === "receita" ? "Receita" : "Despesa"} registrada com sucesso!`);
       setText("");
       setIsDialogOpen(false);
+      setIsSubmittingManual(false);
     },
-    onError: (e) => {
+    onError: (e: any) => {
+      setIsSubmittingManual(false);
       toast.error("Erro ao registrar transação.", { description: e.message });
+      console.error("[QuickEntry] Error:", e);
     }
   });
 
@@ -289,10 +320,10 @@ export function QuickEntry({ financialView }: { financialView: "tudo" | "pessoal
             </Button>
             <Button 
                 onClick={handleConfirm} 
-                disabled={insertData.isPending}
+                disabled={insertData.isPending || isSubmittingManual}
                 className={`w-full sm:w-auto text-white shadow-md ${parsed?.type === "receita" ? "bg-primary hover:bg-primary/90" : "bg-destructive hover:bg-destructive/90"}`}
             >
-              {insertData.isPending ? "Salvando..." : "Confirmar"}
+              {insertData.isPending || isSubmittingManual ? "Salvando..." : "Confirmar"}
             </Button>
           </DialogFooter>
         </DialogContent>

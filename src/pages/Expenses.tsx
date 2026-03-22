@@ -62,26 +62,30 @@ export default function Expenses() {
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
-      // 1. Get the transaction data before deleting
+      console.log(`[Expenses] Deleting transaction ${id}`);
       const { data: item } = await supabase.from("despesas").select("*").eq("id", id).single();
       
-      const todayStr = getLocalDateString();
-      const isFuture = item && item.data > todayStr;
+      if (!item) throw new Error("Transação não encontrada.");
 
-      if (item && item.status === "pago" && item.conta_id && !isFuture) {
-        // Update balance (add back the value since it was an expense)
+      const todayStr = getLocalDateString();
+      const isFuture = item.data > todayStr;
+
+      if (item.status === "pago" && item.conta_id && !isFuture) {
+        console.log(`[Expenses] Reverting balance for account ${item.conta_id} due to deletion`);
         const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", item.conta_id).single();
         if (acc) {
-          await supabase.from("contas_financeiras").update({ saldo: (acc.saldo || 0) + item.valor } as any).eq("id", item.conta_id);
+          const newSaldo = (acc.saldo || 0) + item.valor;
+          const { error: updErr } = await supabase.from("contas_financeiras").update({ saldo: newSaldo } as any).eq("id", item.conta_id);
+          if (updErr) console.error("[Expenses] Balance update error:", updErr);
+          else console.log(`[Expenses] Balance updated to ${newSaldo}`);
         }
       }
 
-      // 2. Delete the transaction
       const { error } = await supabase.from("despesas").delete().eq("id", id);
       if (error) throw error;
       
-      // 3. Handle children
       await (supabase.from("despesas") as any).delete().eq("transacao_pai_id", id);
+      console.log("[Expenses] Deletion complete.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["despesas", user?.id] });
@@ -90,12 +94,15 @@ export default function Expenses() {
       qc.refetchQueries({ queryKey: ["contas_financeiras", user?.id] });
       toast.success("Despesa excluída!");
     },
-    onError: () => toast.error("Erro ao excluir despesa."),
+    onError: (e: any) => {
+      console.error("[Expenses] Delete error:", e);
+      toast.error("Erro ao excluir despesa.");
+    },
   });
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      // 1. Get the transaction data before update
+      console.log(`[Expenses] Updating status for ${id} to ${status}`);
       const { data: item } = await supabase.from("despesas").select("*").eq("id", id).single();
       
       if (item && item.conta_id) {
@@ -110,14 +117,16 @@ export default function Expenses() {
         else if (wasPaid && !isPaid) delta = item.valor;
         
         if (delta !== 0 && !isFuture) {
+          console.log(`[Expenses] Adjusting balance for ${item.conta_id} by ${delta}`);
           const { data: acc } = await supabase.from("contas_financeiras").select("saldo").eq("id", item.conta_id).single();
           if (acc) {
-            await supabase.from("contas_financeiras").update({ saldo: (acc.saldo || 0) + delta } as any).eq("id", item.conta_id);
+            const newSaldo = (acc.saldo || 0) + delta;
+            await supabase.from("contas_financeiras").update({ saldo: newSaldo } as any).eq("id", item.conta_id);
+            console.log(`[Expenses] Balance updated to ${newSaldo}`);
           }
         }
       }
 
-      // 2. Update status
       const { error } = await supabase.from("despesas").update({ status } as any).eq("id", id);
       if (error) throw error;
     },
@@ -128,6 +137,10 @@ export default function Expenses() {
       qc.refetchQueries({ queryKey: ["contas_financeiras", user?.id] });
       toast.success("Status atualizado!");
     },
+    onError: (e: any) => {
+      console.error("[Expenses] Status update error:", e);
+      toast.error("Erro ao atualizar status.");
+    }
   });
 
   const hasFilters = (filterCategoria && filterCategoria !== "all") || searchText.trim();
