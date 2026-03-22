@@ -1,6 +1,4 @@
 import { useRef, useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +11,6 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { CategoryIcon } from "@/components/CategoryIcon";
 import { transactionColors } from "@/lib/categories";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -22,10 +19,11 @@ import {
 import {
   TrendingUp, TrendingDown, Wallet, BarChart3,
   ArrowUpRight, ArrowDownRight, Minus, Activity, PiggyBank, Percent, Scale,
-  Download, Loader2,
+  Download, Loader2, CalendarIcon, Info, FileText, ShieldAlert, AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryKeys } from "@/lib/queryKeys";
+import { useFinancialData } from "@/hooks/useFinancialData";
+import { FinanceService } from "@/lib/financeService";
 
 const PIE_COLORS = [
   "hsl(160, 60%, 38%)", "hsl(38, 90%, 55%)", "hsl(200, 70%, 50%)",
@@ -49,6 +47,9 @@ const VarIndicator = ({ value }: { value: number }) => {
     : <ArrowDownRight className="h-4 w-4 text-red-600" />;
 };
 
+import { useFinancialData } from "@/hooks/useFinancialData";
+import { FinanceService } from "@/lib/financeService";
+
 export default function Reports() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -56,151 +57,66 @@ export default function Reports() {
   const [exporting, setExporting] = useState(false);
   const now = new Date();
 
+  // Use the hook to get base data
+  const { raw, loading } = useFinancialData();
+
   const defaultMonth = now.getMonth() === 0
     ? getMonthKey(now.getFullYear() - 1, 11)
     : getMonthKey(now.getFullYear(), now.getMonth() - 1);
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
 
-  const { data: receitas = [] } = useQuery({
-    queryKey: queryKeys.receitas(user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase.from("receitas").select("*");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  // Available months from raw data
+  const availableMonths = useMemo(() => {
+    const months = new Set<string>();
+    raw.receitas.forEach((r) => months.add(r.data.slice(0, 7)));
+    raw.despesas.forEach((d) => months.add(d.data.slice(0, 7)));
+    return Array.from(months).sort().reverse();
+  }, [raw.receitas, raw.despesas]);
 
-  const { data: despesas = [] } = useQuery({
-    queryKey: queryKeys.despesas(user?.id),
-    queryFn: async () => {
-      const { data, error } = await supabase.from("despesas").select("*");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  // === Visão Geral data ===
-  const monthlyData = useMemo(() => {
-    return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-      const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-      const desp = despesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-      return { month: label.charAt(0).toUpperCase() + label.slice(1), receitas: rec, despesas: desp, saldo: rec - desp };
-    });
-  }, [receitas, despesas]);
+  // View Geral
+  const monthlyData = useMemo(() => 
+    FinanceService.getMonthlySeries(raw.receitas, raw.despesas, "tudo"),
+    [raw.receitas, raw.despesas]
+  );
 
   const last3Months = monthlyData.slice(-3);
 
-  // === Análise Mensal data ===
-  const availableMonths = useMemo(() => {
-    const months = new Set<string>();
-    receitas.forEach((r) => months.add(r.data.slice(0, 7)));
-    despesas.forEach((d) => months.add(d.data.slice(0, 7)));
-    return Array.from(months).sort().reverse();
-  }, [receitas, despesas]);
-
+  // Main Report (DRE + Stats)
   const report = useMemo(() => {
-    const recMes = receitas.filter((r) => r.data.startsWith(selectedMonth));
-    const despMes = despesas.filter((d) => d.data.startsWith(selectedMonth));
-    const faturamento = recMes.reduce((s, r) => s + r.valor, 0);
-    const totalDespesas = despMes.reduce((s, d) => s + d.valor, 0);
-    const lucro = faturamento - totalDespesas;
-
-    const catMap: Record<string, number> = {};
-    despMes.forEach((d) => {
-      const cat = d.categoria || "Outros";
-      catMap[cat] = (catMap[cat] || 0) + d.valor;
-    });
-    const categorias = Object.entries(catMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-    const maiorCategoria = categorias[0] || null;
-
+    const dre = FinanceService.getDRE(raw.receitas, raw.despesas, "tudo", selectedMonth);
+    const categorias = FinanceService.getCategoryBreakdown(raw.despesas, "tudo", selectedMonth);
+    
     const [y, m] = selectedMonth.split("-").map(Number);
     const prevKey = m === 1 ? getMonthKey(y - 1, 11) : getMonthKey(y, m - 2);
-    const fatAnterior = receitas.filter((r) => r.data.startsWith(prevKey)).reduce((s, r) => s + r.valor, 0);
-    const despAnterior = despesas.filter((d) => d.data.startsWith(prevKey)).reduce((s, d) => s + d.valor, 0);
-    const lucroAnterior = fatAnterior - despAnterior;
+    const dreAnterior = FinanceService.getDRE(raw.receitas, raw.despesas, "tudo", prevKey);
 
-    const varFaturamento = fatAnterior > 0 ? ((faturamento - fatAnterior) / fatAnterior) * 100 : 0;
-    const varDespesas = despAnterior > 0 ? ((totalDespesas - despAnterior) / despAnterior) * 100 : 0;
-    const varLucro = lucroAnterior !== 0 ? ((lucro - lucroAnterior) / Math.abs(lucroAnterior)) * 100 : 0;
-
-    const reportData = {
-      faturamento, totalDespesas, lucro, categorias, maiorCategoria,
-      fatAnterior, despAnterior, lucroAnterior,
-      varFaturamento, varDespesas, varLucro,
-    };
-
-    const impostos = reportData.categorias.find(c => c.name === "Impostos")?.value || 0;
-    const recLiquida = faturamento - impostos;
-    
-    const variaveisTags = ["Marketing", "Transporte", "Material de Escritório", "Serviços Bancários"];
-    const fixasTags = ["Aluguel", "Internet/Telefone", "Software/Assinaturas"];
-    
-    const custosVariaveis = reportData.categorias
-      .filter(c => variaveisTags.includes(c.name))
-      .reduce((sum, c) => sum + c.value, 0);
-      
-    const margem = recLiquida - custosVariaveis;
-    
-    const despesasFixas = reportData.categorias
-      .filter(c => fixasTags.includes(c.name))
-      .reduce((sum, c) => sum + c.value, 0);
-      
-    const outras = reportData.categorias
-      .filter(c => !variaveisTags.includes(c.name) && !fixasTags.includes(c.name) && c.name !== "Impostos")
-      .reduce((sum, c) => sum + c.value, 0);
-      
-    const ebitda = margem - despesasFixas;
-    const lucroLiquido = ebitda - outras;
-    
-    const dre = { 
-      rec: faturamento, 
-      impostos, 
-      recLiquida, 
-      custosVariaveis, 
-      margem, 
-      despesasFixas, 
-      ebitda, 
-      outras, 
-      lucroLiquido 
-    };
+    const varFaturamento = dreAnterior.rec > 0 ? ((dre.rec - dreAnterior.rec) / dreAnterior.rec) * 100 : 0;
+    const varDespesas = (dreAnterior.recLiquida - dreAnterior.lucroLiquido) > 0 
+      ? (((dre.recLiquida - dre.lucroLiquido) - (dreAnterior.recLiquida - dreAnterior.lucroLiquido)) / (dreAnterior.recLiquida - dreAnterior.lucroLiquido)) * 100 
+      : 0;
+    const varLucro = dreAnterior.lucroLiquido !== 0 ? ((dre.lucroLiquido - dreAnterior.lucroLiquido) / Math.abs(dreAnterior.lucroLiquido)) * 100 : 0;
 
     return {
-      ...reportData,
+      faturamento: dre.rec,
+      totalDespesas: dre.rec - dre.lucroLiquido, // Simplified for summary cards
+      lucro: dre.lucroLiquido,
+      categorias,
+      maiorCategoria: categorias[0] || null,
+      fatAnterior: dreAnterior.rec,
+      despAnterior: dreAnterior.rec - dreAnterior.lucroLiquido,
+      lucroAnterior: dreAnterior.lucroLiquido,
+      varFaturamento,
+      varDespesas,
+      varLucro,
       dre,
-      despesaPercent: faturamento > 0 ? (totalDespesas / faturamento) * 100 : 0,
+      despesaPercent: dre.rec > 0 ? ((dre.rec - dre.lucroLiquido) / dre.rec) * 100 : 0
     };
-  }, [receitas, despesas, selectedMonth]);
+  }, [raw.receitas, raw.despesas, selectedMonth]);
 
-  const healthIndicators = useMemo(() => {
-    const months: { key: string; rec: number; desp: number }[] = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = getMonthKey(d.getFullYear(), d.getMonth());
-      const rec = receitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-      const desp = despesas.filter((d) => d.data.startsWith(key)).reduce((s, d) => s + d.valor, 0);
-      months.push({ key, rec, desp });
-    }
-    const monthsWithData = months.filter((m) => m.rec > 0 || m.desp > 0);
-    const count = monthsWithData.length || 1;
-    const totalRec = monthsWithData.reduce((s, m) => s + m.rec, 0);
-    const totalDesp = monthsWithData.reduce((s, m) => s + m.desp, 0);
-    const lucroMedioMensal = (totalRec - totalDesp) / count;
-    const saldoMedioMensal = (totalRec - totalDesp) / count;
-    const despesaPercentMedia = totalRec > 0 ? (totalDesp / totalRec) * 100 : 0;
-
-    const recent3 = months.slice(0, 3);
-    const prev3 = months.slice(3, 6);
-    const avgRecent = recent3.reduce((s, m) => s + m.rec, 0) / (recent3.length || 1);
-    const avgPrev = prev3.reduce((s, m) => s + m.rec, 0) / (prev3.length || 1);
-    const crescimento = avgPrev > 0 ? ((avgRecent - avgPrev) / avgPrev) * 100 : 0;
-
-    return { lucroMedioMensal, saldoMedioMensal, despesaPercentMedia, crescimento };
-  }, [receitas, despesas]);
+  const healthIndicators = useMemo(() => 
+    FinanceService.getHealthIndicators(raw.receitas, raw.despesas, "tudo"),
+    [raw.receitas, raw.despesas]
+  );
 
   const [selY, selM] = selectedMonth.split("-").map(Number);
   const monthLabel = getMonthLabel(selY, selM - 1);

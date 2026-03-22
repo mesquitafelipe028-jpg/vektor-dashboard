@@ -5,35 +5,35 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAccounts } from "@/hooks/useAccounts";
 import { queryKeys } from "@/lib/queryKeys";
 import { calcularLimiteProporcional } from "@/lib/fiscal";
-import { getLocalDateString } from "@/lib/utils";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
-import { useFinancialView, type FinancialView as ViewType } from "@/contexts/FinancialViewContext";
-
-export type FinancialView = ViewType;
+import { useFinancialView } from "@/contexts/FinancialViewContext";
+import { FinanceService, type FinancialView } from "@/lib/financeService";
+import { type DespesaExtended, type ReceitaExtended } from "@/types/transactions";
+import { type ContaFinanceira } from "@/types/accounts";
 
 export function useFinancialData(overrideView?: FinancialView) {
   const { view: globalView } = useFinancialView();
   const view = overrideView || globalView;
   const { user } = useAuth();
-  const { accounts, isLoading: loadingAccounts } = useAccounts();
+  const { accounts = [] as ContaFinanceira[], isLoading: loadingAccounts } = useAccounts();
   const { preferences } = useUserPreferences();
 
-  const { data: receitas = [], isLoading: loadingReceitas } = useQuery({
+  const { data: receitas = [] as ReceitaExtended[], isLoading: loadingReceitas } = useQuery({
     queryKey: queryKeys.receitas(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase.from("receitas").select("*, clientes(nome)").order("data", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as ReceitaExtended[];
     },
     enabled: !!user,
   });
 
-  const { data: despesas = [], isLoading: loadingDespesas } = useQuery({
+  const { data: despesas = [] as DespesaExtended[], isLoading: loadingDespesas } = useQuery({
     queryKey: queryKeys.despesas(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as DespesaExtended[];
     },
     enabled: !!user,
   });
@@ -56,89 +56,40 @@ export function useFinancialData(overrideView?: FinancialView) {
   const currentYear = now.getFullYear().toString();
   const currentMonth = `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const filteredData = useMemo(() => {
-    const rSet = view === "tudo" ? receitas : receitas.filter((r: any) => r.tipo_conta === view || !r.tipo_conta);
-    const dSet = view === "tudo" ? despesas : despesas.filter((d: any) => d.tipo_conta === view || !d.tipo_conta);
+  const calculatedData = useMemo(() => {
+    // 1. Filter raw sets by view for basic access
+    const rSet = FinanceService.filterByView<ReceitaExtended>(receitas, view);
+    const dSet = FinanceService.filterByView<DespesaExtended>(despesas, view);
     
-    // STRICT LOGIC: Only settled items
-    const settledReceitas = rSet.filter(r => r.status === "recebido");
-    const allSettledDespesas = dSet.filter(d => d.status === "pago");
-    
-    const settledInvestments = allSettledDespesas.filter((d: any) => d.tipo === "investment");
-    
-    // Simplification: Include everything marked as 'pago' in the total monthly exits,
-    // as requested by the user to match the reality of their bank extract.
-    const settledDespesas = allSettledDespesas;
+    // 2. Calculate core stats using the centralized service
+    const stats = FinanceService.calculateStats(
+      receitas,
+      despesas,
+      accounts,
+      view,
+      currentMonth,
+      currentYear
+    );
 
-    // Orphaned Balance - ONLY TODAY OR PAST
-    const todayStr = getLocalDateString();
-    // Simplified: If it's settled (pago/recebido), it affects the balance, regardless of date.
-    const orphanRecs = settledReceitas.filter(r => !r.conta_id);
-    const orphanDesps = settledDespesas.filter(d => !d.conta_id);
-    // orphanInvests subtraction was removed because they are already included in orphanDesps (merged in settledDespesas)
-    
-    const orphanedBalance = orphanRecs.reduce((s, r) => s + r.valor, 0) - 
-                           orphanDesps.reduce((s, d) => s + d.valor, 0);
-
-    // Total Balance
-    const accountsBalance = accounts
-      .filter(a => view === "tudo" || a.classificacao === view)
-      .reduce((s, a) => s + (a.saldo || 0), 0);
-    
-    // Saldo Total is the sum of account balances + orphaned activity
-    // NOTE: Linked transactions are reflected directly in account.saldo in DB.
-    // Orphaned transactions (settled but not linked) are added here for global consistency.
-    const saldoTotal = Number(accountsBalance) + Number(orphanedBalance);
-
-    // Monthly stats
-    const receitasMes = settledReceitas.filter((r) => r.data.startsWith(currentMonth));
-    const despesasMes = settledDespesas.filter((d) => d.data.startsWith(currentMonth));
-    const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
-    const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
-    const saldoMes = faturamentoMes - despesasMesTotal;
-
-    // Investment stats
-    const totalInvestido = settledInvestments.reduce((s, i) => s + i.valor, 0);
-    const aportesMes = settledInvestments.filter((i) => i.data.startsWith(currentMonth)).reduce((s, i) => s + i.valor, 0);
-
-    // MEI Limit
+    // 3. MEI Limit (requires empresa data)
     const limiteMei = calcularLimiteProporcional(empresa?.data_abertura);
-    const faturamentoAnual = settledReceitas
-      .filter((r) => r.data.startsWith(currentYear))
-      .reduce((s, r) => s + r.valor, 0);
-
-    // Savings Rate (Pessoal)
-    const rendaPessoalMes = settledReceitas.filter(r => r.tipo_conta === 'pessoal' && r.data.startsWith(currentMonth)).reduce((s, r) => s + r.valor, 0);
-    const despPessoalMes = settledDespesas.filter(d => d.tipo_conta === 'pessoal' && d.data.startsWith(currentMonth)).reduce((s, d) => s + d.valor, 0);
-    const taxaPoupanca = rendaPessoalMes > 0 ? ((rendaPessoalMes - despPessoalMes) / rendaPessoalMes) * 100 : 0;
 
     return {
-      saldoTotal,
-      faturamentoMes,
-      despesasMesTotal,
-      saldoMes,
-      totalInvestido,
-      aportesMes,
+      ...stats,
       limiteMei,
-      faturamentoAnual,
-      taxaPoupanca,
-      orphanedBalance,
-      orphanedCount: orphanRecs.length + orphanDesps.length,
       hasCnpj: !!empresa?.cnpj && !preferences.ocultar_mei,
       raw: {
         receitas: rSet,
         despesas: dSet,
-        settledReceitas,
-        settledDespesas
+        // Settled versions for internal consistency
+        settledReceitas: rSet.filter(r => r.status === "recebido"),
+        settledDespesas: dSet.filter(d => d.status === "pago")
       }
     };
-  // Loading flags intentionally excluded - they cause unnecessary recomputes.
-  // The data arrays (receitas, despesas, accounts) already change reference when data arrives.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receitas, despesas, accounts, empresa, view, currentMonth, currentYear, preferences.ocultar_mei]);
 
   return {
-    ...filteredData,
+    ...calculatedData,
     empresa,
     loading: loadingReceitas || loadingDespesas || loadingAccounts,
   };

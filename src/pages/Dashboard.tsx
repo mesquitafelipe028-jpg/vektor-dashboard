@@ -27,7 +27,7 @@ import { InsightsFinanceiros } from "@/components/dashboard/InsightsFinanceiros"
 import { QuickEntry } from "@/components/dashboard/QuickEntry";
 import { QuickSyncModal } from "@/components/dashboard/QuickSyncModal";
 import { queryKeys } from "@/lib/queryKeys";
-import { calcularLimiteProporcional } from "@/lib/fiscal";
+import { FinanceService } from "@/lib/financeService";
 
 // New Dashboard Components
 import { FinancialStats } from "@/components/dashboard/FinancialStats";
@@ -92,6 +92,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const { view: financialView, setView: setFinancialView } = useFinancialView();
+  const { categories: dbCategories } = useCategories("despesa");
 
   const {
     saldoTotal,
@@ -99,16 +100,14 @@ export default function Dashboard() {
     despesasMesTotal,
     saldoMes,
     totalInvestido,
-    aportesMes,
-    limiteMei,
-    faturamentoAnual,
     taxaPoupanca,
-    orphanedBalance,
     orphanedCount,
     hasCnpj,
     loading,
     raw,
-    empresa, // Added from the new structure
+    empresa,
+    limiteMei,
+    faturamentoAnual
   } = useFinancialData();
 
   const { data: impostoPendente } = useQuery({
@@ -143,15 +142,11 @@ export default function Dashboard() {
   const { accounts } = useAccounts();
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
-  // Financial view filter effect - fixed dep array
   useEffect(() => {
-    // Ao entrar no dashboard, resetamos a preferência de landing para o app principal
     localStorage.setItem('vektor_preferred_landing', '/dashboard');
-
     if (!hasCnpj && financialView !== "pessoal") {
       setFinancialView("pessoal");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasCnpj]);
 
   const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
@@ -159,59 +154,24 @@ export default function Dashboard() {
     setHiddenAlerts((prev) => new Set(prev).add(id));
   }, []);
 
-  // STATS derived from raw data in hook - memoized to prevent re-computation on every render
   const currentMonth = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }, []);
 
-  const receitasMes = useMemo(
-    () => raw.settledReceitas.filter((r) => r.data.startsWith(currentMonth)),
-    [raw.settledReceitas, currentMonth]
-  );
-  const despesasMes = useMemo(
-    () => raw.settledDespesas.filter((d) => d.data.startsWith(currentMonth)),
-    [raw.settledDespesas, currentMonth]
+  // Use Centralized Service for Chart Data
+  const monthlyData = useMemo(() => 
+    FinanceService.getMonthlySeries(raw.receitas, raw.despesas, financialView),
+    [raw.receitas, raw.despesas, financialView]
   );
 
-  // Previous month for report summary
   const prevMonth = useMemo(() => {
-    const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("pt-BR", { month: "long" });
-    const rec = raw.settledReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    const desp = raw.settledDespesas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-    const lucro = rec - desp;
-    const varFat = rec > 0 && faturamentoMes > 0 ? ((faturamentoMes - rec) / rec) * 100 : 0;
-    return { label, rec, desp, lucro, varFat };
-  }, [raw.settledReceitas, raw.settledDespesas, faturamentoMes]);
-
-  // Monthly chart data (last 6 months) - memoized
-  const monthlyData = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const label = d.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
-      const rec = raw.settledReceitas.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-      const desp = raw.settledDespesas.filter((d) => d.data.startsWith(key)).reduce((s, d) => s + d.valor, 0);
-      return { month: label.charAt(0).toUpperCase() + label.slice(1), receitas: rec, despesas: desp };
-    });
-  }, [raw.settledReceitas, raw.settledDespesas]);
-
-
-  // Saúde Financeira
-  const despesaPercent = faturamentoMes > 0 ? (despesasMesTotal / faturamentoMes) * 100 : 0;
-  const healthStatus = despesaPercent < 50 ? "healthy" : despesaPercent <= 75 ? "warning" : "critical";
-  const healthConfig = {
-    warning: { label: "Atenção", icon: AlertTriangle, color: "text-yellow-600", bg: "bg-yellow-500/10", border: "border-yellow-500/30" },
-    critical: { label: "Crítico", icon: ShieldAlert, color: "text-red-600", bg: "bg-red-500/10", border: "border-red-500/30" },
-  }[healthStatus];
-
-  
-
-  const { categories: dbCategories } = useCategories("despesa");
+    const months = FinanceService.getMonthlySeries(raw.receitas, raw.despesas, financialView, 2);
+    const prev = months[0]; // month at index 0 is the previous one if count=2
+    const current = faturamentoMes;
+    const varFat = prev.receitas > 0 ? ((current - prev.receitas) / prev.receitas) * 100 : 0;
+    return { label: prev.month, rec: prev.receitas, desp: prev.despesas, lucro: prev.saldo, varFat };
+  }, [raw.receitas, raw.despesas, financialView, faturamentoMes]);
 
   // Flatten DB categories for color lookup
   const catColorMap = useMemo(() => {
@@ -225,149 +185,75 @@ export default function Dashboard() {
     return m;
   }, [dbCategories]);
 
-  // Despesas por categoria (PieChart)
   const categoryData = useMemo(() => {
-    const map: Record<string, number> = {};
-    despesasMes.forEach((d) => {
-      const cat = d.categoria || "Outros";
-      map[cat] = (map[cat] || 0) + d.valor;
-    });
-    return Object.entries(map)
-      .map(([name, value]) => ({ 
-        name, 
-        value, 
-        fill: catColorMap[name] || getVibrantColor(name)
-      }))
-      .sort((a, b) => b.value - a.value);
-  }, [despesasMes, catColorMap]);
+    const data = FinanceService.getCategoryBreakdown(raw.despesas, financialView, currentMonth);
+    return data.map(item => ({
+      ...item,
+      fill: catColorMap[item.name] || getVibrantColor(item.name)
+    }));
+  }, [raw.despesas, financialView, currentMonth, catColorMap]);
 
-
-  const insightColors: Record<string, string> = {
-    success: "border-l-green-500 bg-green-500/5",
-    warning: "border-l-yellow-500 bg-yellow-500/5",
-    danger: "border-l-red-500 bg-red-500/5",
-    info: "border-l-blue-500 bg-blue-500/5",
-  };
-  const insightIconColors: Record<string, string> = {
-    success: "text-green-600",
-    warning: "text-yellow-600",
-    danger: "text-red-600",
-    info: "text-blue-600",
-  };
-
-  // Smart Financial Alerts
+  // Alerts logic (kept local for now as it uses complex component-level dependencies/icons, 
+  // but consuming centralized values)
   const alerts = useMemo(() => {
     const newAlerts: AlertItem[] = [];
-
-    // Alerta 1 — Limite MEI (thresholds: 70%, 90%) — only with CNPJ
     const percentLimit = limiteMei > 0 ? Math.min((faturamentoAnual / limiteMei) * 100, 100) : 0;
+    
     if (hasCnpj && percentLimit >= 90) {
       newAlerts.push({ id: "mei-90", icon: ShieldAlert, type: "danger", message: `Atenção: você está próximo de ultrapassar o limite do MEI (${percentLimit.toFixed(1)}% utilizado).` });
     } else if (hasCnpj && percentLimit >= 70) {
       newAlerts.push({ id: "mei-70", icon: AlertTriangle, type: "warning", message: `Você já utilizou ${percentLimit.toFixed(1)}% do limite anual do MEI.` });
     }
 
-    // Alerta 2 — DAS pendente ou próximo do vencimento — only with CNPJ
     if (hasCnpj && impostoPendente) {
       const vencDate = new Date(impostoPendente.vencimento + "T12:00:00");
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      vencDate.setHours(0, 0, 0, 0);
       const diffDays = Math.ceil((vencDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (diffDays < 0) {
-        newAlerts.push({ id: "das-vencido", icon: ShieldAlert, type: "danger", message: `Seu DAS de ${impostoPendente.competencia} está vencido! Regularize o pagamento.` });
-      } else if (diffDays === 0) {
-        newAlerts.push({ id: "das-hoje", icon: CalendarIcon, type: "danger", message: "Seu imposto MEI (DAS) vence hoje!" });
-      } else if (diffDays <= 7) {
-        newAlerts.push({ id: "das-vencimento", icon: CalendarIcon, type: "warning", message: `Seu DAS de ${impostoPendente.competencia} vence em ${diffDays} dia${diffDays > 1 ? "s" : ""} (${vencDate.toLocaleDateString("pt-BR")}).` });
-      } else {
-        newAlerts.push({ id: "das-pendente", icon: FileText, type: "warning", message: `DAS de ${impostoPendente.competencia} pendente — vencimento em ${vencDate.toLocaleDateString("pt-BR")}.` });
-      }
+      if (diffDays < 0) newAlerts.push({ id: "das-vencido", icon: ShieldAlert, type: "danger", message: `Seu DAS de ${impostoPendente.competencia} está vencido!` });
+      else if (diffDays === 0) newAlerts.push({ id: "das-hoje", icon: CalendarIcon, type: "danger", message: "Seu imposto MEI vence hoje!" });
+      else if (diffDays <= 7) newAlerts.push({ id: "das-vencimento", icon: CalendarIcon, type: "warning", message: `Seu DAS vence em ${diffDays} dias.` });
     }
 
-    // Alertas de cobranças recorrentes/parceladas
+    // Pendencies
     const todayStr = getLocalDateString();
-    const twoDaysLater = new Date();
-    twoDaysLater.setDate(twoDaysLater.getDate() + 2);
-    const twoDaysStr = getLocalDateString(twoDaysLater);
-
-    // Receitas pendentes (cobranças)
-    const receitasPendentes = raw.receitas.filter((r: any) => 
-      r.status === "pendente" || r.status === "atrasado"
-    );
-    const receitasVencidas = receitasPendentes.filter((r: any) => r.data < todayStr);
-    const receitasHoje = receitasPendentes.filter((r: any) => r.data === todayStr);
-    const receitasProximas = receitasPendentes.filter((r: any) => r.data > todayStr && r.data <= twoDaysStr);
-
-    if (receitasVencidas.length > 0) {
-      if (receitasVencidas.length === 1 && receitasVencidas[0].clientes?.nome) {
-         newAlerts.push({ id: `rec-vencida-${receitasVencidas[0].id}`, icon: ShieldAlert, type: "danger", message: `Cliente ${receitasVencidas[0].clientes.nome} possui pagamento em atrasado (${formatCurrency(receitasVencidas[0].valor)}).` });
-      } else {
-         newAlerts.push({ id: "rec-vencidas", icon: ShieldAlert, type: "danger", message: `${receitasVencidas.length} cobrança${receitasVencidas.length > 1 ? "s" : ""} vencida${receitasVencidas.length > 1 ? "s" : ""} (${formatCurrency(receitasVencidas.reduce((s: number, r: any) => s + r.valor, 0))}).` });
-      }
-    }
-    if (receitasHoje.length > 0) {
-      newAlerts.push({ id: "rec-hoje", icon: CalendarIcon, type: "warning", message: `${receitasHoje.length} cobrança${receitasHoje.length > 1 ? "s" : ""} vence${receitasHoje.length > 1 ? "m" : ""} hoje (${formatCurrency(receitasHoje.reduce((s: number, r: any) => s + r.valor, 0))}).` });
-    }
-    if (receitasProximas.length > 0) {
-      newAlerts.push({ id: "rec-proximas", icon: Info, type: "warning", message: `${receitasProximas.length} cobrança${receitasProximas.length > 1 ? "s" : ""} nos próximos 2 dias.` });
+    const recsAtention = raw.receitas.filter(r => r.status !== "recebido" && r.data <= todayStr);
+    if (recsAtention.length > 0) {
+      newAlerts.push({ id: "recs-atention", icon: ShieldAlert, type: "danger", message: `${recsAtention.length} cobranças pendentes ou vencidas.` });
     }
 
-    // Despesas pendentes
-    const despesasPendentes = raw.despesas.filter((d: any) =>
-      (d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") && d.status === "pendente"
-    );
-    const despesasVencidas = despesasPendentes.filter((d: any) => d.data < todayStr);
-    const despesasHoje = despesasPendentes.filter((d: any) => d.data === todayStr);
-
-    if (despesasVencidas.length > 0) {
-      newAlerts.push({ id: "desp-vencidas", icon: ShieldAlert, type: "danger", message: `${despesasVencidas.length} despesa${despesasVencidas.length > 1 ? "s" : ""} pendente${despesasVencidas.length > 1 ? "s" : ""} vencida${despesasVencidas.length > 1 ? "s" : ""} (${formatCurrency(despesasVencidas.reduce((s: number, d: any) => s + d.valor, 0))}).` });
-    }
-    if (despesasHoje.length > 0) {
-      newAlerts.push({ id: "desp-hoje", icon: CalendarIcon, type: "warning", message: `${despesasHoje.length} despesa${despesasHoje.length > 1 ? "s" : ""} vence${despesasHoje.length > 1 ? "m" : ""} hoje.` });
+    const despVencidas = raw.despesas.filter(d => d.status === "pendente" && d.data < todayStr);
+    if (despVencidas.length > 0) {
+      newAlerts.push({ id: "desp-vencidas", icon: ShieldAlert, type: "danger", message: `${despVencidas.length} despesas vencidas.` });
     }
 
-    // Alerta 3 & 4 — Variação de faturamento
     if (prevMonth.rec > 0 && faturamentoMes > 0) {
-      const variation = ((faturamentoMes - prevMonth.rec) / prevMonth.rec) * 100;
-      if (variation > 20) {
-        newAlerts.push({ id: "fat-cresceu", icon: TrendingUp, type: "success", message: `Parabéns! Seu faturamento cresceu ${variation.toFixed(0)}% este mês. 🚀` });
-      } else if (variation < 0) {
-        newAlerts.push({ id: "fat-caiu", icon: TrendingDown, type: "warning", message: `Seu faturamento caiu ${Math.abs(variation).toFixed(0)}% comparado ao mês passado.` });
-      }
-    } else if (faturamentoMes > 0 && prevMonth.rec === 0) {
-      newAlerts.push({ id: "fat-novo", icon: ShieldCheck, type: "success", message: `Ótimo início de mês! Faturamento atual: ${formatCurrency(faturamentoMes)}.` });
+      if (prevMonth.varFat > 20) newAlerts.push({ id: "fat-grow", icon: TrendingUp, type: "success", message: `Seu faturamento cresceu ${prevMonth.varFat.toFixed(0)}%! 🚀` });
+      else if (prevMonth.varFat < -10) newAlerts.push({ id: "fat-drop", icon: TrendingDown, type: "warning", message: `Faturamento caiu ${Math.abs(prevMonth.varFat).toFixed(0)}% vs mês passado.` });
     }
 
     return newAlerts.filter((a) => !hiddenAlerts.has(a.id));
-  }, [limiteMei, impostoPendente, prevMonth, faturamentoMes, hiddenAlerts, hasCnpj, raw.receitas, raw.despesas, faturamentoAnual]);
+  }, [limiteMei, faturamentoAnual, hasCnpj, impostoPendente, raw.receitas, raw.despesas, prevMonth, faturamentoMes, hiddenAlerts]);
 
-  const latestReceitas = raw.receitas.slice(0, 5);
-  const latestDespesas = raw.despesas.slice(0, 5);
-
-
-  const isLoading = loading;
-
-
-  // === NEW: Mini gráfico de fluxo (daily data for current month) ===
   const flowChartData = useMemo(() => {
     const now = new Date();
     const today = now.getDate();
-    // Initial balance is total settled balance BEFORE this month started
-    const beforeThisMonthRec = raw.settledReceitas.filter(r => r.data < `${currentMonth}-01`).reduce((s, r) => s + r.valor, 0);
-    const beforeThisMonthDesp = raw.settledDespesas.filter(d => d.data < `${currentMonth}-01`).reduce((s, d) => s + d.valor, 0);
-    let accumulated = beforeThisMonthRec - beforeThisMonthDesp;
+    const days = Array.from({ length: today }, (_, i) => i + 1);
     
-    return Array.from({ length: today }, (_, i) => {
-      const day = i + 1;
+    // Starting balance: approx using simple subtract
+    let currentFlowBalance = saldoTotal - saldoMes; 
+
+    return days.map(day => {
       const dayStr = `${currentMonth}-${String(day).padStart(2, "0")}`;
-      const rec = raw.receitas.filter((r) => r.data === dayStr).reduce((s, r) => s + r.valor, 0); // Simplified raw access
-      const desp = raw.despesas.filter((d) => d.data === dayStr).reduce((s, d) => s + d.valor, 0);
-      accumulated += rec - desp;
-      return { dia: day, receitas: rec, despesas: desp, saldo: accumulated };
+      const rec = raw.receitas.filter(r => r.data === dayStr).reduce((s, r) => s + r.valor, 0);
+      const desp = raw.despesas.filter(d => d.data === dayStr).reduce((s, d) => s + d.valor, 0);
+      currentFlowBalance += rec - desp;
+      return { dia: day, receitas: rec, despesas: desp, saldo: currentFlowBalance };
     });
-  }, [raw.settledReceitas, raw.settledDespesas, raw.receitas, raw.despesas, currentMonth]);
+  }, [saldoTotal, saldoMes, raw.receitas, raw.despesas, currentMonth]);
+
+  const despesaPercent = faturamentoMes > 0 ? (despesasMesTotal / faturamentoMes) * 100 : 0;
+  const isLoading = loading;
 
   // Extracted insight logic out to InsightsFinanceiros component
 
