@@ -47,8 +47,6 @@ const VarIndicator = ({ value }: { value: number }) => {
     : <ArrowDownRight className="h-4 w-4 text-red-600" />;
 };
 
-import { useFinancialData } from "@/hooks/useFinancialData";
-import { FinanceService } from "@/lib/financeService";
 
 export default function Reports() {
   const { user } = useAuth();

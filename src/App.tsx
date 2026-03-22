@@ -10,6 +10,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import { SplashScreen } from "./components/branding/SplashScreen";
 import { FinancialViewProvider } from "./contexts/FinancialViewContext";
+import { FinancialDataProvider } from "./contexts/FinancialDataContext";
 import { PWAUpdateHandler } from "./components/pwa/PWAUpdateHandler";
 
 const RootRedirect = () => {
@@ -94,48 +95,50 @@ const App = () => {
           <BrowserRouter>
             <AuthProvider>
               <FinancialViewProvider>
-                <Suspense fallback={<PageFallback />}>
-                <Routes>
-                  <Route path="/" element={<RootRedirect />} />
-                  <Route path="/landing" element={<LandingGate />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/cadastro" element={<Signup />} />
-                    <Route path="onboarding" element={<Onboarding />} />
-                    <Route element={<AppLayout />}>
-                      <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="receitas" element={<Revenues />} />
-                      <Route path="despesas" element={<Expenses />} />
-                      <Route path="fluxo-de-caixa" element={<CashFlow />} />
-                      <Route path="impostos" element={<Taxes />} />
-                      <Route path="relatorios" element={<Reports />} />
-                      
-                      <Route path="configuracoes" element={<Settings />} />
-                      <Route path="clientes" element={<Clients />} />
-                      <Route path="clientes/:id" element={<ClientDetails />} />
-                      <Route path="metas" element={<Goals />} />
-                      <Route path="analise-financeira" element={<FinancialAnalysis />} />
-                      <Route path="calculadora-investimentos" element={<InvestmentCalculator />} />
-                      
-                      <Route path="receitas/nova" element={<TransactionForm />} />
-                      <Route path="receitas/editar/:id" element={<TransactionForm />} />
-                      <Route path="despesas/nova" element={<TransactionForm />} />
-                      <Route path="despesas/editar/:id" element={<TransactionForm />} />
-                      <Route path="clientes/novo" element={<ClientForm />} />
-                      <Route path="clientes/editar/:id" element={<ClientForm />} />
-                      <Route path="cartoes" element={<CreditCards />} />
-                      <Route path="categorias" element={<Categories />} />
-                      <Route path="contas" element={<Accounts />} />
-                      <Route path="contas-a-receber" element={<Receivables />} />
-                      <Route path="timeline" element={<Timeline />} />
-                      <Route path="mais" element={<More />} />
-                      <Route path="assinaturas" element={<Subscriptions />} />
-                      <Route path="projetos" element={<Projects />} />
-                      <Route path="importar-extrato" element={<StatementImport />} />
-                      <Route path="tutorial" element={<Tutorial />} />
-                    </Route>
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
+                <FinancialDataProvider>
+                  <Suspense fallback={<PageFallback />}>
+                    <Routes>
+                      <Route path="/" element={<RootRedirect />} />
+                      <Route path="/landing" element={<LandingGate />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/cadastro" element={<Signup />} />
+                      <Route path="onboarding" element={<Onboarding />} />
+                      <Route element={<AppLayout />}>
+                        <Route path="dashboard" element={<Dashboard />} />
+                        <Route path="receitas" element={<Revenues />} />
+                        <Route path="despesas" element={<Expenses />} />
+                        <Route path="fluxo-de-caixa" element={<CashFlow />} />
+                        <Route path="impostos" element={<Taxes />} />
+                        <Route path="relatorios" element={<Reports />} />
+                        
+                        <Route path="configuracoes" element={<Settings />} />
+                        <Route path="clientes" element={<Clients />} />
+                        <Route path="clientes/:id" element={<ClientDetails />} />
+                        <Route path="metas" element={<Goals />} />
+                        <Route path="analise-financeira" element={<FinancialAnalysis />} />
+                        <Route path="calculadora-investimentos" element={<InvestmentCalculator />} />
+                        
+                        <Route path="receitas/nova" element={<TransactionForm />} />
+                        <Route path="receitas/editar/:id" element={<TransactionForm />} />
+                        <Route path="despesas/nova" element={<TransactionForm />} />
+                        <Route path="despesas/editar/:id" element={<TransactionForm />} />
+                        <Route path="clientes/novo" element={<ClientForm />} />
+                        <Route path="clientes/editar/:id" element={<ClientForm />} />
+                        <Route path="cartoes" element={<CreditCards />} />
+                        <Route path="categorias" element={<Categories />} />
+                        <Route path="contas" element={<Accounts />} />
+                        <Route path="contas-a-receber" element={<Receivables />} />
+                        <Route path="timeline" element={<Timeline />} />
+                        <Route path="mais" element={<More />} />
+                        <Route path="assinaturas" element={<Subscriptions />} />
+                        <Route path="projetos" element={<Projects />} />
+                        <Route path="importar-extrato" element={<StatementImport />} />
+                        <Route path="tutorial" element={<Tutorial />} />
+                      </Route>
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </FinancialDataProvider>
               </FinancialViewProvider>
             </AuthProvider>
           </BrowserRouter>
