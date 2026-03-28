@@ -7,6 +7,9 @@ export interface ImportedTransaction {
   categoria: string;
   selected: boolean;
   confidence: "high" | "medium" | "low";
+  numero_parcelas?: number;
+  parcela_atual?: number;
+  isDuplicate?: boolean;
 }
 
 export const WORDS_RECEITA = ["pix recebido", "ted recebido", "ted", "crédito", "pagamento recebido", "remuneração", "salário", "transferência recebida", "boleto recebido", "estorno", "reembolso"];
@@ -89,102 +92,91 @@ export function confidenceLevel(descricao: string): "high" | "medium" | "low" {
   return "low";
 }
 
+export function extractParcelInfo(descricao: string): { cleanDesc: string; parcela_atual?: number; numero_parcelas?: number } {
+  // Matches "01/10", "1/5", "Parc 3/12", "03/12", "03/ 12"
+  const match = descricao.match(/(?:parc\w*\s*)?(\d{1,2})\s*\/\s*(\d{1,2})/i);
+  if (match) {
+    const parcela_atual = parseInt(match[1], 10);
+    const numero_parcelas = parseInt(match[2], 10);
+    // Only accept if sensible percentages/fractions are not mistaken for parcels
+    if (parcela_atual > 0 && numero_parcelas > 0 && parcela_atual <= numero_parcelas && numero_parcelas <= 120) {
+      const cleanDesc = descricao.replace(match[0], "").replace(/\s+/g, " ").trim();
+      return { cleanDesc: cleanDesc || descricao, parcela_atual, numero_parcelas };
+    }
+  }
+  return { cleanDesc: descricao };
+}
+
 export function processPDFLines(lines: string[]): ImportedTransaction[] {
   console.log("[PDF Parser] Total lines to process:", lines.length);
 
   const transactions: ImportedTransaction[] = [];
   const currentYear = new Date().getFullYear();
 
-  // Pattern: [Optional Number] [Date DD/MM] [Description] [Value]
-  // Based on: " 05/02 APPLECOMBILL 19,90"
-  // And "2 18/07 KIWIFY *TREINODEFO 08/10 11,51"
-  const transactionRegex = /^(\d\s)?(\d{2}\/\d{2})\s+(.+?)\s+(-?\d{1,3}(?:\.\d{3})*,\d{2})(?!.*[\d,])/;
-  
-  const generateId = () => {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-    return Math.random().toString(36).substring(2, 15);
-  };
-
-  const currencyRegex = /(-?\d{1,3}(?:\.\d{3})*,\d{2})(?!.*[\d,])/g;
-  
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    let line = lines[i].trim();
     if (!line) continue;
 
     const lowerLine = line.toLowerCase();
     
-    // 1. Filter structural noise
+    // Ignorar cabeçalhos e ruídos explícitos
     if (BLACKLIST_KEYWORDS.some(kw => lowerLine.includes(kw))) continue;
 
-    // 2. Reject lines with multiple monetary values (likely text/instructions)
-    const currencyMatches = line.match(currencyRegex) || [];
-    if (currencyMatches.length > 1) {
-      console.log("[PDF Parser] Multi-value line rejected:", line);
-      continue;
-    }
+    // Buscadores tolerantes que permitem espaços anômalos inseridos pelo OCR, 
+    // como "- 318,79" ou "05 / 02" ou ".99"
+    const dateRegexGlob = /\b(\d{2}\s*\/\s*\d{2}(?:\s*\/\s*\d{2,4})?)\b/;
+    // Aceita valores com ou sem sinal negativo prévio, com espaços antes da vírgula
+    const currencyRegexGlob = /(-\s*)?(\d{1,3}(?:\.\d{3})*\s*[.,]\s*\d{2})\b/g;
 
-    // 3. Try strict pattern matching
-    const match = line.match(transactionRegex);
-    if (match) {
-      const rawDate = match[2];
-      const description = match[3].trim();
-      const rawValue = match[4];
+    const currencyMatches = line.match(currencyRegexGlob) || [];
+    
+    // Rejeita a linha se tiver muitos valores (provavelmente é o cabeçalho descritivo da tabela)
+    if (currencyMatches.length > 2) continue;
 
-      // Clean description from common residue
-      if (description.length < 3 || /^[^\w\s]+$/.test(description)) continue;
-      if (description.includes("R$")) continue; // Description leaking values = noise
+    const dateMatch = line.match(dateRegexGlob);
 
-      // Handle Date conversion (DD/MM -> YYYY-MM-DD)
-      const [day, month] = rawDate.split("/");
-      const formattedDate = `${currentYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    if (dateMatch && currencyMatches.length > 0) {
+      // Pega o último valor encontrado na linha (comumente o valor R$ pulando a coluna Parcela se houver um número lá, mas parcelas não tem vírgula)
+      const rawValueMatch = currencyMatches[currencyMatches.length - 1];
+      const rawDateStr = dateMatch[0];
+      const rawDate = dateMatch[1].replace(/\s+/g, ""); // Tira espacos vazios "05 / 02" -> "05/02"
 
-      const valor = parseAmount(rawValue);
-      if (valor === null || Math.abs(valor) < 0.01) continue;
+      // A descrição é todo o resto da linha tirando a data e o valor
+      let desc = line
+        .replace(rawDateStr, "")
+        .replace(rawValueMatch, "")
+        .replace(/R\$\s*/gi, "") // remove R$ seOCR leu
+        .replace(/^[^\w\s]+/, "") // Tira simbolos do começo da descricao ex "@ "
+        .trim();
 
-      transactions.push({
-        id: generateId(),
-        data: formattedDate,
-        descricao: description.replace(/\s+/g, " "),
-        valor: Math.abs(valor),
-        tipo: guessType(description, valor),
-        categoria: guessCategory(description),
-        selected: true,
-        confidence: "high"
-      });
-      continue;
-    }
-
-    // 4. Fallback for lines where date/value might be slightly separated
-    const dateRegex = /^(\d{2}\/\d{2}\/\d{2,4})|(\d{2}\/\d{2}\s)/; // Date MUST be at the start
-    const dateMatch = line.match(dateRegex);
-    const valueMatch = line.match(/(-?\d{1,3}(?:\.\d{3})*,\d{2})(?!.*[\d,])/);
-
-    if (dateMatch && valueMatch) {
-      const rawDate = dateMatch[0].trim();
-      const rawValue = valueMatch[0];
-      
-      let desc = line.replace(rawDate, "").replace(rawValue, "").trim();
-      if (desc.length > 3 && !BLACKLIST_KEYWORDS.some(kw => desc.toLowerCase().includes(kw)) && !desc.includes("R$")) {
+      if (desc.length > 2) {
+        // Tratar a conversão da data corretamente para nosso sistema
         const parts = rawDate.split("/");
-        let formattedDate = "";
-        if (parts.length === 2) {
-          formattedDate = `${currentYear}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        } else if (parts.length === 3) {
+        let formattedDate = `${currentYear}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        if (parts.length === 3) {
           const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
           formattedDate = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
         }
 
-        const valor = parseAmount(rawValue);
+        // Tratar o valor monetário com espacamento ou ponto "19 . 90" -> "19.90"
+        const cleanValueStr = rawValueMatch.replace(/\s+/g, "");
+        const valor = parseAmount(cleanValueStr);
+
         if (valor && Math.abs(valor) > 0.01) {
+          const { cleanDesc, parcela_atual, numero_parcelas } = extractParcelInfo(desc.replace(/\s+/g, " "));
+          
           transactions.push({
-            id: generateId(),
+            id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
             data: formattedDate,
-            descricao: desc.replace(/\s+/g, " "),
+            descricao: cleanDesc.trim(),
             valor: Math.abs(valor),
             tipo: guessType(desc, valor),
             categoria: guessCategory(desc),
             selected: true,
-            confidence: "medium"
+            confidence: currencyMatches.length === 1 ? "high" : "medium",
+            parcela_atual,
+            numero_parcelas,
+            isDuplicate: false
           });
         }
       }
@@ -257,15 +249,21 @@ export function parseRows(rows: any[][]): ImportedTransaction[] {
       if (!data || !foundVal) continue;
       if (BLACKLIST_KEYWORDS.some(kw => descricao.toLowerCase().includes(kw))) continue;
 
+      const baseDesc = (descricao || "Transação Importada").replace(/\+/g, " ").replace(/\s+/g, " ").trim();
+      const { cleanDesc, parcela_atual, numero_parcelas } = extractParcelInfo(baseDesc);
+
       transactions.push({
         id: crypto.randomUUID(),
         data,
-        descricao: (descricao || "Transação Importada").replace(/\+/g, " ").replace(/\s+/g, " ").trim(),
+        descricao: cleanDesc,
         valor: Math.abs(valor),
-        tipo: guessType(descricao, valor, typeOverride),
-        categoria: guessCategory(descricao),
+        tipo: guessType(baseDesc, valor, typeOverride),
+        categoria: guessCategory(baseDesc),
         selected: true,
-        confidence: confidenceLevel(descricao),
+        confidence: confidenceLevel(baseDesc),
+        parcela_atual,
+        numero_parcelas,
+        isDuplicate: false
       });
       continue;
     }

@@ -36,7 +36,6 @@ import { DashboardGoals } from "@/components/dashboard/DashboardGoals";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
-import { DashboardMetasChart } from "@/components/dashboard/DashboardMetasChart";
 import { CashFlowProjection } from "@/components/dashboard/CashFlowProjection";
 import { FinancialCalendar } from "@/components/dashboard/FinancialCalendar";
 import { DayTransactionsDrawer } from "@/components/dashboard/DayTransactionsDrawer";
@@ -395,8 +394,6 @@ export default function Dashboard() {
         despesas={raw.despesas}
         saldoTotal={saldoTotal}
       />
-
-      <DashboardMetasChart metas={metas} />
 
       <DashboardGoals 
         metaAtual={metaAtual} 

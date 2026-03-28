@@ -2,7 +2,8 @@ import { useState, useCallback } from "react";
 import { 
   type ImportedTransaction, 
   parseSpreadsheet, 
-  parsePDF 
+  parsePDF,
+  parseImage
 } from "@/lib/statement-parser";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -51,6 +52,9 @@ export default function StatementImport() {
         parsed = await parseSpreadsheet(file);
       } else if (ext === "pdf") {
         parsed = await parsePDF(file);
+      } else if (ext === "png" || ext === "jpg" || ext === "jpeg") {
+        toast.info("Lendo a imagem... (Isso pode demorar alguns segundos).");
+        parsed = await parseImage(file);
       } else {
         toast.error("Formato de arquivo não suportado.");
         return;
@@ -61,14 +65,41 @@ export default function StatementImport() {
         return;
       }
 
+      if (user?.id) {
+        const dates = parsed.map(t => new Date(t.data).getTime()).filter(t => !isNaN(t));
+        if (dates.length > 0) {
+          const minDate = new Date(Math.min(...dates));
+          minDate.setDate(minDate.getDate() - 3);
+          const maxDate = new Date(Math.max(...dates));
+          maxDate.setDate(maxDate.getDate() + 3);
+
+          const { data: existing } = await supabase
+            .from('transactions')
+            .select('description, amount, date')
+            .eq('user_id', user.id)
+            .gte('date', minDate.toISOString().split('T')[0])
+            .lte('date', maxDate.toISOString().split('T')[0]);
+          
+          if (existing && existing.length > 0) {
+            parsed = parsed.map(t => {
+              const dup = existing.some(e => 
+                Math.abs(Number(e.amount) - t.valor) < 0.01 &&
+                Math.abs(new Date(e.date).getTime() - new Date(t.data).getTime()) <= 86400000 * 3
+              );
+              return { ...t, isDuplicate: dup, selected: !dup };
+            });
+          }
+        }
+      }
+
       setTransactions(parsed);
       setStep("review");
       toast.success(`${parsed.length} transações identificadas!`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Erro ao processar o arquivo.");
+      toast.error(err.message || "Erro ao processar o arquivo.");
     }
-  }, []);
+  }, [user?.id]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -108,6 +139,8 @@ export default function StatementImport() {
         account_id: selectedAccountId,
         type: t.tipo === "receita" ? "income" : "expense",
         tipo_conta: tipoConta,
+        numero_parcelas: t.numero_parcelas || null,
+        parcela_atual: t.parcela_atual || null,
       }));
 
       const { error } = await supabase.from("transactions").insert(transactionsToInsert);
@@ -154,7 +187,7 @@ export default function StatementImport() {
               </div>
               <h3 className="font-heading text-lg font-semibold mb-2">Arraste seu extrato aqui</h3>
               <p className="text-sm text-muted-foreground max-w-xs">
-                Suportamos arquivos <strong>CSV, Excel (.xlsx, .xls) e PDF</strong> exportados do seu banco.
+                Suportamos arquivos <strong>CSV, Excel, PDF e imagens (JPG/PNG)</strong>.
               </p>
               <Button variant="outline" className="mt-4">
                 <FileText className="mr-2 h-4 w-4" /> Selecionar Arquivo
@@ -162,7 +195,7 @@ export default function StatementImport() {
               <input
                 id="file-input"
                 type="file"
-                accept=".csv,.txt,.xlsx,.xls,.pdf"
+                accept=".csv,.txt,.xlsx,.xls,.pdf,.png,.jpg,.jpeg"
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
               />
@@ -257,8 +290,27 @@ export default function StatementImport() {
                     ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
                     : <TrendingDown className="h-3.5 w-3.5 text-destructive" />}
                 </div>
-                <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3">
-                  <p className="font-medium text-sm truncate col-span-1 sm:col-span-1">{t.descricao}</p>
+                <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 items-center">
+                  <div className="col-span-1 sm:col-span-1 min-w-0 flex flex-col gap-1">
+                    <Input 
+                      value={t.descricao} 
+                      onChange={(e) => updateTransaction(t.id, "descricao", e.target.value)} 
+                      className="h-7 text-xs px-2 bg-transparent"
+                    />
+                    <div className="flex items-center flex-wrap gap-1">
+                      {t.isDuplicate && (
+                        <div className="flex items-center text-[10px] text-amber-600 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded" title="Já existe uma transação parecida no banco para esta data e valor.">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Duplicata susp.
+                        </div>
+                      )}
+                      {(t.parcela_atual && t.numero_parcelas) ? (
+                        <span className="text-[10px] text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded font-medium">
+                          Parc {t.parcela_atual}/{t.numero_parcelas}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
                   <div className="flex gap-2 items-center">
                     <Select value={t.categoria} onValueChange={(v) => updateTransaction(t.id, "categoria", v)}>
                       <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
@@ -268,20 +320,16 @@ export default function StatementImport() {
                     </Select>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end gap-2">
-                    <span className="text-[10px] text-muted-foreground">{formatDate(t.data)}</span>
+                    <Input 
+                      type="date" 
+                      value={t.data} 
+                      onChange={(e) => updateTransaction(t.id, "data", e.target.value)} 
+                      className="h-7 text-[10px] w-[100px] px-1 bg-transparent hidden sm:block"
+                    />
+                    <span className="sm:hidden text-[10px] text-muted-foreground">{formatDate(t.data)}</span>
                     <span className={`font-heading font-bold text-sm ${t.tipo === "receita" ? "text-emerald-600" : "text-destructive"}`}>
                       {formatCurrency(t.valor)}
                     </span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1.5 ${
-                        t.confidence === "high" ? "bg-emerald-500/10 text-emerald-600" :
-                        t.confidence === "medium" ? "bg-amber-500/10 text-amber-600" :
-                        "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {t.confidence === "high" ? "✓ Alta" : t.confidence === "medium" ? "~ Média" : "? Baixa"}
-                    </Badge>
                     <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={() => deleteTransaction(t.id)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>

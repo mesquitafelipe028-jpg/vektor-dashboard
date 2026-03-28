@@ -87,6 +87,9 @@ import { useInvestments, type InvestimentoAtivoInsert, type InvestimentoDividend
 import { useStockQuotes, type QuoteResult } from "@/hooks/useStockQuotes";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, isAfter, isBefore } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getLocalDateString } from "@/lib/utils";
@@ -556,13 +559,21 @@ function DashboardTab({
     return months;
   }, [dividendos]);
 
-  // Metas from localStorage for progress display
-  const metaPatrimonio = useMemo(() => {
-    try { return parseFloat(localStorage.getItem("vektor_meta_patrimonio") || "0") || 0; } catch { return 0; }
-  }, []);
-  const metaRenda = useMemo(() => {
-    try { return parseFloat(localStorage.getItem("vektor_meta_renda") || "0") || 0; } catch { return 0; }
-  }, []);
+  // Metas do Supabase para exibir progresso no dashboard
+  const { user } = useAuth();
+  const { data: metasData } = useQuery({
+    queryKey: ["user_preferences", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from("user_preferences").select("meta_patrimonio, meta_renda").eq("user_id", user.id).maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 30000,
+  });
+  const metaPatrimonio = (metasData?.meta_patrimonio ?? 0) as number;
+  const metaRenda = (metasData?.meta_renda ?? 0) as number;
 
   const indicadores = [
     {
@@ -1762,22 +1773,62 @@ function DividendosTab({
 // Metas Tab
 // ═══════════════════════════════════════════════
 function MetasTab({ patrimonio, dividendosMes }: { patrimonio: number; dividendosMes: number }) {
-  const [metaPatrimonio, setMetaPatrimonio] = useState(() => {
-    try { return localStorage.getItem("vektor_meta_patrimonio") || ""; } catch { return ""; }
-  });
-  const [metaRenda, setMetaRenda] = useState(() => {
-    try { return localStorage.getItem("vektor_meta_renda") || ""; } catch { return ""; }
-  });
+  const { user } = useAuth();
+  const qc = useQueryClient();
   const { toast } = useToast();
 
-  const salvarMetas = () => {
-    localStorage.setItem("vektor_meta_patrimonio", metaPatrimonio);
-    localStorage.setItem("vektor_meta_renda", metaRenda);
-    toast({ title: "Metas salvas com sucesso!" });
-  };
+  // Carregar metas do Supabase
+  const { data: prefsData, isLoading: loadingPrefs } = useQuery({
+    queryKey: ["user_preferences", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_preferences").select("meta_patrimonio, meta_renda").eq("user_id", user!.id).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    staleTime: 0,
+  });
 
-  const metaPatVal = parseFloat(metaPatrimonio) || 0;
-  const metaRendaVal = parseFloat(metaRenda) || 0;
+  const metaPatValDb = prefsData?.meta_patrimonio ?? 0;
+  const metaRendaValDb = prefsData?.meta_renda ?? 0;
+
+  const [metaPatrimonio, setMetaPatrimonio] = useState("");
+  const [metaRenda, setMetaRenda] = useState("");
+
+  // Sincronizar campos com dados do banco
+  useEffect(() => {
+    if (!loadingPrefs) {
+      setMetaPatrimonio(metaPatValDb > 0 ? String(metaPatValDb) : "");
+      setMetaRenda(metaRendaValDb > 0 ? String(metaRendaValDb) : "");
+    }
+  }, [metaPatValDb, metaRendaValDb, loadingPrefs]);
+
+  const salvarMetasMut = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) return;
+      const payload = {
+        meta_patrimonio: parseFloat(metaPatrimonio) || 0,
+        meta_renda: parseFloat(metaRenda) || 0,
+      };
+      const { data: existing } = await supabase.from("user_preferences").select("id").eq("user_id", user.id).maybeSingle();
+      if (existing) {
+        const { error } = await supabase.from("user_preferences").update(payload as any).eq("user_id", user.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("user_preferences").insert({ user_id: user.id, ...payload } as any);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast({ title: "Metas salvas com sucesso!" });
+      qc.invalidateQueries({ queryKey: ["user_preferences", user?.id] });
+    },
+    onError: () => toast({ title: "Erro ao salvar metas", variant: "destructive" }),
+  });
+
+  const metaPatVal = parseFloat(metaPatrimonio) || metaPatValDb;
+  const metaRendaVal = parseFloat(metaRenda) || metaRendaValDb;
   const progressPat = metaPatVal > 0 ? Math.min(100, (patrimonio / metaPatVal) * 100) : 0;
   const progressRenda = metaRendaVal > 0 ? Math.min(100, (dividendosMes / metaRendaVal) * 100) : 0;
 
@@ -1804,13 +1855,7 @@ function MetasTab({ patrimonio, dividendosMes }: { patrimonio: number; dividendo
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Valor da meta (R$)</Label>
-              <Input
-                type="number"
-                step="1000"
-                placeholder="100000"
-                value={metaPatrimonio}
-                onChange={(e) => setMetaPatrimonio(e.target.value)}
-              />
+              <Input type="number" step="1000" placeholder="100000" value={metaPatrimonio} onChange={(e) => setMetaPatrimonio(e.target.value)} />
             </div>
             {metaPatVal > 0 && (
               <div>
@@ -1824,9 +1869,7 @@ function MetasTab({ patrimonio, dividendosMes }: { patrimonio: number; dividendo
                   <span>Meta: {fmt(metaPatVal)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  {metaPatVal > patrimonio
-                    ? `Faltam ${fmt(metaPatVal - patrimonio)} para atingir sua meta.`
-                    : "🎉 Parabéns! Você atingiu sua meta de patrimônio!"}
+                  {metaPatVal > patrimonio ? `Faltam ${fmt(metaPatVal - patrimonio)} para atingir sua meta.` : "🎉 Parabéns! Você atingiu sua meta de patrimônio!"}
                 </p>
               </div>
             )}
@@ -1843,13 +1886,7 @@ function MetasTab({ patrimonio, dividendosMes }: { patrimonio: number; dividendo
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Renda mensal desejada (R$)</Label>
-              <Input
-                type="number"
-                step="100"
-                placeholder="1000"
-                value={metaRenda}
-                onChange={(e) => setMetaRenda(e.target.value)}
-              />
+              <Input type="number" step="100" placeholder="1000" value={metaRenda} onChange={(e) => setMetaRenda(e.target.value)} />
             </div>
             {metaRendaVal > 0 && (
               <div>
@@ -1863,9 +1900,7 @@ function MetasTab({ patrimonio, dividendosMes }: { patrimonio: number; dividendo
                   <span>Meta: {fmt(metaRendaVal)}/mês</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  {metaRendaVal > dividendosMes
-                    ? `Faltam ${fmt(metaRendaVal - dividendosMes)}/mês para atingir sua meta.`
-                    : "🎉 Parabéns! Você atingiu sua meta de renda mensal!"}
+                  {metaRendaVal > dividendosMes ? `Faltam ${fmt(metaRendaVal - dividendosMes)}/mês para atingir sua meta.` : "🎉 Parabéns! Você atingiu sua meta de renda mensal!"}
                 </p>
               </div>
             )}
@@ -1873,8 +1908,8 @@ function MetasTab({ patrimonio, dividendosMes }: { patrimonio: number; dividendo
         </Card>
       </div>
 
-      <Button onClick={salvarMetas} className="w-full sm:w-auto">
-        <Save className="h-4 w-4 mr-2" /> Salvar metas
+      <Button onClick={() => salvarMetasMut.mutate()} className="w-full sm:w-auto" disabled={salvarMetasMut.isPending}>
+        <Save className="h-4 w-4 mr-2" /> {salvarMetasMut.isPending ? "Salvando..." : "Salvar metas"}
       </Button>
     </div>
   );

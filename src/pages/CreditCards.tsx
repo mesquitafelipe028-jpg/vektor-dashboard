@@ -13,8 +13,8 @@ import { CreditCard, Plus, HelpCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { parsePDF, type ImportedTransaction } from "@/lib/statement-parser";
-import { Upload, FileText, CheckCircle, RefreshCw, Trash2, Sparkles, TrendingDown } from "lucide-react";
+import { parsePDF, parseImage, type ImportedTransaction } from "@/lib/statement-parser";
+import { Upload, FileText, CheckCircle, RefreshCw, Trash2, Sparkles, TrendingDown, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency, formatDate, getLocalDateString } from "@/lib/utils";
@@ -346,37 +346,120 @@ export default function CreditCards() {
     setCardForm(emptyCardForm);
   }, []);
 
-  const handlePDFUpload = async (file: File) => {
+  const handleFileUpload = async (file: File) => {
     setIsParsing(true);
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    
     try {
-      const transactions = await parsePDF(file);
-      if (transactions.length === 0) {
-        toast.error("Nenhuma transação identificada no PDF.");
+      let transactions: ImportedTransaction[] = [];
+      
+      if (ext === "pdf") {
+        transactions = await parsePDF(file);
+      } else if (ext === "png" || ext === "jpg" || ext === "jpeg") {
+        toast.info("Lendo a imagem... (Isso pode demorar alguns segundos).");
+        transactions = await parseImage(file);
       } else {
+        toast.error("Formato de arquivo não suportado.");
+        setIsParsing(false);
+        return;
+      }
+      
+      if (transactions.length === 0) {
+        toast.error("Nenhuma transação identificada no arquivo.");
+      } else {
+        // Detect Duplicates in Credit Cards context (compras_cartao table)
+        if (user?.id && activeCard?.id) {
+          const dates = transactions.map(t => new Date(t.data).getTime()).filter(t => !isNaN(t));
+          if (dates.length > 0) {
+            const minDate = new Date(Math.min(...dates));
+            minDate.setDate(minDate.getDate() - 3);
+            const maxDate = new Date(Math.max(...dates));
+            maxDate.setDate(maxDate.getDate() + 3);
+
+            const { data: existing } = await supabase
+              .from('compras_cartao')
+              .select('descricao, valor, data')
+              .eq('cartao_id', activeCard.id)
+              .gte('data', minDate.toISOString().split('T')[0])
+              .lte('data', maxDate.toISOString().split('T')[0]);
+            
+            if (existing && existing.length > 0) {
+              transactions = transactions.map(t => {
+                const dup = existing.some(e => 
+                  Math.abs(Number(e.amount || e.valor) - t.valor) < 0.01 &&
+                  Math.abs(new Date(e.date || e.data).getTime() - new Date(t.data).getTime()) <= 86400000 * 3
+                );
+                return { ...t, isDuplicate: dup, selected: !dup };
+              });
+            }
+          }
+        }
+
         setImportedTransactions(transactions);
         toast.success(`${transactions.length} transações identificadas!`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Erro ao processar o PDF.");
+      toast.error(err.message || "Erro ao processar o arquivo.");
     } finally {
       setIsParsing(false);
     }
   };
 
   const handleBulkImport = async () => {
-    const toImport = importedTransactions.filter(t => t.selected);
+    // Ignorar "receitas" (como pagamentos de fatura com sinal negativo)
+    const toImport = importedTransactions.filter(t => t.selected && t.tipo !== "receita");
     if (toImport.length === 0 || !activeCard) return;
 
     try {
-      const inserts = toImport.map(t => ({
-        descricao: t.descricao,
-        valor: t.valor,
-        data: t.data,
-        categoria: t.categoria || null,
-        cartao_id: activeCard.id,
-        user_id: user!.id,
-      }));
+        const inserts: any[] = [];
+        
+        // Vamos determinar o mês "atual" da fatura lida (moda ou mês atual do sistema se falhar)
+        const nonInstallmentDates = toImport
+          .filter(t => !t.numero_parcelas)
+          .map(t => new Date(t.data).getTime())
+          .filter(t => !isNaN(t));
+        
+        const anchorDate = nonInstallmentDates.length > 0 
+          ? new Date(Math.max(...nonInstallmentDates))
+          : new Date();
+
+        toImport.forEach((t) => {
+          if (t.parcela_atual && t.numero_parcelas && t.parcela_atual <= t.numero_parcelas) {
+            // Se for compra parcelada (ex: 8/10), ancoramos a parcela ATUAL no mês da fatura principal
+            // para evitar que o "18/07" (compra do passado) crie uma fatura fictícia
+            let baseDate = new Date(t.data + "T12:00:00");
+            baseDate.setFullYear(anchorDate.getFullYear());
+            baseDate.setMonth(anchorDate.getMonth());
+
+            // Gerar a parcela lida e todas as subsequentes
+            for (let i = t.parcela_atual; i <= t.numero_parcelas; i++) {
+              inserts.push({
+                descricao: `${t.descricao} (${i}/${t.numero_parcelas})`,
+                valor: t.valor,
+                data: baseDate.toISOString().slice(0, 10),
+                categoria: t.categoria || null,
+                cartao_id: activeCard.id,
+                user_id: user!.id,
+              });
+              baseDate.setMonth(baseDate.getMonth() + 1); // avança mês para a próxima parcela
+            }
+          } else {
+            // Compras comuns à vista (anexa caso tenha alguma parcela isolada sem criar loop longo)
+            let finalDesc = t.descricao;
+            if (t.parcela_atual && t.numero_parcelas) {
+              finalDesc = `${finalDesc} (${t.parcela_atual}/${t.numero_parcelas})`;
+            }
+            inserts.push({
+              descricao: finalDesc,
+              valor: t.valor,
+              data: t.data, // mantemos a data precisa
+              categoria: t.categoria || null,
+              cartao_id: activeCard.id,
+              user_id: user!.id,
+            });
+          }
+        });
 
       const { error } = await supabase.from("compras_cartao").insert(inserts);
       if (error) throw error;
@@ -818,10 +901,10 @@ export default function CreditCards() {
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden" aria-describedby="import-dialog-description">
           <DialogHeader className="p-6 pb-2">
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" /> Importar Fatura (PDF)
+              <Sparkles className="h-5 w-5 text-primary" /> Importar Fatura (PDF ou Imagem)
             </DialogTitle>
             <DialogDescription id="import-dialog-description" className="sr-only">
-              Suba o arquivo PDF da sua fatura para identificar e importar gastos automaticamente.
+              Suba o arquivo PDF ou imagem da sua fatura para identificar e importar gastos automaticamente.
             </DialogDescription>
           </DialogHeader>
           
@@ -829,11 +912,11 @@ export default function CreditCards() {
             {importedTransactions.length === 0 ? (
               <div 
                 className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${isParsing ? "opacity-50 pointer-events-none" : "hover:border-primary/50 hover:bg-primary/5"}`}
-                onClick={() => document.getElementById("pdf-input")?.click()}
+                onClick={() => document.getElementById("file-input-invoice")?.click()}
                 onDrop={(e) => {
                   e.preventDefault();
                   const file = e.dataTransfer.files[0];
-                  if (file && file.type === "application/pdf") handlePDFUpload(file);
+                  if (file) handleFileUpload(file);
                 }}
                 onDragOver={(e) => e.preventDefault()}
               >
@@ -841,22 +924,22 @@ export default function CreditCards() {
                   <Upload className={`h-8 w-8 text-primary ${isParsing ? "animate-bounce" : ""}`} />
                 </div>
                 <h3 className="font-heading text-lg font-semibold mb-2">
-                  {isParsing ? "Processando PDF..." : "Arraste sua fatura aqui"}
+                  {isParsing ? "Processando arquivo..." : "Arraste sua fatura aqui"}
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-xs mb-4">
-                  Selecione o arquivo PDF da sua fatura para identificar as compras automaticamente.
+                  Selecione o arquivo PDF ou uma imagem da sua fatura para identificar as compras automaticamente.
                 </p>
                 <Button variant="outline" disabled={isParsing}>
                    Selecionar Arquivo
                 </Button>
                 <input 
-                  id="pdf-input" 
+                  id="file-input-invoice" 
                   type="file" 
-                  accept=".pdf" 
+                  accept=".pdf,.png,.jpg,.jpeg" 
                   className="hidden" 
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handlePDFUpload(file);
+                    if (file) handleFileUpload(file);
                   }}
                 />
               </div>
@@ -875,43 +958,72 @@ export default function CreditCards() {
                   {importedTransactions.map((t) => (
                     <div 
                       key={t.id} 
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${t.selected ? "bg-card border-primary/20" : "bg-muted/30 opacity-60"}`}
+                      className={`flex flex-col p-3 rounded-lg border transition-all ${t.selected ? "bg-card border-primary/20 shadow-sm" : "bg-muted/30 opacity-60"}`}
                     >
-                      <Checkbox 
-                        checked={t.selected} 
-                        onCheckedChange={() => {
-                          setImportedTransactions(prev => prev.map(item => item.id === t.id ? { ...item, selected: !item.selected } : item));
-                        }} 
-                      />
-                      <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
-                        <TrendingDown className="h-4 w-4 text-destructive" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <Input 
-                            value={t.descricao} 
-                            onChange={(e) => {
-                              setImportedTransactions(prev => prev.map(item => item.id === t.id ? { ...item, descricao: e.target.value } : item));
-                            }}
-                            className="h-7 text-xs border-transparent hover:border-input focus:border-primary shadow-none p-0 bg-transparent w-full"
-                          />
-                          <span className="font-bold text-sm ml-2 whitespace-nowrap">{formatCurrency(t.valor)}</span>
+                      <div className="flex items-center gap-3">
+                        <Checkbox 
+                          checked={t.selected} 
+                          onCheckedChange={() => {
+                            setImportedTransactions(prev => prev.map(item => item.id === t.id ? { ...item, selected: !item.selected } : item));
+                          }} 
+                        />
+                        <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                          <TrendingDown className="h-4 w-4 text-destructive" />
                         </div>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-[10px] text-muted-foreground">{formatDate(t.data)}</span>
-                          <Badge variant="outline" className={`text-[8px] h-4 ${t.confidence === 'high' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
-                            {t.confidence === 'high' ? 'Alta Confiança' : 'Média Confiança'}
-                          </Badge>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <Input 
+                              value={t.descricao} 
+                              onChange={(e) => {
+                                setImportedTransactions(prev => prev.map(item => item.id === t.id ? { ...item, descricao: e.target.value } : item));
+                              }}
+                              className="h-7 text-xs border-transparent hover:border-input focus:border-primary shadow-none p-2 bg-transparent w-full"
+                            />
+                            <div className="flex flex-col items-end shrink-0">
+                              <span className="font-bold text-sm whitespace-nowrap">{formatCurrency(t.valor)}</span>
+                              <Badge variant="outline" className={`text-[8px] h-4 mt-1 ${t.confidence === 'high' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                                {t.confidence === 'high' ? 'Alta Conf' : 'Média'}
+                              </Badge>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="flex items-center gap-2">
+                              <Input 
+                                type="date" 
+                                value={t.data} 
+                                onChange={(e) => {
+                                  setImportedTransactions(prev => prev.map(item => item.id === t.id ? { ...item, data: e.target.value } : item));
+                                }}
+                                className="h-6 text-[10px] border-transparent p-0 bg-transparent w-[95px]"
+                              />
+                              
+                              <div className="flex flex-wrap items-center gap-1">
+                                {t.isDuplicate && (
+                                  <div className="flex items-center text-[9px] text-amber-600 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded cursor-help" title="Possível duplicata já registrada no seu sistema para este cartão, valor e data próximos.">
+                                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
+                                    Duplicata?
+                                  </div>
+                                )}
+                                {(t.parcela_atual && t.numero_parcelas) ? (
+                                  <span className="text-[9px] text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded font-medium">
+                                    {t.parcela_atual}/{t.numero_parcelas}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => setImportedTransactions(prev => prev.filter(item => item.id !== t.id))}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => setImportedTransactions(prev => prev.filter(item => item.id !== t.id))}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   ))}
                 </div>

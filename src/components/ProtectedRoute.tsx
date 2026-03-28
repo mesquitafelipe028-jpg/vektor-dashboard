@@ -37,12 +37,12 @@ function LayoutSkeleton() {
 export default function ProtectedRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
+  const { preferences, isLoading: prefsLoading } = useUserPreferences();
 
   if (loading) return <LayoutSkeleton />;
   if (!user || !user.email) return <Navigate to="/login" replace state={{ from: location }} />;
 
   // Redirect to onboarding if not completed (skip if already on /onboarding)
-  const { preferences, isLoading: prefsLoading } = useUserPreferences();
   const storageDone = localStorage.getItem(`vektor_onboarding_done_${user.id}`);
   
   if (prefsLoading) return <LayoutSkeleton />;

@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,22 +102,27 @@ const paletaCores = [
   "#f59e0b", "#ef4444", "#ec4899", "#f97316",
 ];
 
-// ── Helpers ────────────────────────────────────────────────────
-function getStorageKey(userId: string) {
-  return `vektor_projetos_${userId}`;
-}
-
-function loadProjetos(userId: string): Projeto[] {
+// ── Migração one-time do localStorage ──────────────────────────
+async function migrateProjectsFromLocalStorage(userId: string) {
+  const migKey = `vektor_projetos_migrated_v2_${userId}`;
+  if (localStorage.getItem(migKey)) return;
   try {
-    const stored = localStorage.getItem(getStorageKey(userId));
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveProjetos(userId: string, projetos: Projeto[]) {
-  localStorage.setItem(getStorageKey(userId), JSON.stringify(projetos));
+    const raw = localStorage.getItem(`vektor_projetos_${userId}`);
+    if (raw) {
+      const items: Projeto[] = JSON.parse(raw);
+      if (items.length > 0) {
+        const { count } = await supabase
+          .from("projetos").select("id", { count: "exact", head: true }).eq("user_id", userId);
+        if ((count ?? 0) === 0) {
+          await supabase.from("projetos").insert(
+            items.map(({ id, user_id, nome, cliente, status, valor_contrato, data_inicio, data_fim, descricao, cor, lancamentos, created_at }) =>
+              ({ id, user_id, nome, cliente, status, valor_contrato, data_inicio, data_fim, descricao, cor, lancamentos, created_at }))
+          );
+        }
+      }
+    }
+  } catch (e) { console.warn("[Projects] migration error:", e); }
+  finally { localStorage.setItem(migKey, "true"); }
 }
 
 // ── Component ───────────────────────────────────────────────────
@@ -136,14 +141,34 @@ export default function Projects() {
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  // Load from localStorage via useQuery for reactivity
-  const { data: projetos = [] } = useQuery({
+  // One-time migration
+  useEffect(() => { if (user?.id) migrateProjectsFromLocalStorage(user.id); }, [user?.id]);
+
+  // Load from Supabase
+  const { data: projetos = [], refetch } = useQuery({
     queryKey: ["projetos", user?.id],
-    queryFn: () => loadProjetos(user!.id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projetos").select("*").eq("user_id", user!.id).order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Projeto[];
+    },
     enabled: !!user,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
-  const refresh = useCallback(() => qc.invalidateQueries({ queryKey: ["projetos", user?.id] }), [qc, user?.id]);
+  // Realtime
+  useEffect(() => {
+    if (!user?.id) return;
+    const ch = supabase.channel(`projetos:${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "projetos", filter: `user_id=eq.${user.id}` },
+        () => qc.invalidateQueries({ queryKey: ["projetos", user.id] }))
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id, qc]);
+
+  const invalidate = useCallback(() => qc.invalidateQueries({ queryKey: ["projetos", user?.id] }), [qc, user?.id]);
 
   const selectedProject = useMemo(
     () => projetos.find((p) => p.id === selectedProjectId) ?? projetos[0] ?? null,
@@ -151,67 +176,75 @@ export default function Projects() {
   );
 
   // ── Mutations ────────────────────────────────────────────────
-  const saveProjeto = useCallback(() => {
-    if (!form.nome.trim()) { toast.error("Nome obrigatório"); return; }
-    const updated: Projeto = {
-      id: editingId || crypto.randomUUID(),
-      user_id: user!.id,
-      nome: form.nome.trim(),
-      cliente: form.cliente || null,
-      status: form.status,
-      valor_contrato: form.valor_contrato ? parseFloat(form.valor_contrato) : null,
-      data_inicio: form.data_inicio || null,
-      data_fim: form.data_fim || null,
-      descricao: form.descricao || null,
-      cor: form.cor,
-      lancamentos: editingId ? (projetos.find((p) => p.id === editingId)?.lancamentos ?? []) : [],
-      created_at: editingId ? (projetos.find((p) => p.id === editingId)?.created_at ?? getLocalDateString()) : getLocalDateString(),
-    };
-    if (editingId) {
-      saveProjetos(user!.id, projetos.map((p) => (p.id === editingId ? updated : p)));
-    } else {
-      saveProjetos(user!.id, [...projetos, updated]);
-    }
-    refresh();
-    toast.success(editingId ? "Projeto atualizado!" : "Projeto criado!");
-    closeDialog();
-  }, [form, editingId, projetos, user, refresh]);
+  const saveProjetoMut = useMutation({
+    mutationFn: async () => {
+      if (!form.nome.trim()) throw new Error("Nome obrigatório");
+      const payload = {
+        user_id: user!.id,
+        nome: form.nome.trim(),
+        cliente: form.cliente || null,
+        status: form.status,
+        valor_contrato: form.valor_contrato ? parseFloat(form.valor_contrato) : null,
+        data_inicio: form.data_inicio || null,
+        data_fim: form.data_fim || null,
+        descricao: form.descricao || null,
+        cor: form.cor,
+      };
+      if (editingId) {
+        const { error } = await supabase.from("projetos").update(payload).eq("id", editingId).eq("user_id", user!.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("projetos").insert({ ...payload, lancamentos: [], created_at: getLocalDateString() });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => { toast.success(editingId ? "Projeto atualizado!" : "Projeto criado!"); invalidate(); closeDialog(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
-  const deleteProjeto = useCallback((id: string) => {
-    saveProjetos(user!.id, projetos.filter((p) => p.id !== id));
-    refresh();
-    toast.success("Projeto excluído!");
-    if (selectedProjectId === id) setSelectedProjectId(null);
-  }, [projetos, user, refresh, selectedProjectId]);
+  const saveProjeto = useCallback(() => saveProjetoMut.mutate(), [saveProjetoMut]);
 
-  const saveLancamento = useCallback(() => {
-    const valor = parseFloat(lancForm.valor);
-    if (!valor || !lancForm.descricao.trim() || !lancProjetoId) { toast.error("Preencha todos os campos"); return; }
-    const lanc: LancamentoProjeto = {
-      id: crypto.randomUUID(),
-      tipo: lancForm.tipo,
-      descricao: lancForm.descricao.trim(),
-      valor,
-      data: lancForm.data,
-    };
-    const updated = projetos.map((p) =>
-      p.id === lancProjetoId ? { ...p, lancamentos: [...p.lancamentos, lanc] } : p
-    );
-    saveProjetos(user!.id, updated);
-    refresh();
-    toast.success("Lançamento adicionado!");
-    setLancDialogOpen(false);
-    setLancForm(emptyLancamento);
-  }, [lancForm, lancProjetoId, projetos, user, refresh]);
+  const deleteProjetoMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("projetos").delete().eq("id", id).eq("user_id", user!.id);
+      if (error) throw error;
+    },
+    onSuccess: (_, id) => { toast.success("Projeto excluído!"); invalidate(); if (selectedProjectId === id) setSelectedProjectId(null); },
+    onError: () => toast.error("Erro ao excluir projeto"),
+  });
 
-  const deleteLancamento = useCallback((projetoId: string, lancId: string) => {
-    const updated = projetos.map((p) =>
-      p.id === projetoId ? { ...p, lancamentos: p.lancamentos.filter((l) => l.id !== lancId) } : p
-    );
-    saveProjetos(user!.id, updated);
-    refresh();
-    toast.success("Lançamento removido!");
-  }, [projetos, user, refresh]);
+  const deleteProjeto = useCallback((id: string) => deleteProjetoMut.mutate(id), [deleteProjetoMut]);
+
+  const saveLancamentoMut = useMutation({
+    mutationFn: async () => {
+      const valor = parseFloat(lancForm.valor);
+      if (!valor || !lancForm.descricao.trim() || !lancProjetoId) throw new Error("Preencha todos os campos");
+      const proj = projetos.find((p) => p.id === lancProjetoId);
+      if (!proj) throw new Error("Projeto não encontrado");
+      const lanc: LancamentoProjeto = { id: crypto.randomUUID(), tipo: lancForm.tipo, descricao: lancForm.descricao.trim(), valor, data: lancForm.data };
+      const novoLancamentos = [...proj.lancamentos, lanc];
+      const { error } = await supabase.from("projetos").update({ lancamentos: novoLancamentos }).eq("id", lancProjetoId).eq("user_id", user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Lançamento adicionado!"); invalidate(); setLancDialogOpen(false); setLancForm(emptyLancamento); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const saveLancamento = useCallback(() => saveLancamentoMut.mutate(), [saveLancamentoMut]);
+
+  const deleteLancamentoMut = useMutation({
+    mutationFn: async ({ projetoId, lancId }: { projetoId: string; lancId: string }) => {
+      const proj = projetos.find((p) => p.id === projetoId);
+      if (!proj) throw new Error("Projeto não encontrado");
+      const novoLancamentos = proj.lancamentos.filter((l) => l.id !== lancId);
+      const { error } = await supabase.from("projetos").update({ lancamentos: novoLancamentos }).eq("id", projetoId).eq("user_id", user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Lançamento removido!"); invalidate(); },
+    onError: () => toast.error("Erro ao remover lançamento"),
+  });
+
+  const deleteLancamento = useCallback((projetoId: string, lancId: string) => deleteLancamentoMut.mutate({ projetoId, lancId }), [deleteLancamentoMut]);
 
   // ── Dialog helpers ────────────────────────────────────────────
   const closeDialog = useCallback(() => { setDialogOpen(false); setEditingId(null); setForm(emptyForm); }, []);
