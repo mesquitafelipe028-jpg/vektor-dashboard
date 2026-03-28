@@ -85,7 +85,7 @@ export function DayTransactionsDrawer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-md sm:max-w-[425px] overflow-hidden p-4 sm:p-6">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md sm:max-w-[425px] overflow-hidden p-4 sm:p-6" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="font-heading capitalize text-xl">{dateLabel}</DialogTitle>
         </DialogHeader>
@@ -106,8 +106,8 @@ export function DayTransactionsDrawer({
                     </div>
                     
                     <div className="min-w-0 flex-1">
-                      <div className="flex justify-between items-start gap-2">
-                        <p className="text-sm font-semibold truncate leading-tight">
+                      <div className="flex justify-between items-start gap-2 w-full">
+                        <p className="text-sm font-semibold truncate leading-tight flex-1 min-w-0 pr-2">
                           {t.descricao || 'Sem descrição'}
                         </p>
                         <span className={`text-sm font-bold whitespace-nowrap flex-[0_0_auto] ${t.kind === 'receita' ? 'text-primary' : 'text-destructive'} ${t.isPending ? 'opacity-70' : ''}`}>
