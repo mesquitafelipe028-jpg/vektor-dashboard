@@ -85,42 +85,42 @@ export function DayTransactionsDrawer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-md sm:max-w-[425px] overflow-hidden p-4 sm:p-6" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle className="font-heading capitalize text-xl">{dateLabel}</DialogTitle>
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md sm:max-w-[425px] !flex !flex-col overflow-hidden p-4 sm:p-6 shadow-lg" aria-describedby={undefined}>
+        <DialogHeader className="shrink-0 w-full">
+          <DialogTitle className="font-heading capitalize text-xl truncate pr-6">{dateLabel}</DialogTitle>
         </DialogHeader>
 
-        <div className="py-2">
+        <div className="py-2 flex-1 min-h-0 w-full overflow-hidden">
           {transactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground flex flex-col items-center gap-2">
               <FileText className="h-10 w-10 opacity-20" />
               <p className="text-sm">Nenhuma movimentação neste dia.</p>
             </div>
           ) : (
-            <div className="max-h-[300px] md:max-h-[400px] overflow-y-auto overflow-x-hidden pr-2">
-              <div className="space-y-3">
+            <div className="max-h-[300px] md:max-h-[400px] w-full overflow-y-auto overflow-x-hidden pr-2">
+              <div className="space-y-3 w-full">
                 {transactions.map((t) => (
-                  <div key={t.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-muted/20">
-                    <div className={`h-10 w-10 flex-[0_0_auto] rounded-full flex items-center justify-center ${t.bgClass}`}>
+                  <div key={t.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-muted/20 w-full overflow-hidden">
+                    <div className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center ${t.bgClass}`}>
                       <t.icon className={`h-5 w-5 ${t.colorClass}`} />
                     </div>
                     
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 overflow-hidden">
                       <div className="flex justify-between items-start gap-2 w-full">
                         <p className="text-sm font-semibold truncate leading-tight flex-1 min-w-0 pr-2">
                           {t.descricao || 'Sem descrição'}
                         </p>
-                        <span className={`text-sm font-bold whitespace-nowrap flex-[0_0_auto] ${t.kind === 'receita' ? 'text-primary' : 'text-destructive'} ${t.isPending ? 'opacity-70' : ''}`}>
+                        <span className={`text-sm font-bold whitespace-nowrap shrink-0 ${t.kind === 'receita' ? 'text-primary' : 'text-destructive'} ${t.isPending ? 'opacity-70' : ''}`}>
                           {t.kind === 'receita' ? '+' : '-'}{formatCurrency(t.valor)}
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground font-medium truncate">
+                      <div className="flex justify-between items-center gap-2 mt-1 w-full">
+                        <span className="text-xs text-muted-foreground font-medium truncate min-w-0 flex-1">
                             {t.categoria || 'Outros'}
                         </span>
                         {t.isPending && (
-                           <span className="text-[10px] uppercase font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded flex-[0_0_auto]">
+                           <span className="text-[10px] uppercase font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded shrink-0">
                              Pendente
                            </span>
                         )}
@@ -133,7 +133,7 @@ export function DayTransactionsDrawer({
           )}
         </div>
 
-        <div className="pt-4 border-t">
+        <div className="pt-4 border-t shrink-0 w-full">
           <Button 
             className="w-full" 
             onClick={() => {
