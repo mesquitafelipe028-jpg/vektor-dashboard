@@ -196,8 +196,10 @@ export default function Settings() {
         "investimento_ativos",
         "depositos_meta",
         "metas_financeiras",
-        "receitas",
-        "despesas",
+        "ledger_entries",
+        "transactions",
+        "receitas", // Manter por enquanto para garantir limpeza de resíduos se houver
+        "despesas", // Manter por enquanto para garantir limpeza de resíduos se houver
         "clientes",
         "categorias",
         "impostos_mei",
@@ -223,6 +225,7 @@ export default function Settings() {
       const tasks = [
         supabase.from("impostos_mei").delete().eq("user_id", user!.id),
         (supabase as any).from("empresas").delete().eq("user_id", user!.id),
+        supabase.from("transactions").delete().eq("user_id", user!.id).eq("tipo_conta", "mei" as any),
         supabase.from("receitas").delete().eq("user_id", user!.id).eq("tipo_conta", "mei"),
         supabase.from("despesas").delete().eq("user_id", user!.id).eq("tipo_conta", "mei"),
         (supabase as any).from("contas_financeiras").delete().eq("user_id", user!.id).eq("classificacao", "mei"),

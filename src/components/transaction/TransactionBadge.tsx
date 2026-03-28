@@ -9,7 +9,13 @@ interface TransactionTypeBadgeProps {
 }
 
 export function TransactionTypeBadge({ tipo, parcela_atual, numero_parcelas }: TransactionTypeBadgeProps) {
-  if (tipo === "unica") return null;
+  if (tipo === "unica") {
+    return (
+      <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400">
+        Avulsa
+      </Badge>
+    );
+  }
 
   if (tipo === "recorrente") {
     return (

@@ -50,6 +50,7 @@ export default function Receivables() {
           valor: r.amount,
           descricao: r.description,
           data: r.date,
+          categoria: r.category,
           cliente_nome: r.clientes?.nome,
           cliente_telefone: r.clientes?.telefone,
           cliente_email: r.clientes?.email,

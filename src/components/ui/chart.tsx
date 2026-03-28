@@ -75,7 +75,9 @@ ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    // SEGURANÇA: Validar se a cor é segura antes de injetar no CSS
+    const safeColor = color && /^(?:#|rgb|hsl|var|--)[a-z0-9\s()%,.#-]+$/i.test(color) ? color : null;
+    return safeColor ? `  --color-${key}: ${safeColor};` : null;
   })
   .join("\n")}
 }

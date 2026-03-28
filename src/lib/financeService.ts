@@ -18,6 +18,7 @@ export interface FinancialStats {
 
 export interface MonthlyData {
   month: string;
+  rawKey: string;
   receitas: number;
   despesas: number;
   saldo: number;
@@ -174,6 +175,7 @@ export class FinanceService {
 
       return {
         month: label,
+        rawKey: key,
         receitas: rec,
         despesas: desp,
         saldo: rec - desp,

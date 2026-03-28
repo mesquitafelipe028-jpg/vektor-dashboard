@@ -38,6 +38,9 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
 import { DashboardMetasChart } from "@/components/dashboard/DashboardMetasChart";
 import { CashFlowProjection } from "@/components/dashboard/CashFlowProjection";
+import { FinancialCalendar } from "@/components/dashboard/FinancialCalendar";
+import { DayTransactionsDrawer } from "@/components/dashboard/DayTransactionsDrawer";
+import { QuickAddModal } from "@/components/mobile/QuickAddModal";
 import { useDynamicFavicon } from "@/hooks/useDynamicFavicon";
 
 
@@ -91,6 +94,15 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [syncModalOpen, setSyncModalOpen] = useState(false);
+  
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedMonthStr, setSelectedMonthStr] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddDate, setQuickAddDate] = useState<string>("");
+
   const { view: financialView, setView: setFinancialView } = useFinancialView();
   const { categories: dbCategories } = useCategories("despesa");
 
@@ -248,12 +260,40 @@ export default function Dashboard() {
       const rec = raw.receitas.filter(r => r.data === dayStr).reduce((s, r) => s + r.valor, 0);
       const desp = raw.despesas.filter(d => d.data === dayStr).reduce((s, d) => s + d.valor, 0);
       currentFlowBalance += rec - desp;
-      return { dia: day, receitas: rec, despesas: desp, saldo: currentFlowBalance };
+      return { dia: day, receitas: rec, despesas: desp, saldo: currentFlowBalance, dateStr: dayStr };
     });
   }, [saldoTotal, saldoMes, raw.receitas, raw.despesas, currentMonth]);
 
   const despesaPercent = faturamentoMes > 0 ? (despesasMesTotal / faturamentoMes) * 100 : 0;
   const isLoading = loading;
+
+  const handleBarClick = useCallback((monthRawKey: string) => {
+    setSelectedDate(null);
+    setSelectedMonthStr(monthRawKey);
+    setSelectedCategory(null);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleCategoryClick = useCallback((category: string) => {
+    setSelectedDate(null);
+    setSelectedMonthStr(currentMonth);
+    setSelectedCategory(category);
+    setDrawerOpen(true);
+  }, [currentMonth]);
+
+  const handleDayClick = useCallback((dateStr: string) => {
+    const [year, month, day] = dateStr.split('-');
+    setSelectedDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
+    setSelectedMonthStr(null);
+    setSelectedCategory(null);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleAddTransactionFromDrawer = useCallback((dateStr: string) => {
+    setDrawerOpen(false);
+    setQuickAddDate(dateStr);
+    setQuickAddOpen(true);
+  }, []);
 
   // Extracted insight logic out to InsightsFinanceiros component
 
@@ -337,8 +377,24 @@ export default function Dashboard() {
       <Separator />
 
       <Suspense fallback={<ChartsFallback />}>
-        <DashboardCharts monthlyData={monthlyData} categoryData={categoryData} flowChartData={flowChartData} />
+        <DashboardCharts 
+          monthlyData={monthlyData} 
+          categoryData={categoryData} 
+          flowChartData={flowChartData as any} 
+          onMonthClick={(monthLabel) => {
+             const found = monthlyData.find(m => m.month === monthLabel);
+             if (found?.rawKey) handleBarClick(found.rawKey);
+          }}
+          onCategoryClick={handleCategoryClick}
+          onDayClick={handleDayClick}
+        />
       </Suspense>
+
+      <FinancialCalendar 
+        receitas={raw.receitas}
+        despesas={raw.despesas}
+        saldoTotal={saldoTotal}
+      />
 
       <DashboardMetasChart metas={metas} />
 
@@ -362,6 +418,23 @@ export default function Dashboard() {
       />
 
       <QuickSyncModal open={syncModalOpen} onOpenChange={setSyncModalOpen} />
+
+      <DayTransactionsDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        date={selectedDate}
+        monthStr={selectedMonthStr}
+        categoryStr={selectedCategory}
+        receitas={raw.receitas}
+        despesas={raw.despesas}
+        onAddTransaction={handleAddTransactionFromDrawer}
+      />
+
+      <QuickAddModal 
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        defaultDate={quickAddDate}
+      />
     </div>
   );
 }

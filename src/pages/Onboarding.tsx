@@ -186,7 +186,10 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="flex items-center justify-between px-4 sm:px-6 py-4">
+      <header 
+        className="flex items-center justify-between px-4 sm:px-6 py-4"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 1rem)" }}
+      >
         <LogoVektor size="sm" textClassName="text-muted-foreground" />
         <Button variant="ghost" size="sm" onClick={handleSkip} className="text-muted-foreground">
           Pular Onboarding
@@ -240,7 +243,10 @@ export default function Onboarding() {
         </div>
       </div>
 
-      <footer className="px-4 sm:px-6 pb-6 pt-2 max-w-lg mx-auto w-full">
+      <footer 
+        className="px-4 sm:px-6 pb-6 pt-2 max-w-lg mx-auto w-full"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+      >
         <div className="flex gap-3">
           {step > 1 && (
             <Button variant="outline" onClick={goBack} className="flex-1">

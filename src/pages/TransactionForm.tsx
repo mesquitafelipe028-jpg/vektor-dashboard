@@ -244,7 +244,7 @@ export default function TransactionForm() {
         efetivada: type === "receita" ? rec.status === "recebido" : rec.status === "pago",
         forma_pagamento: rec.forma_pagamento ?? "",
         cliente_id: rec.cliente_id ?? "",
-        categoria: rec.categoria ?? "",
+        categoria: rec.categoria ?? rec.category ?? "",
         numero_parcelas: rec.numero_parcelas ? String(rec.numero_parcelas) : "",
         tipo: rec.tipo ?? "expense",
       });
@@ -284,10 +284,6 @@ export default function TransactionForm() {
 
   const upsert = useMutation({
     mutationFn: async () => {
-      if (isSubmittingManual) return;
-      setIsSubmittingManual(true);
-      console.log(`[Mutation] Starting ${isEditing ? "UPDATE" : "INSERT"} for ${type} using Ledger System`);
-
       try {
         const schema = type === "receita" ? receitaSchema : despesaSchema;
         
@@ -326,7 +322,6 @@ export default function TransactionForm() {
         };
 
         if (form.tipo_transacao === "recorrente" && !isEditing) {
-          console.log("[Mutation] Creating RECURRING transaction");
           const { error } = await supabase.from("transactions").insert({
             ...commonPayload,
             frequencia: form.frequencia,
@@ -338,7 +333,6 @@ export default function TransactionForm() {
         }
 
         if (form.tipo_transacao === "parcelada" && type === "despesa" && !isEditing) {
-          console.log("[Mutation] Creating INSTALLMENT transaction set");
           const numParcelas = parseInt(form.numero_parcelas || "1") || 1;
           const valorBase = form.parcelamento_tipo === "parcela" 
             ? amount * numParcelas 
@@ -386,7 +380,6 @@ export default function TransactionForm() {
       }
     },
     onSuccess: async () => {
-      console.log("[Mutation] Success! Invalidating queries...");
       const userId = user?.id;
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.receitas(userId) }),
@@ -410,7 +403,6 @@ export default function TransactionForm() {
         toast.error(`Erro ao salvar ${type}.`, {
           description: e.message || "Erro desconhecido"
         });
-        console.error("[Mutation] Error:", e);
       }
     },
   });

@@ -36,9 +36,10 @@ function savePrefs(prefs: QuickAddPrefs) {
 interface QuickAddModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultDate?: string;
 }
 
-export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
+export function QuickAddModal({ open, onOpenChange, defaultDate }: QuickAddModalProps) {
   const { user } = useAuth();
   const qc = useQueryClient();
 
@@ -51,7 +52,7 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
   const [showMore, setShowMore] = useState(false);
   const [descricao, setDescricao] = useState("");
   const [clienteId, setClienteId] = useState("");
-  const [data, setData] = useState(getLocalDateString());
+  const [data, setData] = useState(defaultDate || getLocalDateString());
 
   // Reset form when opened
   useEffect(() => {
@@ -61,12 +62,12 @@ export function QuickAddModal({ open, onOpenChange }: QuickAddModalProps) {
       setTipo(dt);
       setValor("");
       setCategoria(p.lastCategory[dt] || "");
-      setShowMore(false);
+      setShowMore(defaultDate ? true : false);
       setDescricao("");
       setClienteId("");
-      setData(getLocalDateString());
+      setData(defaultDate || getLocalDateString());
     }
-  }, [open]);
+  }, [open, defaultDate]);
 
   // Update category when tipo changes
   useEffect(() => {

@@ -51,11 +51,19 @@ export default function Clients() {
     queryKey: ["receitas", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("receitas")
-        .select("id, valor, data, cliente_id, status")
-        .order("data", { ascending: false });
+        .from("transactions")
+        .select("id, amount, date, cliente_id, status")
+        .eq("type", "income")
+        .order("date", { ascending: false });
       if (error) throw error;
-      return data;
+      
+      // Mapeamento para compatibilidade legada
+      return (data ?? []).map(t => ({
+        ...t,
+        valor: t.amount,
+        data: t.date,
+        status: t.status === "confirmed" ? "recebido" : t.status
+      }));
     },
     enabled: !!user,
   });

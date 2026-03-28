@@ -65,12 +65,19 @@ export default function ClientDetails() {
     queryKey: ["receitas_cliente", id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("receitas")
+        .from("transactions")
         .select("*")
         .eq("cliente_id", id!)
-        .order("data", { ascending: false });
+        .eq("type", "income")
+        .order("date", { ascending: false });
       if (error) throw error;
-      return data as unknown as ReceitaExtended[];
+      
+      return (data ?? []).map(t => ({
+        ...t,
+        valor: t.amount,
+        data: t.date,
+        status: t.status === "confirmed" ? "recebido" : t.status
+      })) as unknown as ReceitaExtended[];
     },
     enabled: !!user && !!id,
   });
@@ -171,8 +178,8 @@ export default function ClientDetails() {
   const markPaid = useMutation({
     mutationFn: async (receitaId: string) => {
       const { error } = await supabase
-        .from("receitas")
-        .update({ status: "recebido" } as any)
+        .from("transactions")
+        .update({ status: "confirmed" } as any)
         .eq("id", receitaId);
       if (error) throw error;
     },
@@ -186,13 +193,14 @@ export default function ClientDetails() {
   const payProjection = useMutation({
     mutationFn: async (projection: any) => {
       if (!user?.id) throw new Error("Sem usuário");
-      const { error } = await supabase.from("receitas").insert({
+      const { error } = await supabase.from("transactions").insert({
         user_id: user.id,
         cliente_id: id,
         descricao: projection.descricao,
-        valor: projection.valor,
-        data: projection.data,
-        status: "recebido",
+        amount: projection.valor,
+        date: projection.data,
+        status: "confirmed",
+        type: "income",
         tipo_transacao: "unica",
         transacao_pai_id: projection.id, // ID da mãe
       });

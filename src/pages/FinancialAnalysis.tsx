@@ -18,9 +18,19 @@ export default function FinancialAnalysis() {
   const { data: receitas = [] } = useQuery({
     queryKey: queryKeys.receitas(user?.id),
     queryFn: async () => {
-      const { data, error } = await supabase.from("receitas").select("*").order("data", { ascending: false });
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("type", "income")
+        .order("date", { ascending: false });
       if (error) throw error;
-      return data;
+      
+      return (data ?? []).map(t => ({
+        ...t,
+        valor: t.amount,
+        data: t.date,
+        status: t.status === "confirmed" ? "recebido" : t.status
+      }));
     },
     enabled: !!user,
   });
@@ -28,9 +38,19 @@ export default function FinancialAnalysis() {
   const { data: despesas = [] } = useQuery({
     queryKey: queryKeys.despesas(user?.id),
     queryFn: async () => {
-      const { data, error } = await supabase.from("despesas").select("*").order("data", { ascending: false });
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("type", "expense")
+        .order("date", { ascending: false });
       if (error) throw error;
-      return data;
+
+      return (data ?? []).map(t => ({
+        ...t,
+        valor: t.amount,
+        data: t.date,
+        status: t.status === "confirmed" ? "pago" : t.status
+      }));
     },
     enabled: !!user,
   });
