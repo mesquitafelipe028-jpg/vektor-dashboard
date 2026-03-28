@@ -89,7 +89,7 @@ export function UpgradeModal({
             </div>
           </div>
 
-          <Link to="/assinaturas" onClick={() => onOpenChange(false)}>
+          <Link to="/upgrade" onClick={() => onOpenChange(false)}>
             <Button className="w-full h-12 font-bold text-base gap-2 bg-emerald-600 hover:bg-emerald-500">
               {c.cta}
               <ArrowRight className="h-4 w-4" />

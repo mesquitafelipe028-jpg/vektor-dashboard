@@ -35,7 +35,7 @@ export function SubscriptionBanner() {
           </span>
         </div>
         <Link
-          to="/assinaturas"
+          to="/upgrade"
           className="shrink-0 px-3 py-1 rounded-md bg-red-500 hover:bg-red-400 text-white text-xs font-bold transition-colors"
         >
           Desbloquear agora
@@ -55,7 +55,7 @@ export function SubscriptionBanner() {
             </span>
           </div>
           <Link
-            to="/assinaturas"
+            to="/upgrade"
             className="shrink-0 px-3 py-1 rounded-md bg-orange-500 hover:bg-orange-400 text-white text-xs font-bold transition-colors"
           >
             Ver planos
@@ -75,7 +75,7 @@ export function SubscriptionBanner() {
           </span>
         </div>
         <Link
-          to="/assinaturas"
+          to="/upgrade"
           className="shrink-0 px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors"
         >
           Desbloquear IA

@@ -62,6 +62,7 @@ const StatementImport = lazy(() => import("./pages/StatementImport"));
 const Tutorial = lazy(() => import("./pages/Tutorial"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Upgrade = lazy(() => import("./pages/Upgrade"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -135,6 +136,7 @@ const App = () => {
                           <Route path="projetos" element={<Projects />} />
                           <Route path="importar-extrato" element={<StatementImport />} />
                           <Route path="tutorial" element={<Tutorial />} />
+                          <Route path="upgrade" element={<Upgrade />} />
                         </Route>
                       </Route>
                       <Route path="*" element={<NotFound />} />
