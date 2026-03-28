@@ -7,6 +7,7 @@ import { LogoVektor } from "@/components/branding/LogoVektor";
 import { Button } from "@/components/ui/button";
 import { Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
+import { SubscriptionBanner } from "@/components/layout/SubscriptionBanner";
 
 import { useRecurringGenerator } from "@/hooks/useRecurringGenerator";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +24,7 @@ export default function AppLayout() {
       <div className="min-h-[100dvh] flex w-full overflow-x-hidden bg-background">
         {!isMobile && <AppSidebar />}
         <div className="flex-1 flex flex-col min-w-0">
+          <SubscriptionBanner />
           <header className="flex flex-col sticky top-0 z-50 bg-background border-b border-border" style={{ paddingTop: "env(safe-area-inset-top)" }}>
             <div className="h-14 flex items-center px-3 sm:px-4">
               {!isMobile && <SidebarTrigger className="mr-3 sm:mr-4" />}

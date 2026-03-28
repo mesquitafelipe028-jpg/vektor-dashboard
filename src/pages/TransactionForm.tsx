@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useSubscription } from "@/hooks/useSubscription";
+import { UpgradeModal } from "@/components/modals/UpgradeModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -185,6 +187,10 @@ export default function TransactionForm() {
   const customCategories = useMemo(() => dbCategories.map(toCategoryMeta), [dbCategories]);
 
   const { accounts, isLoading: loadingAccounts } = useAccounts();
+
+  // Subscription guard
+  const { canAddTransaction, isLoading: subLoading } = useSubscription();
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   // Auto-select account if only one exists
   useEffect(() => {
@@ -423,6 +429,11 @@ export default function TransactionForm() {
 
   return (
     <div className="min-h-[100dvh] bg-background">
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+        reason="transaction"
+      />
       {/* Header */}
       <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <button type="button" onClick={() => navigate(backPath)} className="p-1">
@@ -431,8 +442,14 @@ export default function TransactionForm() {
         <h2 className="font-heading text-base font-semibold">{title}</h2>
         <Button
           size="sm"
-          onClick={() => upsert.mutate()}
-          disabled={upsert.isPending || isSubmittingManual}
+          onClick={() => {
+            if (!isEditing && !canAddTransaction) {
+              setUpgradeModalOpen(true);
+              return;
+            }
+            upsert.mutate();
+          }}
+          disabled={upsert.isPending || isSubmittingManual || subLoading}
           className={`${accentBg} text-white px-5 rounded-full text-sm`}
         >
           {upsert.isPending || isSubmittingManual ? "..." : "Salvar"}
