@@ -1,9 +1,10 @@
-import { useEffect } from "react";
-import { Link } from "react-router-dom";
-import { AlertTriangle, Lock, Zap, Clock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Clock, AlertTriangle, Lock, Zap, X } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 
 export function SubscriptionBanner() {
+  const navigate = useNavigate();
   const {
     effectivePlanType,
     isTrial,
@@ -12,93 +13,120 @@ export function SubscriptionBanner() {
     checkUserAccess,
   } = useSubscription();
 
-  // Verificar expiração quando o componente monta e a cada 10 minutos
+  const [dismissed, setDismissed] = useState(false);
+  const [days, setDays] = useState(0);
+
+  // Sincroniza dias e verifica expiração a cada minuto
   useEffect(() => {
-    checkUserAccess();
-    const interval = setInterval(checkUserAccess, 10 * 60 * 1000);
+    const update = () => {
+      setDays(daysRemainingInTrial());
+      checkUserAccess();
+    };
+    update();
+    const interval = setInterval(update, 60_000);
     return () => clearInterval(interval);
-  }, [checkUserAccess]);
+  }, [daysRemainingInTrial, checkUserAccess]);
 
-  const days = daysRemainingInTrial();
-  const isLastDay = days === 1;
-
-  // Não exibir banner para usuários PAID
+  // Não exibir para PAID
   if (effectivePlanType === "PAID") return null;
 
+  // Expirado sempre aparece (não pode ser dispensado)
+  const canDismiss = isTrial && days > 2;
+  if (dismissed && canDismiss) return null;
+
+  /* ── Variantes de conteúdo ────────────────────────────────── */
+  type Variant = {
+    bg: string;
+    border: string;
+    icon: React.ReactNode;
+    message: string;
+    sub?: string;
+    cta: string;
+    ctaStyle: string;
+  };
+
+  let variant: Variant;
+
   if (isExpired) {
-    return (
-      <div className="w-full flex items-center justify-between gap-3 px-4 py-2.5 bg-red-950/80 border-b border-red-500/30 text-red-100 text-sm z-40">
-        <div className="flex items-center gap-2 min-w-0">
-          <Lock className="h-4 w-4 shrink-0 text-red-400" />
-          <span className="truncate font-medium">
-            🔒 Seu acesso foi limitado. Crie novas transações apenas no plano pago.
-          </span>
-        </div>
-        <Link
-          to="/upgrade"
-          className="shrink-0 px-3 py-1 rounded-md bg-red-500 hover:bg-red-400 text-white text-xs font-bold transition-colors"
-        >
-          Desbloquear agora
-        </Link>
-      </div>
-    );
+    variant = {
+      bg: "bg-red-950",
+      border: "border-b border-red-500/25",
+      icon: <Lock className="h-3.5 w-3.5 shrink-0 text-red-400" />,
+      message: "Seu acesso foi limitado.",
+      sub: "Novas transações e IA estão bloqueadas.",
+      cta: "Ativar acesso completo",
+      ctaStyle:
+        "bg-red-500 hover:bg-red-400 text-white font-bold shadow-[0_0_12px_rgba(239,68,68,0.4)]",
+    };
+  } else if (days <= 1) {
+    // Último dia
+    variant = {
+      bg: "bg-orange-950",
+      border: "border-b border-orange-500/25",
+      icon: (
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-400 animate-pulse" />
+      ),
+      message: days === 0 ? "Seu trial expira hoje!" : "Último dia de acesso gratuito.",
+      sub: "Faça o upgrade para não perder nenhuma funcionalidade.",
+      cta: "Desbloquear agora",
+      ctaStyle:
+        "bg-orange-500 hover:bg-orange-400 text-white font-bold shadow-[0_0_12px_rgba(249,115,22,0.4)]",
+    };
+  } else {
+    // Trial ativo
+    variant = {
+      bg: "bg-amber-950/70",
+      border: "border-b border-amber-500/20",
+      icon: <Clock className="h-3.5 w-3.5 shrink-0 text-amber-400" />,
+      message: `Acesso gratuito: ${days} dia${days !== 1 ? "s" : ""} restante${days !== 1 ? "s" : ""}.`,
+      sub: undefined,
+      cta: "Ver planos",
+      ctaStyle:
+        "bg-amber-400 hover:bg-amber-300 text-black font-bold shadow-[0_0_12px_rgba(251,191,36,0.3)]",
+    };
   }
 
-  if (isTrial) {
-    if (isLastDay) {
-      return (
-        <div className="w-full flex items-center justify-between gap-3 px-4 py-2.5 bg-orange-950/80 border-b border-orange-400/30 text-orange-100 text-sm z-40">
-          <div className="flex items-center gap-2 min-w-0">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-orange-400 animate-pulse" />
-            <span className="truncate font-medium">
-              ⚠️ Último dia de acesso gratuito. Não perca seus dados e funcionalidades!
-            </span>
-          </div>
-          <Link
-            to="/upgrade"
-            className="shrink-0 px-3 py-1 rounded-md bg-orange-500 hover:bg-orange-400 text-white text-xs font-bold transition-colors"
-          >
-            Ver planos
-          </Link>
-        </div>
-      );
-    }
-
-    return (
-      <div className="w-full flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-950/60 border-b border-amber-500/20 text-amber-100 text-sm z-40">
-        <div className="flex items-center gap-2 min-w-0">
-          <Clock className="h-4 w-4 shrink-0 text-amber-400" />
-          <span className="truncate font-medium">
-            ⏳ Seu acesso gratuito termina em{" "}
-            <strong className="text-amber-300">{days} dia{days !== 1 ? "s" : ""}</strong>
-            {" "}— A IA só está disponível no plano pago.
-          </span>
-        </div>
-        <Link
-          to="/upgrade"
-          className="shrink-0 px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors"
-        >
-          Desbloquear IA
-        </Link>
-      </div>
-    );
-  }
-
-  // FREE (sem trial, sem expiração explícita)
   return (
-    <div className="w-full flex items-center justify-between gap-3 px-4 py-2.5 bg-zinc-800/80 border-b border-zinc-600/30 text-zinc-300 text-sm z-40">
-      <div className="flex items-center gap-2 min-w-0">
-        <Zap className="h-4 w-4 shrink-0 text-yellow-400" />
-        <span className="truncate font-medium">
-          Você está no plano gratuito. A IA e criação de novas transações estão bloqueadas.
-        </span>
+    <div
+      className={`w-full z-50 ${variant.bg} ${variant.border}`}
+      role="banner"
+      aria-label="Status do plano"
+    >
+      <div className="max-w-screen-xl mx-auto px-3 sm:px-4 h-10 flex items-center gap-3">
+        {/* Ícone + texto */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {variant.icon}
+          <p className="text-xs sm:text-sm font-semibold text-white leading-none truncate">
+            {variant.message}
+            {variant.sub && (
+              <span className="hidden sm:inline text-white/60 font-normal ml-1.5">
+                {variant.sub}
+              </span>
+            )}
+          </p>
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={() => navigate("/upgrade")}
+          className={`shrink-0 flex items-center gap-1.5 px-3 h-6 rounded-md text-xs transition-all duration-150 hover:scale-105 active:scale-95 ${variant.ctaStyle}`}
+        >
+          <Zap className="h-3 w-3" />
+          <span className="hidden xs:inline">{variant.cta}</span>
+          <span className="xs:hidden">Upgrade</span>
+        </button>
+
+        {/* Fechar (só para trial com +2 dias) */}
+        {canDismiss && (
+          <button
+            onClick={() => setDismissed(true)}
+            className="shrink-0 p-1 rounded text-white/40 hover:text-white/80 transition-colors"
+            aria-label="Fechar aviso"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
-      <Link
-        to="/assinaturas"
-        className="shrink-0 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors"
-      >
-        Ver planos
-      </Link>
     </div>
   );
 }

@@ -20,7 +20,7 @@ const plans = [
     description: "IA trabalhando por você todos os dias.",
     highlight: false,
     cta: "Assinar agora",
-    checkoutUrl: "#checkout-inteligente", // Substituir pelo link real de checkout
+    checkoutUrl: "#checkout-inteligente",
     features: [
       { label: "Assistente IA 24/7", included: true },
       { label: "Registro por texto ou voz", included: true },
@@ -30,7 +30,7 @@ const plans = [
       { label: "Dashboard completo", included: true },
       { label: "Relatórios avançados", included: true },
       { label: "Cartões ilimitados", included: true },
-      { label: "Clientes e cobranças", included: false },
+      { label: "Clientes e cobranças", included: true },
     ],
   },
   {
@@ -42,10 +42,10 @@ const plans = [
     description: "Acesso completo para sempre, sem mensalidade.",
     highlight: true,
     cta: "Comprar agora",
-    checkoutUrl: "#checkout-essencial", // Substituir pelo link real de checkout
+    checkoutUrl: "#checkout-essencial",
     features: [
-      { label: "Assistente IA 24/7", included: true },
-      { label: "Registro por texto ou voz", included: true },
+      { label: "Assistente IA 24/7", included: false },
+      { label: "Registro por texto ou voz", included: false },
       { label: "Insights automáticos", included: true },
       { label: "Previsões financeiras", included: true },
       { label: "Transações ilimitadas", included: true },
@@ -61,7 +61,7 @@ const aiHighlights = [
   {
     icon: Bot,
     title: "Registre em segundos",
-    desc: "Mande uma mensagem simples como "Uber 23" e a IA categoriza, registra e projeta o impacto no seu saldo.",
+    desc: "Mande uma mensagem simples como 'Uber 23' e a IA categoriza, registra e projeta o impacto no seu saldo.",
   },
   {
     icon: BarChart3,
