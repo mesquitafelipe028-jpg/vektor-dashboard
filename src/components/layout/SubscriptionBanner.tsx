@@ -88,7 +88,7 @@ export function SubscriptionBanner() {
 
   return (
     <div
-      className={`w-full z-50 ${variant.bg} ${variant.border}`}
+      className={`w-full ${variant.bg} ${variant.border}`}
       role="banner"
       aria-label="Status do plano"
     >

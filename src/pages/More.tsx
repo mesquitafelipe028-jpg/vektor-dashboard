@@ -5,6 +5,7 @@ import {
   ClipboardList, Clock, Wallet, Briefcase, Upload, HelpCircle, Sparkles, Lock
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 
 const menuGroups = [
@@ -12,7 +13,7 @@ const menuGroups = [
     label: "Visão Geral",
     items: [
       { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", color: "bg-primary/10 text-primary" },
-      { label: "Vektor IA", icon: Sparkles, path: "/ai-chat", color: "bg-primary/10 text-primary", isLocked: true },
+      { label: "Vektor IA", icon: Sparkles, path: "https://chatvektorapp.vercel.app", color: "bg-primary/10 text-primary", isVektorIA: true },
       { label: "Fluxo de Caixa", icon: ArrowLeftRight, path: "/fluxo-de-caixa", color: "bg-chart-2/10 text-chart-2" },
       { label: "Timeline", icon: Clock, path: "/timeline", color: "bg-chart-3/10 text-chart-3" },
     ],
@@ -63,7 +64,12 @@ const menuGroups = [
 
 export default function More() {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const { isIAEnabled } = useSubscription();
+
+  const unlimitedEmails = ["mesquitafelipe028@gmail.com", "elisiane0708@gmail.com", "demo@vektor.app"];
+  const isUserUnlimited = user?.email && unlimitedEmails.includes(user.email.toLowerCase());
+  const canAccessIA = isIAEnabled || isUserUnlimited;
 
   const handleLogout = async () => {
     await signOut();
@@ -78,21 +84,26 @@ export default function More() {
         <div key={group.label} className="space-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">{group.label}</h2>
           <div className="grid grid-cols-3 gap-3">
-            {group.items.map((item: any) => (
+            {group.items.map((item: any) => {
+              const locked = item.isVektorIA ? !canAccessIA : item.isLocked;
+
+              return (
               <button
                 key={item.path}
                 onClick={() => {
-                  if (item.isLocked) {
+                  if (locked) {
                     toast.error("Vektor IA disponível no plano Inteligente.", {
                       description: "Faça o upgrade para liberar o assistente financeiro.",
                     });
+                  } else if (item.isVektorIA) {
+                    window.open(item.path, "_blank");
                   } else {
                     navigate(item.path);
                   }
                 }}
                 className="flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 shadow-sm active:scale-95 transition-transform relative overflow-hidden"
               >
-                {item.isLocked && (
+                {locked && (
                   <div className="absolute top-1 right-1">
                     <Lock className="h-3 w-3 text-muted-foreground/50" />
                   </div>
@@ -102,7 +113,7 @@ export default function More() {
                 </div>
                 <span className="text-xs font-medium text-foreground text-center leading-tight">{item.label}</span>
               </button>
-            ))}
+            )})}
           </div>
         </div>
       ))}

@@ -38,9 +38,12 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-[#0B0F0D] text-foreground font-geist">
+    <div className="min-h-[100dvh] grid grid-cols-1 md:grid-cols-2 bg-[#0B0F0D] text-foreground font-geist">
       {/* Coluna Esquerda: Formulário */}
-      <div className="flex flex-col items-center justify-center p-8 md:p-12 lg:p-16 relative">
+      <div
+        className="flex flex-col items-center justify-center p-8 md:p-12 lg:p-16 relative"
+        style={{ paddingTop: "max(2rem, calc(env(safe-area-inset-top) + 2rem))" }}
+      >
         <div className="w-full max-w-sm space-y-8 relative z-10">
           <div className="md:hidden flex justify-center mb-8">
             <BrandHeader className="scale-110" />

@@ -149,3 +149,63 @@
     transform: translateY(0);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SAFE AREA & MOBILE UTILITIES
+ * Aplica suporte completo a safe areas do iOS/Android (notch, home indicator)
+ * ─────────────────────────────────────────────────────────────────────────────*/
+
+/**
+ * Container base com padding seguro em todos os lados.
+ * Garante que o conteúdo nunca fique atrás do notch, home indicator
+ * ou bordas físicas do dispositivo.
+ */
+.safe-container {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+/**
+ * Substitui min-h-screen (100vh) por 100dvh.
+ * 100dvh respeita a barra de URL retrátil do navegador mobile,
+ * evitando overflow/scroll indesejado em Chrome/Safari mobile.
+ */
+.min-h-screen-safe {
+  min-height: 100dvh;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * TIPOGRAFIA RESPONSIVA (clamp)
+ * Escala suavemente entre breakpoints sem media queries quebradas.
+ * ─────────────────────────────────────────────────────────────────────────────*/
+
+/** Título principal de páginas (hero) */
+.heading-hero {
+  font-size: clamp(1.625rem, 5vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+/** Título de seções internas */
+.heading-section {
+  font-size: clamp(1.125rem, 3.5vw, 1.5rem);
+  line-height: 1.3;
+}
+
+/** Subtítulo / descrição de hero */
+.subheading {
+  font-size: clamp(0.9rem, 2.5vw, 1.125rem);
+  line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * OVERFLOW HORIZONTAL GLOBAL
+ * Garante que nenhum elemento extrapole a largura da tela
+ * ─────────────────────────────────────────────────────────────────────────────*/
+#root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+

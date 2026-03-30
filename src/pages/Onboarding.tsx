@@ -185,7 +185,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       <header 
         className="flex items-center justify-between px-4 sm:px-6 py-4"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 1rem)" }}
