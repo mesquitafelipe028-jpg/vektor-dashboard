@@ -17,6 +17,7 @@ import { BillingReminderSheet } from "@/components/billing/BillingReminderSheet"
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import type { ReceitaExtended } from "@/types/transactions";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface ReceivableWithClient extends ReceitaExtended {
   cliente_nome?: string;
@@ -50,6 +51,7 @@ export default function Receivables() {
           valor: r.amount,
           descricao: r.description,
           data: r.date,
+          status: r.status === "confirmed" ? "recebido" : "pendente",
           categoria: r.category,
           cliente_nome: r.clientes?.nome,
           cliente_telefone: r.clientes?.telefone,
@@ -66,12 +68,34 @@ export default function Receivables() {
         .update({ status: "confirmed" } as any)
         .eq("id", id);
       if (error) throw error;
+      return id;
     },
-    onSuccess: () => {
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["receivables"] });
+      const previousReceivables = qc.getQueryData(["receivables"]);
+      
+      qc.setQueryData(["receivables"], (old: any) => {
+        if (!old) return old;
+        // Atualiza otimista, setando status para "recebido" para sumir da lista de pendentes
+        return old.map((r: any) => 
+          r.id === id ? { ...r, status: "recebido" } : r
+        );
+      });
+      
+      return { previousReceivables };
+    },
+    onError: (err, id, context) => {
+      qc.setQueryData(["receivables"], context?.previousReceivables);
+      toast.error("Erro ao registrar pagamento.");
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["receivables"] });
       qc.invalidateQueries({ queryKey: queryKeys.transactions(user?.id) });
       qc.invalidateQueries({ queryKey: queryKeys.accounts(user?.id) });
-      toast.success("Pagamento registrado!");
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard(user?.id) });
+    },
+    onSuccess: () => {
+      toast.success("Pagamento recebido!");
     },
   });
 
