@@ -77,29 +77,12 @@ export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialC
   const dailyBalances = useMemo(() => {
     const balances = new Map<string, number>();
     
-    // First, find the "Initial Balance" at the start of the visible calendar grid.
-    // For simplicity: We know saldoTotal is the balance today (excluding pending).
-    // Let's compute a daily delta for ALL transactions since the start of the calendar grid up to the end.
-    
     const todayStr = getLocalDateString();
-    let runnerBalance = saldoTotal;
-
-    // To find the balance at the start of our calendar grid, we take today's balance,
-    // and undo all confirmed transactions between the calendar start and today.
-    // Actually, a simpler approach for cash flow projection:
-    // 1. Calculate the total net flow of confirmed past transactions before the calendar grid starts.
-    // We already have `saldoTotal` as the current exact balance. 
-    // We calculate daily 'net' (including pending).
-    // From today onwards, we ADD future nets.
-    // From today backwards, we SUBTRACT past nets.
-
-    // Let's just track from calendarDays[0]
-    // Find net between calendarDays[0] and today (using only confirmed to match saldoTotal).
     let flowSinceGridStartToToday = 0;
     
     calendarDays.forEach(day => {
       const dStr = format(day, "yyyy-MM-dd");
-      if (dStr < todayStr) {
+      if (dStr <= todayStr) {
         const dayData = dataMap.get(dStr);
         if (dayData) {
            flowSinceGridStartToToday += (dayData.in - dayData.out);
@@ -107,19 +90,17 @@ export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialC
       }
     });
 
-    // Approximation of balance at the beginning of the grid
     let currentBalance = saldoTotal - flowSinceGridStartToToday;
 
-    // Now roll forward exactly through the grid using ALL transactions (confirmed + pending)
-    // to show expected flow.
     calendarDays.forEach(day => {
       const dStr = format(day, "yyyy-MM-dd");
-      const dayData = dataMap.get(dStr);
-      
-      if (dayData) {
-        currentBalance += (dayData.in + dayData.pendingIn) - (dayData.out + dayData.pendingOut);
+      if (dStr <= todayStr) {
+        const dayData = dataMap.get(dStr);
+        if (dayData) {
+          currentBalance += (dayData.in - dayData.out);
+        }
+        balances.set(dStr, currentBalance);
       }
-      balances.set(dStr, currentBalance);
     });
 
     return balances;
@@ -135,6 +116,8 @@ export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialC
     setQuickAddDate(dateStr);
     setQuickAddOpen(true);
   };
+
+  const todayStr = getLocalDateString();
 
   return (
     <Card className="w-full shadow-sm">
@@ -166,12 +149,12 @@ export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialC
         <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {calendarDays.map((day, idx) => {
             const dateStr = format(day, "yyyy-MM-dd");
+            const isFuture = dateStr > todayStr;
             const data = dataMap.get(dateStr) || { in: 0, out: 0, pendingIn: 0, pendingOut: 0 };
-            const projBalance = dailyBalances.get(dateStr) || 0;
             
-            const totalIn = data.in + data.pendingIn;
-            const totalOut = data.out + data.pendingOut;
-            const hasActivity = totalIn > 0 || totalOut > 0;
+            const confirmedIn = data.in;
+            const confirmedOut = data.out;
+            const hasConfirmedActivity = confirmedIn > 0 || confirmedOut > 0;
             
             const isCurrentMonth = isSameMonth(day, currentDate);
             const isTodayDate = isToday(day);
@@ -192,34 +175,35 @@ export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialC
                     {format(day, "d")}
                   </span>
                   
-                  {/* Indicators for mobile/compact view */}
+                  {/* Indicators for mobile/compact view and future dates */}
                   <div className="flex flex-col gap-0.5 items-end opacity-80 mt-0.5">
-                    {totalIn > 0 && <span className="block w-1.5 h-1.5 rounded-full bg-emerald-500" />}
-                    {totalOut > 0 && <span className="block w-1.5 h-1.5 rounded-full bg-rose-500" />}
-                    {(data.pendingIn > 0 || data.pendingOut > 0) && <span className="block w-1.5 h-1.5 rounded-full bg-amber-500" />}
+                    {(data.in > 0 || data.pendingIn > 0) && <span className="block w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                    {(data.out > 0 || data.pendingOut > 0) && <span className="block w-1.5 h-1.5 rounded-full bg-rose-500" />}
                   </div>
                 </div>
 
-                {/* Values for desktop/larger screens */}
-                {hasActivity && (
+                {/* Values for desktop/larger screens (Past & Today only for confirmed) */}
+                {!isFuture && hasConfirmedActivity && (
                   <div className="hidden sm:flex flex-col mt-auto space-y-0.5 mb-1">
-                    {totalIn > 0 && (
+                    {confirmedIn > 0 && (
                       <div className="text-[10px] font-bold text-emerald-600 truncate">
-                        +{formatCurrency(totalIn)}
+                        +{formatCurrency(confirmedIn)}
                       </div>
                     )}
-                    {totalOut > 0 && (
+                    {confirmedOut > 0 && (
                       <div className="text-[10px] font-bold text-rose-600 truncate">
-                        -{formatCurrency(totalOut)}
+                        -{formatCurrency(confirmedOut)}
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Projected Balance */}
-                <div className={`mt-auto text-[9px] sm:text-[10px] font-bold truncate ${projBalance < 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>
-                  {formatCurrency(projBalance)}
-                </div>
+                {/* Real Balance (Past & Today only) */}
+                {!isFuture && dailyBalances.has(dateStr) && (
+                  <div className={`mt-auto text-[9px] sm:text-[10px] font-bold truncate ${(dailyBalances.get(dateStr) || 0) < 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>
+                    {formatCurrency(dailyBalances.get(dateStr) || 0)}
+                  </div>
+                )}
 
               </div>
             );
