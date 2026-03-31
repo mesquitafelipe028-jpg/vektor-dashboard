@@ -37,7 +37,7 @@ export function DashboardGoals({ metaAtual, prevMonth, navigate, formatCurrency 
           </CardContent>
         </Card>
       )}
-      <Card className={`cursor-pointer hover:shadow-md transition-shadow ${!metaAtual ? "lg:col-span-2" : ""}`} onClick={() => navigate("/relatorio-mensal")}>
+      <Card className={`cursor-pointer hover:shadow-md transition-shadow ${!metaAtual ? "lg:col-span-2" : ""}`} onClick={() => navigate("/relatorios")}>
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
