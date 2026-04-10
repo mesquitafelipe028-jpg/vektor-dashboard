@@ -12,22 +12,33 @@ export interface ImportedTransaction {
   isDuplicate?: boolean;
 }
 
+export interface InvoiceParseResult {
+  invoice?: {
+    source: string;
+    total_amount: number;
+    due_date: string;
+    minimum_payment?: number;
+  };
+  transactions: ImportedTransaction[];
+}
+
 export const WORDS_RECEITA = ["pix recebido", "ted recebido", "ted", "crédito", "pagamento recebido", "remuneração", "salário", "transferência recebida", "boleto recebido", "estorno", "reembolso"];
 export const WORDS_DESPESA = ["pix enviado", "transferência enviada", "pagamento", "compra", "débito", "tarifa", "mensalidade", "fatura", "saque", "iof", "anuidade", "seguro"];
 
 export const BLACKLIST_KEYWORDS = [
   "saldo anterior", "saldo atual", "total da fatura", "pagamento efetuado", 
   "pagamento recebido", "total de gastos", "limite disponível", "limite total",
-  "encargos", "juros", "multa", "demonstrativo", "vencimento", "fechamento",
+  "encargos", "juros", "multa", "demonstrativo", "vencimento", "fechamento", "fechada", "fechamento de fatura",
   "resumo", "detalhamento", "provisório", "proxima fatura", "melhor dia",
   "banco ", "cnpj", "av. ", "avenida", "cep:", "endereço", "telefone:", "fatura mensal",
-  "atendimento", "sac:", "ouvidoria", "total selecionado", "pagamento total",
-  "realizados até", "esta é a fatura", "contendo compras", "código de barras", 
+  "atendimento", "sac:", "ouvidoria", "total selecionado", "pagamento total", "pagar fatura",
+  "realizados até", "esta é a fatura", "esta fatura", "contendo compras", "código de barras", 
   "parcelamento", "histórico de", "período", "pagando o valor", "desta fatura",
   "contratará", "utilizando o", "exato de até", "valor total", "resumo da fatura",
   "total despesas", "total de pagamentos", "consolidado de", "seus limites", "seu limite",
   "pagando o", "utilizando o", "opção!", "saque à crédito", "mínimo", "anuidade", 
-  "app way", "orientações", "beneficiária", "exato de", "favor de", "atraso da"
+  "app way", "orientações", "beneficiária", "exato de", "favor de", "atraso da", 
+  "fatura aberta", "abertura de fatura", "abr."
 ];
 
 export const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -35,8 +46,9 @@ export const CATEGORY_KEYWORDS: Record<string, string[]> = {
   "Alimentação/Supermercado": ["supermercado", "mercado", "pao de acucar", "carrefour", "extra", "assai", "atacadão", "dia%", "restaurante", "lanchonete", "delivery", "ifood", "uber eats", "rappi", "mcdonalds", "bk ", "burger king", "starbucks", "padaria", "confeitaria", "açougue"],
   "Transporte/Combustível": ["uber", "99", "taxi", "estacionamento", "gasolina", "combustível", "posto ", "shell", "ipiranga", "br ", "petrobras", "pedágio", "sem parar", "veloe", "ônibus", "metrô", "cptm"],
   "Saúde/Academia": ["farmácia", "droga", "raia", "drogasil", "pague menos", "médico", "hospital", "clinica", "unimed", "bradesco saude", "sulamerica", "plano de saúde", "academia", "smart fit", "bluefit", "gympass", "dentista"],
-  "Educação/Cursos": ["curso", "escola", "faculdade", "universidade", "livro", "saraiva", "amazon", "udemy", "alura", "hotmart", "coursera"],
+  "Educação/Cursos": ["curso", "escola", "faculdade", "universidade", "livro", "saraiva", "amazon", "udemy", "alura", "hotmart", "coursera", "kiwify", "uniasselvi", "objetivo"],
   "Lazer/Entretenimento": ["netflix", "spotify", "amazon prime", "disney", "youtube", "hbo", "cinema", "ingresso", "teatro", "show", "viagem", "hotel", "airbnb", "decolar", "booking", "jogos", "steam", "playstation", "xbox"],
+  "Assinaturas/Software": ["apple", "google", "microsoft", "adobe", "canva", "github", "aws", "vercel", "digitalocean"],
   "Marketing/Ads": ["google ads", "facebook ads", "meta ads", "linkedin ads"],
   "Serviços Bancários": ["tarifa", "iof", "anuidade", "juros", "seguro", "mensalidade"],
   "Telefonia/Internet": ["vivo", "claro", "tim", "oi ", "net ", "sky ", "internet", "celular"],
@@ -149,6 +161,12 @@ export function processPDFLines(lines: string[]): ImportedTransaction[] {
         .replace(/^[^\w\s]+/, "") // Tira simbolos do começo da descricao ex "@ "
         .trim();
 
+      // REGRA CRÍTICA: Se não restar nome do estabelecimento (somos tolerantes a pelo menos 3 chars que não sejam só números)
+      if (desc.replace(/[^a-zA-Z]/g, '').length < 3) continue;
+
+      // Descarta linhas soltas ou fragmentadas sem sentido na fátura
+      if (BLACKLIST_KEYWORDS.some(kw => desc.toLowerCase().includes(kw))) continue;
+
       if (desc.length > 2) {
         // Tratar a conversão da data corretamente para nosso sistema
         const parts = rawDate.split("/");
@@ -171,7 +189,7 @@ export function processPDFLines(lines: string[]): ImportedTransaction[] {
             descricao: cleanDesc.trim(),
             valor: Math.abs(valor),
             tipo: guessType(desc, valor),
-            categoria: guessCategory(desc),
+            categoria: guessCategory(cleanDesc.trim()),
             selected: true,
             confidence: currencyMatches.length === 1 ? "high" : "medium",
             parcela_atual,

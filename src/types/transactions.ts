@@ -8,19 +8,67 @@ export type TipoTransacao = "unica" | "recorrente" | "parcelada";
 export type Frequencia = "semanal" | "quinzenal" | "mensal" | "anual";
 export type StatusReceita = "pendente" | "recebido" | "atrasado";
 export type StatusDespesa = "pendente" | "pago" | "atrasado";
+export type InvoiceStatus = "pending" | "confirmed" | "processing";
 
-export interface DespesaExtended extends Omit<Tables<"despesas">, "tipo" | "frequencia" | "status" | "tipo_transacao"> {
-  tipo?: "expense" | "investment";
-  frequencia: Frequencia | null;
-  status: StatusDespesa;
-  tipo_transacao: TipoTransacao;
+export interface Invoice {
+  id: string;
+  user_id: string;
+  account_id: string | null;
+  source: string;
+  total_amount: number;
+  due_date: string;
+  month: number;
+  year: number;
+  minimum_payment: number | null;
+  status: "open" | "closed" | "paid" | InvoiceStatus; // InvoiceStatus pending pra tras
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface ReceitaExtended extends Omit<Tables<"receitas">, "frequencia" | "status" | "tipo_transacao"> {
-  frequencia: Frequencia | null;
-  status: StatusReceita;
-  tipo_transacao: TipoTransacao;
+export interface UnifiedTransaction {
+  id: string;
+  user_id: string;
+  account_id: string | null;
+  type: "income" | "expense";
+  amount: number;
+  status: "pending" | "confirmed";
+  date: string;
+  description: string;
+  category: string | null;
+  created_at: string;
+  tipo_transacao?: TipoTransacao;
+  frequencia?: Frequencia | null;
+  data_inicio?: string;
+  data_fim?: string;
+  transacao_pai_id?: string | null;
+  forma_pagamento?: string | null;
+  cliente_id?: string | null;
+  tipo_conta: FinancialView;
+  numero_parcelas?: number | null;
+  parcela_atual?: number | null;
+  tipo_despesa?: "expense" | "investment";
   clientes?: { nome: string } | null;
+  invoice_id?: string | null;
+  subtype?: "credit_card_expense" | "credit_card_payment" | string | null;
+}
+
+export type FinancialView = "pessoal" | "mei" | "tudo";
+
+export interface DespesaExtended extends UnifiedTransaction {
+  type: "expense";
+  status: any; // Mantido para compatibilidade temporária
+  valor: number;
+  data: string;
+  descricao: string;
+  tipo: "expense" | "investment";
+}
+
+export interface ReceitaExtended extends UnifiedTransaction {
+  type: "income";
+  status: any; // Mantido para compatibilidade temporária
+  valor: number;
+  data: string;
+  descricao: string;
 }
 
 export const frequenciaLabels: Record<Frequencia, string> = {

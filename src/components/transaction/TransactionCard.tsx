@@ -39,16 +39,21 @@ interface TransactionCardProps {
   index?: number;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onMarkAsPaid?: (id: string) => void;
   deleteWarning?: string;
+  isVirtual?: boolean;
 }
 
 function getStatusIcon(status: string | null | undefined) {
   switch (status) {
+    case "confirmed":
     case "recebido":
     case "pago":
       return <CheckCircle className="h-5 w-5 text-emerald-500" />;
     case "atrasado":
       return <AlertTriangle className="h-5 w-5 text-destructive" />;
+    case "pending":
+    case "pendente":
     default:
       return <Clock className="h-5 w-5 text-amber-500" />;
   }
@@ -75,8 +80,12 @@ export default function TransactionCard({
   onEdit,
   onDelete,
   deleteWarning,
+  isVirtual,
+  onMarkAsPaid,
 }: TransactionCardProps) {
   const isReceita = type === "receita";
+  const isPending = status === "pending" || status === "pendente";
+  
   const colorClass = isReceita
     ? "text-emerald-600 dark:text-emerald-400"
     : "text-red-600 dark:text-red-400";
@@ -86,7 +95,9 @@ export default function TransactionCard({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.02 }}
-      className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 hover:bg-muted/30 transition-colors"
+      className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+        isPending ? "opacity-[0.65] grayscale-[0.2] bg-muted/20 hover:bg-muted/40 border-muted-foreground/20" : "border-border bg-card hover:bg-muted/30"
+      }`}
     >
       {/* Status icon */}
       <div className="shrink-0">{getStatusIcon(status)}</div>
@@ -102,6 +113,12 @@ export default function TransactionCard({
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 border-border">
               <CategoryIcon category={categoria} type={type === "receita" ? "receita" : "despesa"} size={12} />
               <span className="truncate max-w-[100px]">{categoria}</span>
+            </Badge>
+          )}
+          {isPending && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1 border-amber-600/30 text-amber-600 bg-amber-600/10">
+              <Clock className="h-2.5 w-2.5" />
+              Previsto
             </Badge>
           )}
           <TransactionTypeBadge
@@ -131,12 +148,17 @@ export default function TransactionCard({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {isPending && onMarkAsPaid && (
+              <DropdownMenuItem onClick={() => onMarkAsPaid(id)} className="text-emerald-600 focus:text-emerald-500 font-medium">
+                <CheckCircle className="mr-2 h-4 w-4" /> Marcar como pago
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => onEdit(id)}>
               <Pencil className="mr-2 h-4 w-4" /> Editar
             </DropdownMenuItem>
             <AlertDialogTrigger asChild>
               <DropdownMenuItem className="text-destructive focus:text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                <Trash2 className="mr-2 h-4 w-4" /> {isVirtual ? "Excluir Ocorrência Origem" : "Excluir"}
               </DropdownMenuItem>
             </AlertDialogTrigger>
           </DropdownMenuContent>

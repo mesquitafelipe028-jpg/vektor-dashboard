@@ -137,8 +137,17 @@ export function InvoiceTimeline({
       result.push({ mesRef, compras: groupCompras, total, faturaDb, type });
     }
 
-    // Ordenar: Faturas futuras primeiro, depois atuais, depois passadas
-    return result.sort((a, b) => b.mesRef.localeCompare(a.mesRef));
+    // Ordenar: Atual primeiro, depois próximas/futuras em sequência asc, depois passadas desc
+    return result.sort((a, b) => {
+      const typeWeight = { current: 1, next: 2, future: 3, past: 4 };
+      if (typeWeight[a.type] !== typeWeight[b.type]) {
+        return typeWeight[a.type] - typeWeight[b.type];
+      }
+      if (a.type === "past") {
+        return b.mesRef.localeCompare(a.mesRef); // passado mais recente primeiro
+      }
+      return a.mesRef.localeCompare(b.mesRef); // futuras em ordem cronológica
+    });
   }, [compras, cartao.dia_fechamento, faturas, currentPeriod]);
 
   const renderPurchaseList = (groupCompras: Compra[]) => {

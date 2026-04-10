@@ -65,11 +65,9 @@ const menuGroups = [
 export default function More() {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
-  const { isIAEnabled } = useSubscription();
+  const { isIAEnabled, isUnlimited } = useSubscription();
 
-  const unlimitedEmails = ["mesquitafelipe028@gmail.com", "elisiane0708@gmail.com", "demo@vektor.app"];
-  const isUserUnlimited = user?.email && unlimitedEmails.includes(user.email.toLowerCase());
-  const canAccessIA = isIAEnabled || isUserUnlimited;
+  const canAccessIA = isIAEnabled;
 
   const handleLogout = async () => {
     await signOut();

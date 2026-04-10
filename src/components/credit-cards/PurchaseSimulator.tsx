@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { formatCurrency, getLocalDateString } from "@/lib/utils";
 import { Calculator } from "lucide-react";
+import { CalculatorModal } from "@/components/modals/CalculatorModal";
 
 interface SimulatorProps {
   cartaoDiaFechamento: number;
@@ -21,6 +22,8 @@ export function PurchaseSimulator({ cartaoDiaFechamento }: SimulatorProps) {
   const [valorTotal, setValorTotal] = useState("");
   const [parcelas, setParcelas] = useState("1");
   const [dataCompra, setDataCompra] = useState(getLocalDateString());
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
 
   const simulacao = useMemo(() => {
     const valorNum = parseFloat(valorTotal);
@@ -86,14 +89,48 @@ export function PurchaseSimulator({ cartaoDiaFechamento }: SimulatorProps) {
         <div className="space-y-6 py-6">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Valor Total (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={valorTotal}
-                onChange={(e) => setValorTotal(e.target.value)}
-                placeholder="Ex: 1500.00"
+              <div className="flex items-center justify-between">
+                <Label>Valor Total (R$)</Label>
+                <button 
+                  type="button" 
+                  onClick={() => setManualMode(!manualMode)} 
+                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  title="Alternar para digitação manual se a calculadora falhar"
+                >
+                  {manualMode ? "Usar Módulo Inteligente" : "Digitar Manualmente"}
+                </button>
+              </div>
+              {manualMode ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={valorTotal}
+                  onChange={(e) => setValorTotal(e.target.value)}
+                  placeholder="0.00"
+                  className="h-10 text-sm"
+                  autoFocus
+                />
+              ) : (
+                <div 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background cursor-pointer items-center transition-colors hover:bg-muted/50"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCalculatorOpen(true);
+                  }}
+                >
+                  <span className={valorTotal ? "text-foreground" : "text-muted-foreground"}>
+                    {valorTotal ? Number(valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "Ex: 1.500,00"}
+                  </span>
+                </div>
+              )}
+              <CalculatorModal 
+                open={calculatorOpen}
+                onOpenChange={setCalculatorOpen}
+                initialValue={valorTotal}
+                onConfirm={(val) => setValorTotal(val)}
+                accentColor="primary"
               />
             </div>
             <div className="space-y-2">

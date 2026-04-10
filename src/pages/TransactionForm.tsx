@@ -9,6 +9,7 @@ import { useCategories, toCategoryMeta } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useSubscription } from "@/hooks/useSubscription";
 import { UpgradeModal } from "@/components/modals/UpgradeModal";
+import { CalculatorModal } from "@/components/modals/CalculatorModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -181,6 +182,8 @@ export default function TransactionForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
 
   const { categories: dbCategories } = useCategories(type);
@@ -251,6 +254,7 @@ export default function TransactionForm() {
         forma_pagamento: rec.forma_pagamento ?? "",
         cliente_id: rec.cliente_id ?? "",
         categoria: rec.categoria ?? rec.category ?? "",
+        conta_id: rec.account_id ?? "",
         numero_parcelas: rec.numero_parcelas ? String(rec.numero_parcelas) : "",
         tipo: rec.tipo ?? "expense",
       });
@@ -310,7 +314,13 @@ export default function TransactionForm() {
         setErrors({});
 
         const amount = (parsed.data as any).valor;
-        const status = form.efetivada ? "confirmed" : "pending";
+        let status = form.efetivada ? "confirmed" : "pending";
+        
+        // Transações recorrentes ou parceladas devem ser criadas sempre como previstas (pending)
+        if (form.tipo_transacao === "recorrente" || form.tipo_transacao === "parcelada") {
+          status = "pending";
+        }
+
         const commonPayload = {
           user_id: user!.id,
           description: (parsed.data as any).descricao,
@@ -479,19 +489,53 @@ export default function TransactionForm() {
         <div className="px-4 py-3.5 flex items-center gap-3">
           <DollarSign className={`h-5 w-5 shrink-0 ${accentColor}`} />
           <div className="flex-1">
-            <p className="text-xs text-muted-foreground mb-0.5">
-              {form.tipo_transacao === "parcelada" 
-                ? (form.parcelamento_tipo === "total" ? "Valor Total (R$)" : "Valor por Parcela (R$)") 
-                : "Valor (R$)"
-              }
-            </p>
-            <Input
-              type="number"
-              step="0.01"
-              value={form.valor}
-              onChange={(e) => update({ valor: e.target.value })}
-              placeholder="0,00"
-              className="border-0 p-0 h-auto text-lg font-bold shadow-none focus-visible:ring-0 bg-transparent"
+            <div className="flex items-center justify-between mb-0.5">
+              <p className="text-xs text-muted-foreground">
+                {form.tipo_transacao === "parcelada" 
+                  ? (form.parcelamento_tipo === "total" ? "Valor Total (R$)" : "Valor por Parcela (R$)") 
+                  : "Valor (R$)"
+                }
+              </p>
+              <button 
+                type="button" 
+                onClick={() => setManualMode(!manualMode)} 
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                title="Alternar para digitação manual se a calculadora falhar"
+              >
+                {manualMode ? "Usar Módulo Inteligente" : "Digitar Manualmente"}
+              </button>
+            </div>
+            {manualMode ? (
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor}
+                onChange={(e) => update({ valor: e.target.value })}
+                placeholder="0,00"
+                className="border-0 p-0 h-auto text-lg font-bold shadow-none focus-visible:ring-0 bg-transparent"
+                autoFocus
+              />
+            ) : (
+              <div 
+                className="border-0 p-0 h-auto text-lg font-bold flex items-center bg-transparent cursor-pointer w-full min-h-[1.75rem]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCalculatorOpen(true);
+                }}
+              >
+                <span className={form.valor ? "text-foreground" : "text-muted-foreground"}>
+                  {form.valor ? Number(form.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0,00"}
+                </span>
+              </div>
+            )}
+            <CalculatorModal 
+              open={calculatorOpen}
+              onOpenChange={setCalculatorOpen}
+              initialValue={form.valor}
+              onConfirm={(val) => update({ valor: val })}
+              accentColor={type === "receita" ? "emerald" : "red"}
             />
             {errors.valor && <p className="text-xs text-destructive mt-1">{errors.valor}</p>}
           </div>
@@ -633,15 +677,23 @@ export default function TransactionForm() {
         <Separator />
 
         {/* Efetivada */}
-        <div className="px-4 py-3.5 flex items-center gap-3">
-          <CheckCircle2 className={`h-5 w-5 shrink-0 ${form.efetivada ? accentColor : "text-muted-foreground"}`} />
+        <div className={`px-4 py-3.5 flex items-center gap-3 ${(form.tipo_transacao === "recorrente" || form.tipo_transacao === "parcelada") ? "opacity-50" : ""}`}>
+          <CheckCircle2 className={`h-5 w-5 shrink-0 ${form.efetivada && form.tipo_transacao === "unica" ? accentColor : "text-muted-foreground"}`} />
           <div className="flex-1">
             <p className="text-sm font-medium">Situação do Pagamento</p>
-            <p className="text-xs font-semibold">
-              {type === "receita" ? (form.efetivada ? <span className="text-primary">Pago (Recebido)</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>) : (form.efetivada ? <span className="text-primary">Pago</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>)}
-            </p>
+            {(form.tipo_transacao === "recorrente" || form.tipo_transacao === "parcelada") ? (
+              <p className="text-[11px] mt-0.5 text-muted-foreground">Será criada como <strong className="text-amber-600 dark:text-amber-400">Prevista</strong> por padrão.</p>
+            ) : (
+              <p className="text-xs font-semibold">
+                {type === "receita" ? (form.efetivada ? <span className="text-primary">Pago (Recebido)</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>) : (form.efetivada ? <span className="text-primary">Pago</span> : <span className="text-amber-600 dark:text-amber-400">Pendente</span>)}
+              </p>
+            )}
           </div>
-          <Switch checked={form.efetivada} onCheckedChange={(v) => update({ efetivada: v })} />
+          <Switch 
+            checked={form.tipo_transacao === "unica" ? form.efetivada : false} 
+            onCheckedChange={(v) => update({ efetivada: v })} 
+            disabled={form.tipo_transacao === "recorrente" || form.tipo_transacao === "parcelada"}
+          />
         </div>
         <Separator />
 

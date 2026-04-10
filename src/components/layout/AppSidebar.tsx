@@ -42,6 +42,7 @@ import {
 const quickActions = [
   { title: "Nova Receita", url: "/receitas/nova", icon: TrendingUp },
   { title: "Nova Despesa", url: "/despesas/nova", icon: TrendingDown },
+  { title: "Nova Fatura / Cartão", url: "/compras-cartao/nova", icon: CreditCard },
   { title: "Novo Cliente", url: "/clientes/novo", icon: Users },
 ];
 
@@ -61,6 +62,7 @@ const menuGroups = [
       { title: "Despesas", url: "/despesas", icon: TrendingDown },
       { title: "Contas", url: "/contas", icon: Wallet },
       { title: "Cartões", url: "/cartoes", icon: CreditCard },
+      { title: "Faturas", url: "/faturas", icon: Receipt },
       { title: "Clientes", url: "/clientes", icon: Users },
       { title: "Cobranças", url: "/contas-a-receber", icon: ClipboardList },
     ],

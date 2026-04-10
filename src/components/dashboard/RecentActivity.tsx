@@ -62,7 +62,7 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
         bgClass = "bg-primary/10";
       } 
       // Billing/Cobranca Check
-      else if (r.cliente_id && (r.status === "pendente" || r.status === "atrasado")) {
+      else if (r.cliente_id && (r.status === "pendente" || r.status === "atrasado" || r.status === "pending")) {
         type = "cobranca";
         icon = FileText;
         colorClass = "text-amber-500";
@@ -76,7 +76,7 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
         amount: r.valor,
         date: r.data,
         status: r.status,
-        statusLabel: r.status === "recebido" ? "" : "Pendente",
+        statusLabel: (r.status === "recebido" || r.status === "confirmed") ? "" : "Pendente",
         icon,
         colorClass,
         bgClass,
@@ -108,7 +108,7 @@ export function RecentActivity({ isLoading, receitas, despesas }: RecentActivity
         amount: d.valor,
         date: d.data,
         status: d.status,
-        statusLabel: d.status === "pago" ? "" : "Pendente",
+        statusLabel: (d.status === "pago" || d.status === "confirmed") ? "" : "Pendente",
         icon,
         colorClass,
         bgClass,

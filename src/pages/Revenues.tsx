@@ -21,7 +21,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import type { ReceitaExtended } from "@/types/transactions";
+import type { ExtendedUnifiedTransaction } from "@/lib/virtualTransactions";
 import { useFinancialData } from "@/hooks/useFinancialData";
+import { useMarkAsPaid } from "@/hooks/useMarkAsPaid";
 
 export default function Revenues() {
   const { user } = useAuth();
@@ -36,7 +38,9 @@ export default function Revenues() {
   const [sortBy, setSortBy] = useState("data-desc");
 
   const { raw, loading: isLoading } = useFinancialData();
-  const receitas = (raw.receitas as unknown as ReceitaExtended[]) || [];
+  const receitas = (raw.receitas as unknown as (ReceitaExtended & ExtendedUnifiedTransaction)[]) || [];
+
+  const markAsPaidMut = useMarkAsPaid();
 
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes", user?.id],
@@ -72,8 +76,13 @@ export default function Revenues() {
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
-      console.log(`[Revenues] Deleting transaction ${id} via Ledger System`);
-      const { error } = await supabase.from("transactions").delete().eq("id", id);
+      let targetId = id;
+      if (id.startsWith("virtual-")) {
+        const parts = id.split("-");
+        targetId = parts.slice(1, 6).join("-");
+      }
+      console.log(`[Revenues] Deleting transaction ${targetId} via Ledger System`);
+      const { error } = await supabase.from("transactions").delete().eq("id", targetId);
       if (error) throw error;
       console.log("[Revenues] Deletion complete.");
     },
@@ -89,24 +98,7 @@ export default function Revenues() {
     },
   });
 
-  const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      console.log(`[Revenues] Updating status for ${id} to ${status} (Ledger)`);
-      const newStatus = status === "recebido" ? "confirmed" : "pending";
-      const { error } = await supabase.from("transactions").update({ status: newStatus } as any).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["transactions", user?.id] });
-      qc.invalidateQueries({ queryKey: ["contas_financeiras"] });
-      qc.invalidateQueries({ queryKey: ["dashboard", user?.id] });
-      toast.success("Status atualizado!");
-    },
-    onError: (e: any) => {
-      console.error("[Revenues] Status update error:", e);
-      toast.error("Erro ao atualizar status.");
-    }
-  });
+
 
   const hasFilters = filterClientId && filterClientId !== "all";
 
@@ -227,7 +219,18 @@ export default function Revenues() {
               clienteNome={(r.clientes as any)?.nome}
               type="receita"
               index={i}
-              onEdit={(id) => navigate(`/receitas/editar/${id}`)}
+              isVirtual={r.isVirtual}
+              onMarkAsPaid={(id) => markAsPaidMut.mutate(id)}
+              onEdit={(id) => {
+                if (r.isVirtual) {
+                   toast.info("Essa é uma projeção futura. Para editá-la, edite a transação original.");
+                   const parts = id.split("-");
+                   const parentId = parts.slice(1, 6).join("-");
+                   navigate(`/receitas/editar/${parentId}`);
+                } else {
+                   navigate(`/receitas/editar/${id}`);
+                }
+              }}
               onDelete={(id) => deleteMut.mutate(id)}
               deleteWarning={
                 r.tipo_transacao === "recorrente" && !r.transacao_pai_id
@@ -278,10 +281,17 @@ export default function Revenues() {
                       <TransactionTypeBadge tipo={r.tipo_transacao || "unica"} />
                     </TableCell>
                     <TableCell>
-                      {r.tipo_transacao === "recorrente" ? (
+                      {r.isVirtual ? (
+                         <div className="flex gap-2 items-center">
+                           <StatusBadge status="pendente" type="receita" />
+                           <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => markAsPaidMut.mutate(r.id)}>Receber</Button>
+                         </div>
+                      ) : r.tipo_transacao === "recorrente" ? (
                         <Select
                           value={r.status || "pendente"}
-                          onValueChange={(v) => updateStatus.mutate({ id: r.id, status: v })}
+                          onValueChange={(v) => {
+                             if (v === "recebido") markAsPaidMut.mutate(r.id);
+                          }}
                         >
                           <SelectTrigger className="h-7 w-28 text-xs">
                             <SelectValue />
@@ -301,9 +311,19 @@ export default function Revenues() {
                       +{formatCurrency(r.valor)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => navigate(`/receitas/editar/${r.id}`)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {r.isVirtual ? (
+                        <Button variant="ghost" size="icon" onClick={() => {
+                           const parts = r.id.split("-");
+                           const parentId = parts.slice(1, 6).join("-");
+                           navigate(`/receitas/editar/${parentId}`);
+                        }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="icon" onClick={() => navigate(`/receitas/editar/${r.id}`)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">

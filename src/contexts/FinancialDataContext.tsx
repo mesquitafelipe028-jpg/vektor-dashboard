@@ -6,11 +6,12 @@ import { useAccounts } from "@/hooks/useAccounts";
 import { queryKeys } from "@/lib/queryKeys";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useFinancialView } from "@/contexts/FinancialViewContext";
-import { FinanceService, type FinancialView } from "@/lib/financeService";
+import { FinanceService } from "@/lib/financeService";
 import { calcularLimiteProporcional } from "@/lib/fiscal";
-import { type DespesaExtended, type ReceitaExtended } from "@/types/transactions";
+import { type UnifiedTransaction, type DespesaExtended, type ReceitaExtended, type FinancialView } from "@/types/transactions";
 import { type ContaFinanceira } from "@/types/accounts";
 import { getLocalDateString } from "@/lib/utils";
+import { generateVirtualTransactions } from "@/lib/virtualTransactions";
 
 interface FinancialDataState {
   saldoTotal: number;
@@ -23,10 +24,10 @@ interface FinancialDataState {
   hasCnpj: boolean;
   loading: boolean;
   raw: {
-    receitas: ReceitaExtended[];
-    despesas: DespesaExtended[];
-    settledReceitas: ReceitaExtended[];
-    settledDespesas: DespesaExtended[];
+    receitas: UnifiedTransaction[];
+    despesas: UnifiedTransaction[];
+    settledReceitas: UnifiedTransaction[];
+    settledDespesas: UnifiedTransaction[];
   };
   empresa: any;
   limiteMei: number;
@@ -49,31 +50,12 @@ export function FinancialDataProvider({ children }: { children: React.ReactNode 
         .select("*, clientes(nome)")
         .order("date", { ascending: false });
       if (error) throw error;
-      
-      // Mapear para o formato legado esperado pelo restante do app
-      return (data ?? []).map(t => ({
-        ...t,
-        valor: t.amount,
-        descricao: t.description,
-        data: t.date,
-        status: t.type === "income" 
-          ? (t.status === "confirmed" ? "recebido" : "pendente")
-          : (t.status === "confirmed" ? "pago" : "pendente"),
-        tipo: t.tipo_despesa, // campo legado
-        conta_id: t.account_id, // essencial para evitar duplicidade no calculateStats
-        categoria: t.category // mapear category do banco para categoria do frontend
-      }));
+      return (data ?? []) as unknown as UnifiedTransaction[];
     },
     enabled: !!user,
   });
 
-  const receitas = useMemo(() => 
-    allTransactions.filter(t => t.type === "income") as ReceitaExtended[], 
-  [allTransactions]);
-
-  const despesas = useMemo(() => 
-    allTransactions.filter(t => t.type === "expense") as DespesaExtended[], 
-  [allTransactions]);
+  // No more separate memos for arrays unless really needed for local UI
 
   const { data: empresa } = useQuery({
     queryKey: queryKeys.empresa(user?.id),
@@ -95,12 +77,16 @@ export function FinancialDataProvider({ children }: { children: React.ReactNode 
 
     // We calculate for the global view. Components can still override local if needed,
     // but the global context handles the default app state.
-    const rSet = FinanceService.filterByView<ReceitaExtended>(receitas, globalView);
-    const dSet = FinanceService.filterByView<DespesaExtended>(despesas, globalView);
+    const allWithVirtuals = generateVirtualTransactions(allTransactions, 6);
+
+    const recipes = allWithVirtuals.filter(t => t.type === "income");
+    const costs = allWithVirtuals.filter(t => t.type === "expense");
+
+    const rFiltered = FinanceService.filterByView(recipes, globalView);
+    const dFiltered = FinanceService.filterByView(costs, globalView);
 
     const stats = FinanceService.calculateStats(
-      receitas,
-      despesas,
+      allWithVirtuals,
       accounts,
       globalView,
       currentMonth,
@@ -109,20 +95,28 @@ export function FinancialDataProvider({ children }: { children: React.ReactNode 
 
     const limiteMei = calcularLimiteProporcional(empresa?.data_abertura);
 
+    const mapLegacy = (t: UnifiedTransaction) => ({
+      ...t,
+      data: t.date,
+      valor: t.amount,
+      descricao: t.description,
+      categoria: t.category || "Sem Categoria",
+    });
+
     return {
       ...stats,
       limiteMei,
       loading,
       raw: {
-        receitas: rSet,
-        despesas: dSet,
-        settledReceitas: rSet.filter((r) => r.status === "recebido"),
-        settledDespesas: dSet.filter((d) => d.status === "pago"),
+        receitas: (rFiltered || []).map(mapLegacy),
+        despesas: (dFiltered || []).map(mapLegacy),
+        settledReceitas: (rFiltered || []).filter((r) => r.status === "confirmed").map(mapLegacy),
+        settledDespesas: (dFiltered || []).filter((d) => d.status === "confirmed").map(mapLegacy),
       },
-      empresa,
+      empresa: empresa || null,
       hasCnpj: !!empresa?.cnpj && !preferences.ocultar_mei,
     };
-  }, [receitas, despesas, accounts, globalView, empresa, loading, preferences.ocultar_mei]);
+  }, [allTransactions, accounts, globalView, empresa, loading, preferences.ocultar_mei]);
 
   // 2. Use Deferred Value to prevent blocking the main thread during transitions
   const deferredValue = useDeferredValue(processedData);

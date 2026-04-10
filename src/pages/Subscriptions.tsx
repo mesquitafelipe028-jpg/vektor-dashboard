@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAccounts } from "@/hooks/useAccounts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ import {
   AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Pencil, Trash2, RepeatIcon, Calendar, TrendingDown, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, RepeatIcon, Calendar, TrendingDown, RefreshCw, CheckCircle2, Wallet, CreditCard } from "lucide-react";
 import { formatCurrency, getLocalDateString } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -34,16 +35,23 @@ interface Assinatura {
   cor: string | null;
   icone: string | null;
   created_at: string;
+  payment_source_type?: "account" | "credit_card" | null;
+  payment_source_id?: string | null;
+  status?: "pending" | "paid";
+  last_paid_month?: string | null;
 }
 
 type AssinaturaForm = {
   nome: string; valor: string; frequencia: FrequenciaAssinatura;
   dia_cobranca: string; categoria: string; ativa: boolean; cor: string;
+  payment_source_type: "account" | "credit_card" | "";
+  payment_source_id: string;
 };
 
 const emptyForm: AssinaturaForm = {
   nome: "", valor: "", frequencia: "mensal", dia_cobranca: "1",
   categoria: "Streaming", ativa: true, cor: "#8b5cf6",
+  payment_source_type: "", payment_source_id: ""
 };
 
 const categorias = [
@@ -106,6 +114,7 @@ async function migrateFromLocalStorage(userId: string) {
 export default function Subscriptions() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { accounts } = useAccounts();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AssinaturaForm>(emptyForm);
@@ -119,9 +128,24 @@ export default function Subscriptions() {
         .from("radar_assinaturas").select("*")
         .eq("user_id", user!.id).order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as Assinatura[];
+      
+      const currentMonth = getLocalDateString().slice(0, 7);
+      return (data ?? []).map(a => ({
+        ...a,
+        status: a.last_paid_month === currentMonth ? a.status : "pending"
+      })) as Assinatura[];
     },
     enabled: !!user, staleTime: 0, refetchOnWindowFocus: true,
+  });
+
+  const { data: cartoes = [] } = useQuery({
+    queryKey: ["cartoes_credito", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("cartoes_credito").select("*").order("nome");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user
   });
 
   // Realtime
@@ -144,6 +168,8 @@ export default function Subscriptions() {
         user_id: user!.id, nome: form.nome.trim(), valor,
         frequencia: form.frequencia, dia_cobranca: parseInt(form.dia_cobranca) || 1,
         categoria: form.categoria || null, ativa: form.ativa, cor: form.cor || "#8b5cf6", icone: null,
+        payment_source_type: form.payment_source_type || null,
+        payment_source_id: form.payment_source_id || null,
       };
       if (editingId) {
         const { error } = await supabase.from("radar_assinaturas").update(payload).eq("id", editingId).eq("user_id", user!.id);
@@ -177,9 +203,84 @@ export default function Subscriptions() {
   const closeDialog = useCallback(() => { setDialogOpen(false); setEditingId(null); setForm(emptyForm); }, []);
   const openEdit = (a: Assinatura) => {
     setEditingId(a.id);
-    setForm({ nome: a.nome, valor: String(a.valor), frequencia: a.frequencia, dia_cobranca: String(a.dia_cobranca), categoria: a.categoria ?? "Outro", ativa: a.ativa, cor: a.cor ?? "#8b5cf6" });
+    setForm({ 
+      nome: a.nome, valor: String(a.valor), frequencia: a.frequencia, dia_cobranca: String(a.dia_cobranca), 
+      categoria: a.categoria ?? "Outro", ativa: a.ativa, cor: a.cor ?? "#8b5cf6",
+      payment_source_type: a.payment_source_type ?? "",
+      payment_source_id: a.payment_source_id ?? ""
+    });
     setDialogOpen(true);
   };
+
+  const markAsPaid = useMutation({
+    mutationFn: async (a: Assinatura) => {
+      if (!a.payment_source_id || !a.payment_source_type) {
+        throw new Error("Edite a assinatura e defina a origem de pagamento antes de pagar.");
+      }
+      
+      const thisMonth = getLocalDateString().slice(0, 7); // YYYY-MM
+      const startOfMonth = `${thisMonth}-01`;
+      const endOfMonth = `${thisMonth}-31`; 
+
+      const { data: existing } = await supabase
+        .from("transactions")
+        .select("id")
+        .eq("reference_id", a.id)
+        .gte("date", startOfMonth)
+        .lte("date", endOfMonth)
+        .limit(1);
+        
+      if (existing && existing.length > 0) {
+        throw new Error("Já existe um pagamento para o mês atual.");
+      }
+
+      const tPayload = {
+        user_id: user!.id,
+        amount: a.valor,
+        date: getLocalDateString(),
+        description: `Ref: ${a.nome}`,
+        category: a.categoria ?? "Assinaturas",
+        status: "confirmed",
+        type: "expense",
+        subtype: a.payment_source_type === "credit_card" ? "credit_card_expense" : null,
+        account_id: a.payment_source_id,
+        reference_id: a.id
+      };
+
+      const { error: tError } = await supabase.from("transactions").insert([tPayload]);
+      if (tError) throw tError;
+
+      // Injeta também no legado de cartões para refletir na fatura visual (CreditCards.tsx)
+      if (a.payment_source_type === "credit_card") {
+        const cPayload = {
+          user_id: user!.id,
+          cartao_id: a.payment_source_id,
+          descricao: `Assinatura: ${a.nome}`,
+          valor: a.valor,
+          data: getLocalDateString(),
+          categoria: a.categoria ?? "Assinaturas"
+        };
+        const { error: cError } = await supabase.from("compras_cartao").insert([cPayload]);
+        if (cError) {
+           console.error("Não foi possível espelhar na fatura:", cError);
+        }
+      }
+
+      const { error: aError } = await supabase
+        .from("radar_assinaturas")
+        .update({ status: "paid", last_paid_month: thisMonth })
+        .eq("id", a.id);
+      if (aError) throw aError;
+    },
+    onSuccess: () => {
+      toast.success("Assinatura marcada como paga!");
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["contas_financeiras"] });
+      qc.invalidateQueries({ queryKey: ["compras_cartao"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const stats = useMemo(() => {
     const ativas = assinaturas.filter((a) => a.ativa);
@@ -272,7 +373,13 @@ export default function Subscriptions() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-lg shrink-0 flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: a.cor ?? "#8b5cf6" }}>{a.nome.slice(0, 2).toUpperCase()}</div>
-                        <div className="min-w-0"><p className="font-heading font-semibold text-sm leading-tight truncate">{a.nome}</p><p className="text-[11px] text-muted-foreground">{a.categoria ?? "—"}</p></div>
+                        <div className="min-w-0">
+                          <p className="font-heading font-semibold text-sm leading-tight truncate">{a.nome}</p>
+                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
+                            {a.payment_source_type === "credit_card" ? <CreditCard className="h-3 w-3" /> : a.payment_source_type === "account" ? <Wallet className="h-3 w-3" /> : null}
+                            <span className="truncate">{a.payment_source_type === "credit_card" ? cartoes.find((c: any) => c.id === a.payment_source_id)?.nome : a.payment_source_type === "account" ? accounts.find((acc: any) => acc.id === a.payment_source_id)?.nome : (a.categoria || "—")}</span>
+                          </div>
+                        </div>
                       </div>
                       <div className="flex gap-1 shrink-0">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}><Pencil className="h-3 w-3" /></Button>
@@ -290,11 +397,24 @@ export default function Subscriptions() {
                       <div className="flex justify-between text-xs text-muted-foreground"><span>≈ {formatCurrency(monthlyVal)}/mês</span><span>Dia {a.dia_cobranca}</span></div>
                     </div>
                     <div className="mt-3 flex items-center justify-between">
-                      <Badge variant="outline" className={`text-[10px] cursor-pointer transition-colors ${a.ativa ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20" : "bg-muted text-muted-foreground hover:bg-muted/80"}`} onClick={() => toggleActiva.mutate({ id: a.id, ativa: a.ativa })}>
-                        {a.ativa ? "✓ Ativa" : "⏸ Pausada"}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={`text-[10px] cursor-pointer transition-colors ${a.ativa ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20" : "bg-muted text-muted-foreground hover:bg-muted/80"}`} onClick={() => toggleActiva.mutate({ id: a.id, ativa: a.ativa })}>
+                          {a.ativa ? "✓ Ativa" : "⏸ Pausada"}
+                        </Badge>
+                        {a.ativa && a.status === "paid" && (
+                          <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20">Pago</Badge>
+                        )}
+                        {a.ativa && a.status !== "paid" && (
+                          <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20">Pendente</Badge>
+                        )}
+                      </div>
                       {a.ativa && <span className={`text-[10px] font-medium ${daysLeft <= 3 ? "text-destructive" : "text-muted-foreground"}`}>{daysLeft === 0 ? "Cobrado hoje!" : `Próx. em ${daysLeft}d`}</span>}
                     </div>
+                    {a.ativa && a.status !== "paid" && (
+                      <Button className="w-full mt-3 h-8 text-xs bg-primary/10 text-primary hover:bg-primary hover:text-white" variant="ghost" onClick={() => markAsPaid.mutate(a)} disabled={markAsPaid.isPending}>
+                         <CheckCircle2 className="h-3 w-3 mr-1.5" /> Marcar como pago
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -345,6 +465,38 @@ export default function Subscriptions() {
                 </Select>
               </div>
             </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Cobrar de (Opcional)</Label>
+                <Select value={form.payment_source_type || "none"} onValueChange={(v) => {
+                   if (v === "none") setForm({ ...form, payment_source_type: "", payment_source_id: "" });
+                   else setForm({ ...form, payment_source_type: v as any, payment_source_id: "" });
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Fonte" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não vincular</SelectItem>
+                    <SelectItem value="account">Conta Corrente</SelectItem>
+                    <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Conta/Cartão ID</Label>
+                <Select disabled={!form.payment_source_type} value={form.payment_source_id} onValueChange={(v) => setForm({ ...form, payment_source_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {form.payment_source_type === "account" && accounts.filter((a: any) => a.tipo !== "cartao").map((a: any) => (
+                      <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                    ))}
+                    {form.payment_source_type === "credit_card" && cartoes.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Cor do Card</Label>
               <div className="flex gap-2 flex-wrap">

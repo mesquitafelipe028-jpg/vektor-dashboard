@@ -354,10 +354,12 @@ export default function CreditCards() {
       let transactions: ImportedTransaction[] = [];
       
       if (ext === "pdf") {
-        transactions = await parsePDF(file);
+        const res = await parsePDF(file);
+        transactions = res.transactions;
       } else if (ext === "png" || ext === "jpg" || ext === "jpeg") {
         toast.info("Lendo a imagem... (Isso pode demorar alguns segundos).");
-        transactions = await parseImage(file);
+        const res = await parseImage(file);
+        transactions = res.transactions;
       } else {
         toast.error("Formato de arquivo não suportado.");
         setIsParsing(false);

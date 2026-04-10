@@ -17,6 +17,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
 import type { TipoTransacao, Frequencia } from "@/types/transactions";
 import { frequenciaLabels } from "@/types/transactions";
+import { CalculatorModal } from "@/components/modals/CalculatorModal";
 
 export type TransactionFormType = "receita" | "despesa";
 
@@ -167,6 +168,8 @@ export function TransactionFormSheet({
   const isMobile = useIsMobile();
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
 
   const update = (partial: Partial<TransactionFormData>) => {
     onFormChange({ ...form, ...partial });
@@ -233,16 +236,50 @@ export function TransactionFormSheet({
         <div className="px-4 py-3.5 flex items-center gap-3">
           <DollarSign className={`h-5 w-5 shrink-0 ${accentColor}`} />
           <div className="flex-1">
-            <p className="text-xs text-muted-foreground mb-0.5">
-              {form.tipo_transacao === "parcelada" ? "Valor Total (R$)" : "Valor (R$)"}
-            </p>
-            <Input
-              type="number"
-              step="0.01"
-              value={form.valor}
-              onChange={(e) => update({ valor: e.target.value })}
-              placeholder="0,00"
-              className="border-0 p-0 h-auto text-lg font-bold shadow-none focus-visible:ring-0 bg-transparent"
+            <div className="flex items-center justify-between mb-0.5">
+              <p className="text-xs text-muted-foreground">
+                {form.tipo_transacao === "parcelada" ? "Valor Total (R$)" : "Valor (R$)"}
+              </p>
+              <button 
+                type="button" 
+                onClick={() => setManualMode(!manualMode)} 
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                title="Alternar para digitação manual se a calculadora falhar"
+              >
+                {manualMode ? "Usar Módulo Inteligente" : "Digitar Manualmente"}
+              </button>
+            </div>
+            {manualMode ? (
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.valor}
+                onChange={(e) => update({ valor: e.target.value })}
+                placeholder="0.00"
+                className="border-0 p-0 h-auto text-lg font-bold shadow-none focus-visible:ring-0 bg-transparent"
+                autoFocus
+              />
+            ) : (
+              <div 
+                className="border-0 p-0 h-auto text-lg font-bold flex items-center bg-transparent cursor-pointer w-full min-h-[1.75rem]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCalculatorOpen(true);
+                }}
+              >
+                <span className={form.valor ? "text-foreground" : "text-muted-foreground"}>
+                  {form.valor ? Number(form.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0,00"}
+                </span>
+              </div>
+            )}
+            <CalculatorModal 
+              open={calculatorOpen}
+              onOpenChange={setCalculatorOpen}
+              initialValue={form.valor}
+              onConfirm={(val) => update({ valor: val })}
+              accentColor={type === "receita" ? "emerald" : "red"}
             />
             {errors.valor && <p className="text-xs text-destructive mt-1">{errors.valor}</p>}
           </div>

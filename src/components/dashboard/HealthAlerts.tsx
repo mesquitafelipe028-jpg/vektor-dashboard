@@ -1,5 +1,6 @@
-import { AlertCircle, CheckCircle2, Info, Target, AlertTriangle, ShieldCheck, ShieldAlert, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, Target, AlertTriangle, ShieldCheck, ShieldAlert, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export type AlertType = "info" | "success" | "warning" | "danger";
 
@@ -8,6 +9,7 @@ export interface AlertItem {
   icon: any;
   type: AlertType;
   message: string;
+  actionRoute?: string;
 }
 
 interface HealthAlertsProps {
@@ -23,6 +25,8 @@ const alertStyles = {
 };
 
 export function HealthAlerts({ alerts, onDismiss }: HealthAlertsProps) {
+  const navigate = useNavigate();
+
   if (alerts.length === 0) return null;
 
   return (
@@ -33,13 +37,15 @@ export function HealthAlerts({ alerts, onDismiss }: HealthAlertsProps) {
         return (
           <div
             key={alert.id}
-            className={`flex items-start gap-3 p-3.5 rounded-xl border ${style.bg} ${style.border} ${style.text} transition-all duration-200 animate-in fade-in slide-in-from-top-2`}
+            className={`flex items-start gap-3 p-3.5 rounded-xl border ${style.bg} ${style.border} ${style.text} transition-all duration-200 animate-in fade-in slide-in-from-top-2 ${alert.actionRoute ? "cursor-pointer hover:shadow-md" : ""}`}
+            onClick={() => { if (alert.actionRoute) navigate(alert.actionRoute); }}
           >
             <Icon className={`h-5 w-5 mt-0.5 shrink-0 ${style.iconColor}`} />
             <p className="text-sm font-medium leading-tight flex-1">{alert.message}</p>
+            {alert.actionRoute && <ChevronRight className="h-4 w-4 mt-1 opacity-50 shrink-0" />}
             <button
-              onClick={() => onDismiss(alert.id)}
-              className="mt-0.5 text-current opacity-50 hover:opacity-100 transition-opacity"
+              onClick={(e) => { e.stopPropagation(); onDismiss(alert.id); }}
+              className="mt-0.5 ml-2 text-current opacity-50 hover:opacity-100 transition-opacity"
             >
               <X size={16} />
             </button>

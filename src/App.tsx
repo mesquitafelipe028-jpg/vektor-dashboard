@@ -60,6 +60,9 @@ const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Projects = lazy(() => import("./pages/Projects"));
 const StatementImport = lazy(() => import("./pages/StatementImport"));
 const Tutorial = lazy(() => import("./pages/Tutorial"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const QuickCardExpenseForm = lazy(() => import("./pages/QuickCardExpenseForm"));
+const AlertResolution = lazy(() => import("./pages/AlertResolution"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
@@ -128,6 +131,8 @@ const App = () => {
                           <Route path="clientes/editar/:id" element={<ClientForm />} />
                           <Route path="cartoes" element={<CreditCards />} />
                           <Route path="categorias" element={<Categories />} />
+                          <Route path="compras-cartao/nova" element={<QuickCardExpenseForm />} />
+                          <Route path="faturas" element={<Invoices />} />
                           <Route path="contas" element={<Accounts />} />
                           <Route path="contas-a-receber" element={<Receivables />} />
                           <Route path="timeline" element={<Timeline />} />
@@ -137,6 +142,7 @@ const App = () => {
                           <Route path="importar-extrato" element={<StatementImport />} />
                           <Route path="tutorial" element={<Tutorial />} />
                           <Route path="upgrade" element={<Upgrade />} />
+                          <Route path="alertas/resolucao" element={<AlertResolution />} />
                         </Route>
                       </Route>
                       <Route path="*" element={<NotFound />} />

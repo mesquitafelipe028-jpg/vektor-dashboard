@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus, MoreHorizontal, LineChart,
+  LayoutDashboard, TrendingUp, TrendingDown, Plus, X, Receipt, UserPlus, MoreHorizontal, LineChart, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,8 +17,8 @@ const navItems = [
 const quickActions = [
   { label: "Nova Receita", icon: TrendingUp, path: "/receitas/nova", color: "text-primary" },
   { label: "Nova Despesa", icon: Receipt, path: "/despesas/nova", color: "text-destructive" },
-  { label: "+ Investimento", icon: LineChart, path: "/despesas/nova?tipo=investment", color: "text-primary" },
-  { label: "Novo Cliente", icon: UserPlus, path: "/clientes/novo", color: "text-primary/70" },
+  { label: "+ Cartão / Fatura", icon: CreditCard, path: "/compras-cartao/nova", color: "text-primary" },
+  { label: "+ Investimento", icon: LineChart, path: "/despesas/nova?tipo=investment", color: "text-primary/70" },
 ];
 
 export function MobileBottomNav() {

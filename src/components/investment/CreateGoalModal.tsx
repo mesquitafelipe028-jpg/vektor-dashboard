@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Target } from "lucide-react";
 import { getLocalDateString } from "@/lib/utils";
+import { CalculatorModal } from "@/components/modals/CalculatorModal";
 
 interface CreateGoalModalProps {
   open: boolean;
@@ -36,6 +37,8 @@ export function CreateGoalModal({
   const [valorAlvo, setValorAlvo] = useState(String(suggestedTarget));
   const [prazoAnos, setPrazoAnos] = useState(String(suggestedYears));
   const [valorMensal, setValorMensal] = useState(String(suggestedMonthly));
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
 
   // Reset form when modal opens with new values
   const handleOpenChange = (isOpen: boolean) => {
@@ -115,14 +118,48 @@ export function CreateGoalModal({
           </div>
 
           <div className="space-y-2">
-            <Label>Valor objetivo (R$) *</Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={valorAlvo}
-              onChange={(e) => setValorAlvo(e.target.value)}
-              placeholder="100000.00"
+            <div className="flex items-center justify-between">
+              <Label>Valor objetivo (R$) *</Label>
+              <button 
+                type="button" 
+                onClick={() => setManualMode(!manualMode)} 
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                title="Alternar para digitação manual se a calculadora falhar"
+              >
+                {manualMode ? "Usar Módulo Inteligente" : "Digitar Manualmente"}
+              </button>
+            </div>
+            {manualMode ? (
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={valorAlvo}
+                onChange={(e) => setValorAlvo(e.target.value)}
+                placeholder="0.00"
+                className="h-10 text-sm"
+                autoFocus
+              />
+            ) : (
+              <div 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background cursor-pointer items-center transition-colors hover:bg-muted/50"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCalculatorOpen(true);
+                }}
+              >
+                <span className={valorAlvo && valorAlvo !== "0" ? "text-foreground" : "text-muted-foreground"}>
+                  {valorAlvo && valorAlvo !== "0" ? Number(valorAlvo).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "100.000,00"}
+                </span>
+              </div>
+            )}
+            <CalculatorModal 
+              open={calculatorOpen}
+              onOpenChange={setCalculatorOpen}
+              initialValue={valorAlvo}
+              onConfirm={(val) => setValorAlvo(val)}
+              accentColor="primary"
             />
           </div>
 

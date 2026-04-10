@@ -39,21 +39,29 @@ export function TransactionTypeBadge({ tipo, parcela_atual, numero_parcelas }: T
 }
 
 interface StatusBadgeProps {
-  status: StatusReceita | StatusDespesa;
-  type: "receita" | "despesa";
+  status: StatusReceita | StatusDespesa | "confirmed" | "pending";
+  type: "receita" | "despesa" | "income" | "expense";
 }
 
 export function StatusBadge({ status, type }: StatusBadgeProps) {
   const configs = {
+    pending: { icon: Clock, className: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400" },
+    confirmed: { icon: CheckCircle, className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
     pendente: { icon: Clock, className: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400" },
     recebido: { icon: CheckCircle, className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
     pago: { icon: CheckCircle, className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
     atrasado: { icon: AlertTriangle, className: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400" },
   };
 
-  const config = configs[status] || configs.pendente;
+  const config = configs[status as keyof typeof configs] || configs.pending;
   const Icon = config.icon;
-  const label = status === "pago" ? "Pago" : status === "recebido" ? "Recebido" : status === "atrasado" ? "Atrasado" : "Pendente";
+  
+  let label = "Pendente";
+  if (status === "confirmed" || status === "pago" || status === "recebido") {
+    label = (type === "despesa" || type === "expense") ? "Pago" : "Recebido";
+  } else if (status === "atrasado") {
+    label = "Atrasado";
+  }
 
   return (
     <Badge variant="outline" className={`text-[10px] gap-1 px-1.5 py-0 ${config.className}`}>

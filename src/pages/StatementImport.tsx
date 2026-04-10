@@ -49,12 +49,15 @@ export default function StatementImport() {
 
     try {
       if (ext === "csv" || ext === "txt" || ext === "xlsx" || ext === "xls") {
-        parsed = await parseSpreadsheet(file);
+        const res = await parseSpreadsheet(file);
+        parsed = res.transactions;
       } else if (ext === "pdf") {
-        parsed = await parsePDF(file);
+        const res = await parsePDF(file);
+        parsed = res.transactions;
       } else if (ext === "png" || ext === "jpg" || ext === "jpeg") {
         toast.info("Lendo a imagem... (Isso pode demorar alguns segundos).");
-        parsed = await parseImage(file);
+        const res = await parseImage(file);
+        parsed = res.transactions;
       } else {
         toast.error("Formato de arquivo não suportado.");
         return;

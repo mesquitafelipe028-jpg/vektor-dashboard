@@ -16,6 +16,7 @@ interface DayTransactionsDrawerProps {
   categoryStr?: string | null;
   receitas: ReceitaExtended[];
   despesas: DespesaExtended[];
+  assinaturas?: any[];
   onAddTransaction: (date: string) => void;
 }
 
@@ -27,6 +28,7 @@ export function DayTransactionsDrawer({
   categoryStr,
   receitas, 
   despesas,
+  assinaturas = [],
   onAddTransaction
 }: DayTransactionsDrawerProps) {
   
@@ -36,40 +38,65 @@ export function DayTransactionsDrawer({
     let rFiltradas: any[] = receitas;
     let dFiltradas: any[] = despesas;
 
+    let aFiltradas: any[] = assinaturas;
+
     if (date) {
       const dateStr = format(date, "yyyy-MM-dd");
-      rFiltradas = rFiltradas.filter(r => r.data === dateStr);
-      dFiltradas = dFiltradas.filter(d => d.data === dateStr);
+      const dayNum = date.getDate();
+      rFiltradas = rFiltradas.filter(r => (r.date || r.data) === dateStr);
+      dFiltradas = dFiltradas.filter(d => (d.date || d.data) === dateStr);
+      aFiltradas = aFiltradas.filter(a => a.dia_cobranca === dayNum);
     } else if (monthStr) {
-      rFiltradas = rFiltradas.filter(r => r.data.startsWith(monthStr));
-      dFiltradas = dFiltradas.filter(d => d.data.startsWith(monthStr));
+      rFiltradas = rFiltradas.filter(r => (r.date || r.data).startsWith(monthStr));
+      dFiltradas = dFiltradas.filter(d => (d.date || d.data).startsWith(monthStr));
+      // for month, active subscriptions are just presented
       
       if (categoryStr) {
-        dFiltradas = dFiltradas.filter(d => d.categoria === categoryStr);
+        dFiltradas = dFiltradas.filter(d => (d.category || d.categoria) === categoryStr);
         rFiltradas = []; // Categoria chart only shows expenses.
+        aFiltradas = aFiltradas.filter(a => (a.category || a.categoria) === categoryStr);
       }
     }
 
     rFiltradas = rFiltradas.map(r => ({
       ...r,
       kind: 'receita' as const,
-      isPending: r.status !== 'recebido',
-      icon: (r.forma_pagamento?.toLowerCase().includes("transferência") || r.categoria?.toLowerCase().includes("transferência")) ? Building2 : DollarSign,
-      colorClass: r.status !== 'recebido' ? "text-amber-500" : "text-primary",
-      bgClass: r.status !== 'recebido' ? "bg-amber-500/10" : "bg-primary/10",
+      isPending: r.status !== 'confirmed',
+      icon: (r.forma_pagamento?.toLowerCase().includes("transferência") || (r.category || r.categoria)?.toLowerCase().includes("transferência")) ? Building2 : DollarSign,
+      colorClass: r.status !== 'confirmed' ? "text-amber-500" : "text-primary",
+      bgClass: r.status !== 'confirmed' ? "bg-amber-500/10" : "bg-primary/10",
+      valorFormat: r.amount || r.valor || 0,
+      descFormat: r.description || r.descricao,
+      catFormat: r.category || r.categoria
     }));
 
     dFiltradas = dFiltradas.map(d => ({
       ...d,
       kind: 'despesa' as const,
-      isPending: d.status !== 'pago',
-      icon: d.categoria?.toLowerCase().includes("transferência") ? Building2 : TrendingDown,
-      colorClass: d.status !== 'pago' ? "text-amber-500" : "text-destructive",
-      bgClass: d.status !== 'pago' ? "bg-amber-500/10" : "bg-destructive/10",
+      isPending: d.status !== 'confirmed',
+      icon: (d.category || d.categoria)?.toLowerCase().includes("transferência") ? Building2 : TrendingDown,
+      colorClass: d.status !== 'confirmed' ? "text-amber-500" : "text-destructive",
+      bgClass: d.status !== 'confirmed' ? "bg-amber-500/10" : "bg-destructive/10",
+      valorFormat: d.amount || d.valor || 0,
+      descFormat: d.description || d.descricao,
+      catFormat: d.category || d.categoria
     }));
 
-    return [...rFiltradas, ...dFiltradas].sort((a, b) => b.valor - a.valor);
-  }, [date, monthStr, categoryStr, receitas, despesas]);
+    aFiltradas = aFiltradas.map(a => ({
+      ...a,
+      id: "ass-"+a.id,
+      kind: 'assinatura' as const,
+      isPending: a.status !== 'paid',
+      icon: FileText,
+      colorClass: a.status !== 'paid' ? "text-amber-500" : "text-muted-foreground",
+      bgClass: a.status !== 'paid' ? "bg-amber-500/10" : "bg-muted/10",
+      valorFormat: a.valor || 0,
+      descFormat: `Assinatura: ${a.nome}`,
+      catFormat: a.categoria
+    }));
+
+    return [...rFiltradas, ...dFiltradas, ...aFiltradas].sort((a, b) => b.valorFormat - a.valorFormat);
+  }, [date, monthStr, categoryStr, receitas, despesas, assinaturas]);
 
   let dateLabel = "";
   if (date) dateLabel = format(date, "dd 'de' MMMM, yyyy", { locale: ptBR });
@@ -108,16 +135,16 @@ export function DayTransactionsDrawer({
                     <div className="min-w-0 flex-1 overflow-hidden">
                       <div className="flex justify-between items-start gap-2 w-full">
                         <p className="text-sm font-semibold truncate leading-tight flex-1 min-w-0 pr-2">
-                          {t.descricao || 'Sem descrição'}
+                          {t.descFormat || 'Sem descrição'}
                         </p>
-                        <span className={`text-sm font-bold whitespace-nowrap shrink-0 ${t.kind === 'receita' ? 'text-primary' : 'text-destructive'} ${t.isPending ? 'opacity-70' : ''}`}>
-                          {t.kind === 'receita' ? '+' : '-'}{formatCurrency(t.valor)}
+                        <span className={`text-sm font-bold whitespace-nowrap shrink-0 ${t.kind === 'receita' ? 'text-primary' : t.kind === 'assinatura' ? 'text-muted-foreground' : 'text-destructive'} ${t.isPending ? 'opacity-70' : ''}`}>
+                          {t.kind === 'receita' ? '+' : '-'}{formatCurrency(t.valorFormat)}
                         </span>
                       </div>
                       
                       <div className="flex justify-between items-center gap-2 mt-1 w-full">
                         <span className="text-xs text-muted-foreground font-medium truncate min-w-0 flex-1">
-                            {t.categoria || 'Outros'}
+                            {t.catFormat || 'Outros'}
                         </span>
                         {t.isPending && (
                            <span className="text-[10px] uppercase font-bold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded shrink-0">

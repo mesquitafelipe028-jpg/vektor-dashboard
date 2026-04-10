@@ -110,12 +110,17 @@ export function useSubscription() {
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }, [subscription]);
 
-  const isIAEnabled = effectivePlanType === "PAID";
+  const isUnlimitedEmail = useCallback(() => {
+    const unlimitedEmails = ["mesquitafelipe028@gmail.com", "elisiane0708@gmail.com", "demo@vektor.app"];
+    return !!user?.email && unlimitedEmails.includes(user.email.toLowerCase());
+  }, [user?.email]);
+
+  const isIAEnabled = effectivePlanType === "PAID" || isUnlimitedEmail();
   const canAddTransaction =
-    effectivePlanType === "TRIAL" || effectivePlanType === "PAID";
-  const isExpired = effectivePlanType === "EXPIRED" || effectivePlanType === "FREE";
-  const isTrial = effectivePlanType === "TRIAL";
-  const isPaid = effectivePlanType === "PAID";
+    effectivePlanType === "TRIAL" || effectivePlanType === "PAID" || isUnlimitedEmail();
+  const isExpired = !isUnlimitedEmail() && (effectivePlanType === "EXPIRED" || effectivePlanType === "FREE");
+  const isTrial = effectivePlanType === "TRIAL" && !isUnlimitedEmail();
+  const isPaid = effectivePlanType === "PAID" || isUnlimitedEmail();
 
   return {
     subscription,
@@ -126,6 +131,7 @@ export function useSubscription() {
     isExpired,
     isTrial,
     isPaid,
+    isUnlimited: isUnlimitedEmail(),
     daysRemainingInTrial,
     checkUserAccess,
   };

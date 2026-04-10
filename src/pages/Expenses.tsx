@@ -21,7 +21,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import type { DespesaExtended } from "@/types/transactions";
+import type { ExtendedUnifiedTransaction } from "@/lib/virtualTransactions";
 import { useFinancialData } from "@/hooks/useFinancialData";
+import { useMarkAsPaid } from "@/hooks/useMarkAsPaid";
 
 export default function Expenses() {
   const { user } = useAuth();
@@ -36,7 +38,9 @@ export default function Expenses() {
   const [sortBy, setSortBy] = useState("data-desc");
 
   const { raw, loading: isLoading } = useFinancialData();
-  const despesas = (raw.despesas as unknown as DespesaExtended[]) || [];
+  const despesas = (raw.despesas as unknown as (DespesaExtended & ExtendedUnifiedTransaction)[]) || [];
+
+  const markAsPaidMut = useMarkAsPaid();
 
   const filtered = useMemo(() => {
     let list = despesas;
@@ -62,8 +66,13 @@ export default function Expenses() {
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
-      console.log(`[Expenses] Deleting transaction ${id} via Ledger System`);
-      const { error } = await supabase.from("transactions").delete().eq("id", id);
+      let targetId = id;
+      if (id.startsWith("virtual-")) {
+        const parts = id.split("-");
+        targetId = parts.slice(1, 6).join("-"); // extrai o parentId
+      }
+      console.log(`[Expenses] Deleting transaction ${targetId} via Ledger System`);
+      const { error } = await supabase.from("transactions").delete().eq("id", targetId);
       if (error) throw error;
       console.log("[Expenses] Deletion complete.");
     },
@@ -79,24 +88,7 @@ export default function Expenses() {
     },
   });
 
-  const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      console.log(`[Expenses] Updating status for ${id} to ${status} (Ledger)`);
-      const newStatus = status === "pago" ? "confirmed" : "pending";
-      const { error } = await supabase.from("transactions").update({ status: newStatus } as any).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["transactions", user?.id] });
-      qc.invalidateQueries({ queryKey: ["contas_financeiras"] });
-      qc.invalidateQueries({ queryKey: ["dashboard", user?.id] });
-      toast.success("Status atualizado!");
-    },
-    onError: (e: any) => {
-      console.error("[Expenses] Status update error:", e);
-      toast.error("Erro ao atualizar status.");
-    }
-  });
+
 
   const hasFilters = (filterCategoria && filterCategoria !== "all") || searchText.trim();
 
@@ -214,7 +206,18 @@ export default function Expenses() {
               numero_parcelas={d.numero_parcelas}
               type="despesa"
               index={i}
-              onEdit={(id) => navigate(`/despesas/editar/${id}`)}
+              isVirtual={d.isVirtual}
+              onMarkAsPaid={(id) => markAsPaidMut.mutate(id)}
+              onEdit={(id) => {
+                if (d.isVirtual) {
+                   toast.info("Essa é uma projeção futura. Para editá-la, edite a transação original.");
+                   const parts = id.split("-");
+                   const parentId = parts.slice(1, 6).join("-");
+                   navigate(`/despesas/editar/${parentId}`);
+                } else {
+                   navigate(`/despesas/editar/${id}`);
+                }
+              }}
               onDelete={(id) => deleteMut.mutate(id)}
               deleteWarning={
                 (d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") && !d.transacao_pai_id
@@ -268,10 +271,17 @@ export default function Expenses() {
                       />
                     </TableCell>
                     <TableCell>
-                      {(d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") ? (
+                      {d.isVirtual ? (
+                         <div className="flex gap-2 items-center">
+                           <StatusBadge status="pendente" type="despesa" />
+                           <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => markAsPaidMut.mutate(d.id)}>Pagar</Button>
+                         </div>
+                      ) : (d.tipo_transacao === "recorrente" || d.tipo_transacao === "parcelada") ? (
                         <Select
                           value={d.status || "pendente"}
-                          onValueChange={(v) => updateStatus.mutate({ id: d.id, status: v })}
+                          onValueChange={(v) => {
+                             if (v === "pago") markAsPaidMut.mutate(d.id);
+                          }}
                         >
                           <SelectTrigger className="h-7 w-28 text-xs">
                             <SelectValue />
@@ -291,9 +301,19 @@ export default function Expenses() {
                       -{formatCurrency(d.valor)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => navigate(`/despesas/editar/${d.id}`)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {d.isVirtual ? (
+                        <Button variant="ghost" size="icon" onClick={() => {
+                           const parts = d.id.split("-");
+                           const parentId = parts.slice(1, 6).join("-");
+                           navigate(`/despesas/editar/${parentId}`);
+                        }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="icon" onClick={() => navigate(`/despesas/editar/${d.id}`)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">

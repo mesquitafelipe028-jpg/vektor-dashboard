@@ -7,9 +7,10 @@ import { queryKeys } from "@/lib/queryKeys";
 import { calcularLimiteProporcional } from "@/lib/fiscal";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useFinancialView } from "@/contexts/FinancialViewContext";
-import { FinanceService, type FinancialView } from "@/lib/financeService";
-import { type DespesaExtended, type ReceitaExtended } from "@/types/transactions";
+import { FinanceService } from "@/lib/financeService";
+import { type UnifiedTransaction, type FinancialView } from "@/types/transactions";
 import { type ContaFinanceira } from "@/types/accounts";
+import { generateVirtualTransactions, type ExtendedUnifiedTransaction } from "@/lib/virtualTransactions";
 
 import { useFinancialDataContext } from "@/contexts/FinancialDataContext";
 
@@ -36,30 +37,12 @@ export function useFinancialData(overrideView?: FinancialView) {
         .select("*, clientes(nome)")
         .order("date", { ascending: false });
       if (error) throw error;
-      
-      return (data ?? []).map(t => ({
-        ...t,
-        valor: t.amount,
-        descricao: t.description,
-        data: t.date,
-        status: t.type === "income" 
-          ? (t.status === "confirmed" ? "recebido" : "pendente")
-          : (t.status === "confirmed" ? "pago" : "pendente"),
-        tipo: t.tipo_despesa,
-        conta_id: t.account_id,
-        categoria: t.category
-      }));
+      return (data ?? []) as unknown as UnifiedTransaction[];
     },
     enabled: false, // Usually fetched by context, but available if needed
   });
 
-  const receitas = useMemo(() => 
-    allTransactions.filter(t => t.type === "income") as ReceitaExtended[], 
-  [allTransactions]);
-
-  const despesas = useMemo(() => 
-    allTransactions.filter(t => t.type === "expense") as DespesaExtended[], 
-  [allTransactions]);
+  // Separate processing is now done during calculation to avoid redundant loops
 
   const { data: empresa } = useQuery({
     queryKey: queryKeys.empresa(user?.id),
@@ -80,12 +63,14 @@ export function useFinancialData(overrideView?: FinancialView) {
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const currentYear = String(now.getFullYear());
 
-    const rSet = FinanceService.filterByView<ReceitaExtended>(receitas, view);
-    const dSet = FinanceService.filterByView<DespesaExtended>(despesas, view);
+    // Injetar instâncias virtuais para projeção de transações recorrentes previstas
+    const allWithVirtuals = generateVirtualTransactions(allTransactions as UnifiedTransaction[], 6);
+
+    const rFiltered = FinanceService.filterByView(allWithVirtuals.filter(t => t.type === "income"), view);
+    const dFiltered = FinanceService.filterByView(allWithVirtuals.filter(t => t.type === "expense"), view);
 
     const stats = FinanceService.calculateStats(
-      receitas,
-      despesas,
+      allWithVirtuals as UnifiedTransaction[],
       accounts,
       view,
       currentMonth,
@@ -99,13 +84,13 @@ export function useFinancialData(overrideView?: FinancialView) {
       limiteMei,
       loading: false,
       raw: {
-        receitas: rSet,
-        despesas: dSet,
-        settledReceitas: rSet.filter((r) => r.status === "recebido"),
-        settledDespesas: dSet.filter((d) => d.status === "pago"),
+        receitas: rFiltered as any,
+        despesas: dFiltered as any,
+        settledReceitas: rFiltered.filter((r) => r.status === "confirmed") as any,
+        settledDespesas: dFiltered.filter((d) => d.status === "confirmed") as any,
       },
       empresa,
       hasCnpj: !!empresa?.cnpj && !preferences.ocultar_mei,
     };
-  }, [receitas, despesas, accounts, view, empresa, preferences.ocultar_mei]);
+  }, [allTransactions, accounts, view, empresa, preferences.ocultar_mei]);
 }

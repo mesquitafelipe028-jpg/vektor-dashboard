@@ -26,9 +26,10 @@ interface FinancialCalendarProps {
   receitas: ReceitaExtended[];
   despesas: DespesaExtended[];
   saldoTotal: number;
+  assinaturas?: any[];
 }
 
-export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialCalendarProps) {
+export function FinancialCalendar({ receitas, despesas, saldoTotal, assinaturas = [] }: FinancialCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -48,28 +49,42 @@ export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialC
 
   // Daily map of transactions
   const dataMap = useMemo(() => {
-    const map = new Map<string, { in: number; out: number; pendingIn: number; pendingOut: number }>();
+    const map = new Map<string, { in: number; out: number; pendingIn: number; pendingOut: number; pendingSub: boolean; settledSub: boolean }>();
     
     // Process Receitas
     receitas.forEach(r => {
-      const date = r.data;
-      if (!map.has(date)) map.set(date, { in: 0, out: 0, pendingIn: 0, pendingOut: 0 });
+      const date = r.date || r.data;
+      if (!map.has(date)) map.set(date, { in: 0, out: 0, pendingIn: 0, pendingOut: 0, pendingSub: false, settledSub: false });
       const current = map.get(date)!;
-      if (r.status === 'recebido') current.in += r.valor;
-      else current.pendingIn += r.valor;
+      if (r.status === 'confirmed') current.in += (r.amount || r.valor || 0);
+      else current.pendingIn += (r.amount || r.valor || 0);
     });
 
     // Process Despesas
     despesas.forEach(d => {
-      const date = d.data;
-      if (!map.has(date)) map.set(date, { in: 0, out: 0, pendingIn: 0, pendingOut: 0 });
+      const date = d.date || d.data;
+      if (!map.has(date)) map.set(date, { in: 0, out: 0, pendingIn: 0, pendingOut: 0, pendingSub: false, settledSub: false });
       const current = map.get(date)!;
-      if (d.status === 'pago') current.out += d.valor;
-      else current.pendingOut += d.valor;
+      if (d.status === 'confirmed') current.out += (d.amount || d.valor || 0);
+      else current.pendingOut += (d.amount || d.valor || 0);
+    });
+
+    // Process Assinaturas
+    const currentMonthPrefix = format(currentDate, "yyyy-MM");
+    assinaturas.forEach(a => {
+       const dStr = `${currentMonthPrefix}-${String(a.dia_cobranca).padStart(2, '0')}`;
+       if (!map.has(dStr)) map.set(dStr, { in: 0, out: 0, pendingIn: 0, pendingOut: 0, pendingSub: false, settledSub: false });
+       const current = map.get(dStr)!;
+       if (a.status === 'paid') {
+          // If paid, it's ALREADY duplicated via DoubleWrite in standard despesas, so we just set a visual flag but DO NOT add to Out again!
+          current.settledSub = true;
+       } else {
+          current.pendingSub = true;
+       }
     });
 
     return map;
-  }, [receitas, despesas]);
+  }, [receitas, despesas, assinaturas, currentDate]);
 
   // Projected Balance Map
   // Calculates an initial balance to roll forward
@@ -150,7 +165,7 @@ export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialC
           {calendarDays.map((day, idx) => {
             const dateStr = format(day, "yyyy-MM-dd");
             const isFuture = dateStr > todayStr;
-            const data = dataMap.get(dateStr) || { in: 0, out: 0, pendingIn: 0, pendingOut: 0 };
+            const data = dataMap.get(dateStr) || { in: 0, out: 0, pendingIn: 0, pendingOut: 0, pendingSub: false, settledSub: false };
             
             const confirmedIn = data.in;
             const confirmedOut = data.out;
@@ -179,6 +194,7 @@ export function FinancialCalendar({ receitas, despesas, saldoTotal }: FinancialC
                   <div className="flex flex-col gap-0.5 items-end opacity-80 mt-0.5">
                     {(data.in > 0 || data.pendingIn > 0) && <span className="block w-1.5 h-1.5 rounded-full bg-emerald-500" />}
                     {(data.out > 0 || data.pendingOut > 0) && <span className="block w-1.5 h-1.5 rounded-full bg-rose-500" />}
+                    {data.pendingSub && <span className="block w-1.5 h-1.5 rounded-full bg-amber-500" title="Assinatura Pendente" />}
                   </div>
                 </div>
 

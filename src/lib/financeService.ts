@@ -1,4 +1,4 @@
-import { DespesaExtended, ReceitaExtended } from "@/types/transactions";
+import { UnifiedTransaction, FinancialView } from "@/types/transactions";
 import { ContaFinanceira } from "@/types/accounts";
 import { formatInTimeZone } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
@@ -52,7 +52,6 @@ export interface DREData {
   lucroLiquido: number;
 }
 
-export type FinancialView = "pessoal" | "mei" | "tudo";
 
 export class FinanceService {
   /**
@@ -60,7 +59,7 @@ export class FinanceService {
    */
   static filterByView<T extends { tipo_conta?: string | null }>(
     data: T[],
-    view: FinancialView
+    view: string
   ): T[] {
     if (view === "tudo") return data;
     return data.filter((item) => item.tipo_conta === view || !item.tipo_conta);
@@ -69,38 +68,44 @@ export class FinanceService {
   /**
    * Filters transactions by period (YYYY-MM)
    */
-  static filterByMonth<T extends { data: string }>(
+  static filterByMonth<T extends { date: string }>(
     data: T[],
     monthKey: string
   ): T[] {
-    return data.filter((item) => item.data.startsWith(monthKey));
+    return data.filter((item) => item.date.startsWith(monthKey));
   }
 
   /**
    * Calculates financial stats for a given view and month
    */
   static calculateStats(
-    receitas: ReceitaExtended[],
-    despesas: DespesaExtended[],
+    transactions: UnifiedTransaction[],
     accounts: ContaFinanceira[],
-    view: FinancialView,
+    view: string,
     currentMonth: string,
     currentYear: string
   ): FinancialStats {
-    const rFiltered = this.filterByView(receitas, view);
-    const dFiltered = this.filterByView(despesas, view);
+    const filtered = this.filterByView(transactions, view);
 
-    // STRICT LOGIC: Only settled items
-    const settledReceitas = rFiltered.filter((r) => r.status === "recebido");
-    const settledDespesas = dFiltered.filter((d) => d.status === "pago");
-    const settledInvestments = settledDespesas.filter((d) => d.tipo === "investment");
+    // STRICT LOGIC: Only confirmed (settled) items
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const settledTransactions = filtered.filter((t) => t.status === "confirmed" && t.date <= todayStr);
+    
+    // Ignore internal transfers to avoid double counting gross values (Net is zero anyway)
+    // Now also ignore our new subtype!
+    const validTransactions = settledTransactions.filter(t => 
+      t.category !== "Transferência/Pagamento Fatura" && 
+      t.subtype !== "credit_card_expense"
+    );
 
-    // Orphaned Balance (Settled but not linked to any account)
-    const orphanRecs = settledReceitas.filter((r) => !r.conta_id);
-    const orphanDesps = settledDespesas.filter((d) => !d.conta_id);
-    const orphanedBalance =
-      orphanRecs.reduce((s, r) => s + r.valor, 0) -
-      orphanDesps.reduce((s, d) => s + d.valor, 0);
+    const settledReceitas = validTransactions.filter((t) => t.type === "income");
+    const settledDespesas = validTransactions.filter((t) => t.type === "expense");
+    const settledInvestments = settledDespesas.filter((d) => d.tipo_despesa === "investment");
+
+    // Orphaned Balance (Confirmed but not linked to any account)
+    const orphans = settledTransactions.filter((t) => !t.account_id);
+    const orphanedBalance = orphans.reduce((s, t) => 
+      s + (t.type === "income" ? t.amount : -t.amount), 0);
 
     // Accounts Balance
     const accountsBalance = accounts
@@ -110,30 +115,30 @@ export class FinanceService {
     const saldoTotal = Number(accountsBalance) + Number(orphanedBalance);
 
     // Monthly stats
-    const receitasMes = settledReceitas.filter((r) => r.data.startsWith(currentMonth));
-    const despesasMes = settledDespesas.filter((d) => d.data.startsWith(currentMonth));
-    const faturamentoMes = receitasMes.reduce((s, r) => s + r.valor, 0);
-    const despesasMesTotal = despesasMes.reduce((s, d) => s + d.valor, 0);
+    const receitasMes = settledReceitas.filter((r) => r.date.startsWith(currentMonth));
+    const despesasMes = settledDespesas.filter((d) => d.date.startsWith(currentMonth));
+    const faturamentoMes = receitasMes.reduce((s, r) => s + r.amount, 0);
+    const despesasMesTotal = despesasMes.reduce((s, d) => s + d.amount, 0);
     const saldoMes = faturamentoMes - despesasMesTotal;
 
     // Investment stats
-    const totalInvestido = settledInvestments.reduce((s, i) => s + i.valor, 0);
+    const totalInvestido = settledInvestments.reduce((s, i) => s + i.amount, 0);
     const aportesMes = settledInvestments
-      .filter((i) => i.data.startsWith(currentMonth))
-      .reduce((s, i) => s + i.valor, 0);
+      .filter((i) => i.date.startsWith(currentMonth))
+      .reduce((s, i) => s + i.amount, 0);
 
     // Annual stats
     const faturamentoAnual = settledReceitas
-      .filter((r) => r.data.startsWith(currentYear))
-      .reduce((s, r) => s + r.valor, 0);
+      .filter((r) => r.date.startsWith(currentYear))
+      .reduce((s, r) => s + r.amount, 0);
 
     // Savings Rate (Pessoal)
     const rendaPessoalMes = settledReceitas
-      .filter((r) => r.tipo_conta === "pessoal" && r.data.startsWith(currentMonth))
-      .reduce((s, r) => s + r.valor, 0);
+      .filter((r) => r.tipo_conta === "pessoal" && r.date.startsWith(currentMonth))
+      .reduce((s, r) => s + r.amount, 0);
     const despPessoalMes = settledDespesas
-      .filter((d) => d.tipo_conta === "pessoal" && d.data.startsWith(currentMonth))
-      .reduce((s, d) => s + d.valor, 0);
+      .filter((d) => d.tipo_conta === "pessoal" && d.date.startsWith(currentMonth))
+      .reduce((s, d) => s + d.amount, 0);
     const taxaPoupanca =
       rendaPessoalMes > 0 ? ((rendaPessoalMes - despPessoalMes) / rendaPessoalMes) * 100 : 0;
 
@@ -147,7 +152,7 @@ export class FinanceService {
       faturamentoAnual,
       taxaPoupanca,
       orphanedBalance,
-      orphanedCount: orphanRecs.length + orphanDesps.length,
+      orphanedCount: orphans.length,
     };
   }
 
@@ -155,14 +160,26 @@ export class FinanceService {
    * Generates monthly series for charts
    */
   static getMonthlySeries(
-    receitas: ReceitaExtended[],
-    despesas: DespesaExtended[],
-    view: FinancialView,
-    count = 6
+    transactions: UnifiedTransaction[],
+    view: string,
+    count = 6,
+    incluirPrevisao = false
   ): MonthlyData[] {
-    const today = new Date(); // browser local is fine for relative month calc
-    const rFiltered = this.filterByView(receitas, view).filter((r) => r.status === "recebido");
-    const dFiltered = this.filterByView(despesas, view).filter((d) => d.status === "pago");
+    const today = new Date();
+    const todayStr = today.toISOString().substring(0, 10);
+    const safeTransactions = transactions || [];
+    const vFiltered = this.filterByView(safeTransactions, view).filter((t) => {
+      // Ignore transfers and double-counted credit cards
+      if (t.category === "Transferência/Pagamento Fatura" || t.subtype === "credit_card_expense") return false;
+      
+      if (incluirPrevisao) {
+         // Keep everything: confirmed, past pending, future pending
+         return true;
+      } else {
+         // Strict to confirmed & past up to today
+         return t.status === "confirmed" && t.date <= todayStr;
+      }
+    });
 
     return Array.from({ length: count }, (_, i) => {
       const d = new Date(today.getFullYear(), today.getMonth() - (count - 1 - i), 1);
@@ -170,8 +187,9 @@ export class FinanceService {
       const labelRaw = formatInTimeZone(d, "America/Sao_Paulo", "MMM", { locale: ptBR });
       const label = labelRaw.charAt(0).toUpperCase() + labelRaw.slice(1).replace(".", "");
 
-      const rec = rFiltered.filter((r) => r.data.startsWith(key)).reduce((s, r) => s + r.valor, 0);
-      const desp = dFiltered.filter((d) => d.data.startsWith(key)).reduce((s, d) => s + d.valor, 0);
+      const monthTrans = vFiltered.filter((t) => t.date.startsWith(key));
+      const rec = monthTrans.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+      const desp = monthTrans.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
 
       return {
         month: label,
@@ -187,19 +205,19 @@ export class FinanceService {
    * Generates category breakdown for pie charts
    */
   static getCategoryBreakdown(
-    despesas: DespesaExtended[],
+    transactions: UnifiedTransaction[],
     view: FinancialView,
     monthKey?: string
   ): CategoryData[] {
-    let dFiltered = this.filterByView(despesas, view).filter((d) => d.status === "pago");
+    let tFiltered = this.filterByView(transactions, view).filter((t) => t.status === "confirmed");
     if (monthKey) {
-      dFiltered = this.filterByMonth(dFiltered, monthKey);
+      tFiltered = this.filterByMonth(tFiltered, monthKey);
     }
 
     const map: Record<string, number> = {};
-    dFiltered.forEach((d) => {
-      const cat = d.categoria || "Outros";
-      map[cat] = (map[cat] || 0) + d.valor;
+    tFiltered.forEach((t) => {
+      const cat = t.category || "Outros";
+      map[cat] = (map[cat] || 0) + t.amount;
     });
 
     return Object.entries(map)
@@ -211,20 +229,23 @@ export class FinanceService {
    * Calculates DRE (Demonstrativo de Resultado do Exercício)
    */
   static getDRE(
-    receitas: ReceitaExtended[],
-    despesas: DespesaExtended[],
-    view: FinancialView,
+    transactions: UnifiedTransaction[],
+    view: string,
     monthKey: string
   ): DREData {
-    const rMes = this.filterByMonth(this.filterByView(receitas, view), monthKey).filter(
-      (r) => r.status === "recebido"
-    );
-    const dMes = this.filterByMonth(this.filterByView(despesas, view), monthKey).filter(
-      (d) => d.status === "pago"
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const vFiltered = this.filterByMonth(this.filterByView(transactions, view), monthKey).filter(
+      (t) => t.status === "confirmed" && 
+        t.date <= todayStr && 
+        t.category !== "Transferência/Pagamento Fatura" &&
+        t.subtype !== "credit_card_expense"
     );
 
-    const faturamento = rMes.reduce((s, r) => s + r.valor, 0);
-    const categories = this.getCategoryBreakdown(dMes, view);
+    const rMes = vFiltered.filter(t => t.type === "income");
+    const dMes = vFiltered.filter(t => t.type === "expense");
+
+    const faturamento = rMes.reduce((s, r) => s + r.amount, 0);
+    const categories = this.getCategoryBreakdown(dMes, view as FinancialView);
 
     const impostos = categories.find((c) => c.name === "Impostos")?.value || 0;
     const recLiquida = faturamento - impostos;
@@ -268,12 +289,12 @@ export class FinanceService {
    * Calculates health indicators based on last X months
    */
   static getHealthIndicators(
-    receitas: ReceitaExtended[],
-    despesas: DespesaExtended[],
-    view: FinancialView,
-    count = 6
+    transactions: UnifiedTransaction[],
+    view: string,
+    count = 6,
+    incluirPrevisao = false
   ) {
-    const months = this.getMonthlySeries(receitas, despesas, view, count);
+    const months = this.getMonthlySeries(transactions, view, count, incluirPrevisao);
     const monthsWithData = months.filter((m) => m.receitas > 0 || m.despesas > 0);
     const activeCount = monthsWithData.length || 1;
 
