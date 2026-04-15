@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import * as pdfjs from "pdfjs-dist";
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import Tesseract from 'tesseract.js';
 import { 
@@ -13,7 +13,7 @@ export { type ImportedTransaction, type InvoiceParseResult };
 
 // PDF.js worker configuration
 // @ts-ignore
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export async function parseSpreadsheet(file: File): Promise<InvoiceParseResult> {
   return new Promise((resolve, reject) => {
@@ -35,7 +35,7 @@ export async function parseSpreadsheet(file: File): Promise<InvoiceParseResult> 
 export async function parsePDF(file: File): Promise<InvoiceParseResult> {
   const arrayBuffer = await file.arrayBuffer();
   // @ts-ignore
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await getDocument({ data: arrayBuffer }).promise;
   const lines: string[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
