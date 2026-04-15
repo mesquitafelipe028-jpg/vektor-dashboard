@@ -48,7 +48,7 @@ const ClientDetails = lazy(() => import("./pages/ClientDetails"));
 const More = lazy(() => import("./pages/More"));
 const InvestmentCalculator = lazy(() => import("./pages/InvestmentCalculator"));
 
-const CreditCards = lazy(() => import("./pages/CreditCards"));
+
 const Categories = lazy(() => import("./pages/Categories"));
 const Receivables = lazy(() => import("./pages/Receivables"));
 const Timeline = lazy(() => import("./pages/Timeline"));
@@ -58,9 +58,7 @@ const TransactionForm = lazy(() => import("./pages/TransactionForm"));
 const ClientForm = lazy(() => import("./pages/ClientForm"));
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Projects = lazy(() => import("./pages/Projects"));
-const StatementImport = lazy(() => import("./pages/StatementImport"));
 const Tutorial = lazy(() => import("./pages/Tutorial"));
-const Invoices = lazy(() => import("./pages/Invoices"));
 const QuickCardExpenseForm = lazy(() => import("./pages/QuickCardExpenseForm"));
 const AlertResolution = lazy(() => import("./pages/AlertResolution"));
 
@@ -129,17 +127,17 @@ const App = () => {
                           <Route path="despesas/editar/:id" element={<TransactionForm />} />
                           <Route path="clientes/novo" element={<ClientForm />} />
                           <Route path="clientes/editar/:id" element={<ClientForm />} />
-                          <Route path="cartoes" element={<CreditCards />} />
+                          <Route path="cartoes" element={<Navigate to="/contas" replace />} />
                           <Route path="categorias" element={<Categories />} />
                           <Route path="compras-cartao/nova" element={<QuickCardExpenseForm />} />
-                          <Route path="faturas" element={<Invoices />} />
+                          <Route path="faturas" element={<Navigate to="/contas" replace />} />
                           <Route path="contas" element={<Accounts />} />
                           <Route path="contas-a-receber" element={<Receivables />} />
                           <Route path="timeline" element={<Timeline />} />
                           <Route path="mais" element={<More />} />
                           <Route path="assinaturas" element={<Subscriptions />} />
                           <Route path="projetos" element={<Projects />} />
-                          <Route path="importar-extrato" element={<StatementImport />} />
+                          <Route path="importar-extrato" element={<Navigate to="/contas" replace />} />
                           <Route path="tutorial" element={<Tutorial />} />
                           <Route path="upgrade" element={<Upgrade />} />
                           <Route path="alertas/resolucao" element={<AlertResolution />} />

@@ -23,10 +23,10 @@ export function DashboardHeader({ hasCnpj, onSyncOpen }: DashboardHeaderProps) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold mb-1">
+          <h1 className="font-heading text-2xl md:text-3xl font-bold mb-1 bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent">
             Olá, {firstName ? `${firstName},` : ""} bem-vindo ao Vektor
           </h1>
-          <p className="text-sm text-muted-foreground">Seu centro de controle financeiro</p>
+          <p className="text-sm text-muted-foreground font-medium">Seu centro de controle financeiro inteligente</p>
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>

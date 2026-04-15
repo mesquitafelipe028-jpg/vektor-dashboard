@@ -61,8 +61,6 @@ const menuGroups = [
       { title: "Receitas", url: "/receitas", icon: TrendingUp },
       { title: "Despesas", url: "/despesas", icon: TrendingDown },
       { title: "Contas", url: "/contas", icon: Wallet },
-      { title: "Cartões", url: "/cartoes", icon: CreditCard },
-      { title: "Faturas", url: "/faturas", icon: Receipt },
       { title: "Clientes", url: "/clientes", icon: Users },
       { title: "Cobranças", url: "/contas-a-receber", icon: ClipboardList },
     ],
@@ -92,7 +90,6 @@ const menuGroups = [
   {
     label: "Sistema",
     items: [
-      { title: "Importar Extrato", url: "/importar-extrato", icon: Upload },
       { title: "Categorias", url: "/categorias", icon: Tag },
       { title: "Configurações", url: "/configuracoes", icon: Settings },
     ],

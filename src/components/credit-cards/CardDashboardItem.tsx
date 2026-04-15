@@ -126,7 +126,7 @@ export function CardDashboardItem({
           </div>
           <Progress value={Math.min(usagePercent, 100)} className={`h-2 ${usagePercent >= 100 ? "[&>div]:bg-destructive" : "[&>div]:bg-purple-500"}`} />
           <div className="text-[10px] text-right text-muted-foreground font-medium">
-            Usado: {formatCurrency(limiteUsado)}
+            Total da Fatura: {formatCurrency(limiteUsado)}
           </div>
         </div>
       </CardContent>

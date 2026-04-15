@@ -3,7 +3,8 @@ import {
   TrendingUp, TrendingDown, Wallet, Receipt,
   Plus, ShieldCheck, AlertTriangle, ShieldAlert, Target,
   FileText, ArrowUpRight, ArrowDownRight, Building2, X, Bell,
-  Clock, Flame, User, Briefcase, Layers, Info, PiggyBank, CalendarIcon, CreditCard
+  Clock, Flame, User, Briefcase, Layers, Info, PiggyBank, CalendarIcon, CreditCard,
+  ChevronRight
 } from "lucide-react";
 import { AreaChart, Area, XAxis as AXAxis, YAxis as AYAxis, CartesianGrid as ACG, Tooltip as ATooltip, ResponsiveContainer as ARC } from "recharts";
 import { useQuery, useIsFetching } from "@tanstack/react-query";
@@ -172,7 +173,36 @@ export default function Dashboard() {
   const { accounts } = useAccounts();
   const metaAtual = metas.find((m) => m.valor_atual < m.valor_alvo) || metas[0];
 
-  const { invoices } = useInvoices();
+  // Busca compras e cartões para calcular fatura real (igual à página de Cartões)
+  const { data: todasComprasCartao = [] } = useQuery({
+    queryKey: ["compras_cartao", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("compras_cartao").select("cartao_id, valor, data");
+      if (error) throw error;
+      return (data ?? []) as { cartao_id: string; valor: number; data: string }[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: todosCartoesCredito = [] } = useQuery({
+    queryKey: ["cartoes_credito", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("cartoes_credito").select("id, dia_fechamento");
+      if (error) throw error;
+      return (data ?? []) as { id: string; dia_fechamento: number }[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: todasFaturasCartao = [] } = useQuery({
+    queryKey: ["faturas_cartao", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("faturas_cartao").select("cartao_id, mes_referencia, status");
+      if (error) throw error;
+      return (data ?? []) as { cartao_id: string; mes_referencia: string; status: string }[];
+    },
+    enabled: !!user,
+  });
 
   const assinaturasResumo = useMemo(() => {
     let totalPago = 0;
@@ -184,24 +214,59 @@ export default function Dashboard() {
     return { pago: totalPago, pendente: totalPendente, total: totalPago + totalPendente };
   }, [assinaturas]);
 
+  // Calcula a fatura atual somando compras_cartao do mês vigente (igual à lógica da página de Cartões)
   const faturasResumo = useMemo(() => {
     const now = new Date();
-    const currM = now.getMonth() + 1;
-    const currY = now.getFullYear();
-    const nextM = currM === 12 ? 1 : currM + 1;
-    const nextY = currM === 12 ? currY + 1 : currY;
+    const currYear = now.getFullYear();
+    const currMonth = now.getMonth();
+    const currDay = now.getDate();
 
-    // Fatura Atual (mês e ano vigentes, ainda não paga inteiramente se houver controle, mas basta pegar by date)
-    const atual = invoices.find(i => i.month === currM && i.year === currY);
-    const proxima = invoices.find(i => i.month === nextM && i.year === nextY);
-    const debt = invoices.filter(i => i.status !== "paid" && i.status !== "confirmed").reduce((s, i) => s + i.total_amount, 0);
+    // Função local para determinar em qual período de fatura uma compra cai
+    function getInvoicePeriod(purchaseDate: string, diaFechamento: number): string {
+      const d = new Date(purchaseDate + "T12:00:00");
+      const day = d.getDate();
+      const y = d.getFullYear();
+      const m = d.getMonth();
+      if (day >= diaFechamento) {
+        const next = new Date(y, m + 1, 1);
+        return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+      }
+      return `${y}-${String(m + 1).padStart(2, "0")}`;
+    }
 
-    return { 
-      atualVal: atual?.total_amount || 0,
-       proxVal: proxima?.total_amount || 0,
-       totalDebt: debt
-    };
-  }, [invoices]);
+    // Mês atual e próximo no formato YYYY-MM
+    const currMesRef = `${currYear}-${String(currMonth + 1).padStart(2, "0")}`;
+    const nextDate = new Date(currYear, currMonth + 1, 1);
+    const nextMesRef = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`;
+
+    // Faturas já pagas (não conta no cálculo)
+    const faturasPagas = new Set(
+      todasFaturasCartao.filter(f => f.status === "paga").map(f => `${f.cartao_id}|${f.mes_referencia}`)
+    );
+
+    // Cria um mapa de dia_fechamento por cartao_id
+    const diaFechamentoMap: Record<string, number> = {};
+    todosCartoesCredito.forEach(c => {
+      diaFechamentoMap[c.id] = c.dia_fechamento || 1;
+    });
+
+    let atualVal = 0;
+    let proxVal = 0;
+
+    todasComprasCartao.forEach(compra => {
+      const diaFech = diaFechamentoMap[compra.cartao_id] ?? 1;
+      const periodo = getInvoicePeriod(compra.data, diaFech);
+      const key = `${compra.cartao_id}|${periodo}`;
+      if (faturasPagas.has(key)) return; // fatura já foi paga, ignora
+      if (periodo === currMesRef) {
+        atualVal += compra.valor;
+      } else if (periodo === nextMesRef) {
+        proxVal += compra.valor;
+      }
+    });
+
+    return { atualVal, proxVal };
+  }, [todasComprasCartao, todosCartoesCredito, todasFaturasCartao]);
 
   useEffect(() => {
     localStorage.setItem('vektor_preferred_landing', '/dashboard');
@@ -408,119 +473,124 @@ export default function Dashboard() {
         saldoMes={saldoMes}
       />
 
-      <HealthAlerts alerts={alerts} onDismiss={dismissAlert} />
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-6">
+        {/* Coluna Principal: Insights e Gráficos */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          <InsightsFinanceiros
+            faturamentoMes={faturamentoMes}
+            despesasMesTotal={despesasMesTotal}
+            despesaPercent={despesaPercent}
+            savingsRate={taxaPoupanca}
+            varFaturamento={prevMonth.varFat}
+            categoryData={categoryData}
+          />
 
-      {isLoading ? (
-        <Skeleton className="h-64 w-full rounded-xl" />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <InsightsFinanceiros
-              faturamentoMes={faturamentoMes}
-              despesasMesTotal={despesasMesTotal}
-              despesaPercent={despesaPercent}
-              savingsRate={taxaPoupanca}
-              varFaturamento={prevMonth.varFat}
-              categoryData={categoryData}
-            />
-          </div>
-          <div className="flex flex-col gap-4">
-            <Card className="border-emerald-500/20 bg-emerald-500/5">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 shrink-0">
-                  <CreditCard className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Fatura Atual (Cartão)</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-heading text-xl font-bold text-emerald-600">{formatCurrency(faturasResumo.atualVal)}</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Próxima: {formatCurrency(faturasResumo.proxVal)}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-indigo-500/20 bg-indigo-500/5">
-              <CardContent className="p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="flex h-6 w-6 items-center justify-center rounded bg-indigo-500/10 shrink-0">
-                    <Layers className="h-3 w-3 text-indigo-600" />
-                  </div>
-                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Assinaturas do Mês</span>
-                </div>
-                <div className="flex items-center justify-between">
-                   <div className="flex flex-col">
-                      <span className="text-[10px] text-muted-foreground">Previsão</span>
-                      <span className="font-heading text-sm font-bold text-indigo-600">{formatCurrency(assinaturasResumo.total)}</span>
-                   </div>
-                   <div className="flex flex-col text-right">
-                      <span className="text-[10px] text-muted-foreground">Pago até agora</span>
-                      <span className="font-heading text-sm font-bold text-primary">{formatCurrency(assinaturasResumo.pago)}</span>
-                   </div>
-                </div>
-                <div className="w-full bg-indigo-500/10 rounded-full h-1.5 mt-1 overflow-hidden">
-                   <div className="bg-primary h-1.5 rounded-full" style={{ width: `${assinaturasResumo.total > 0 ? (assinaturasResumo.pago / assinaturasResumo.total) * 100 : 0}%` }} />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-500/20 bg-amber-500/5">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 shrink-0">
-                  <Clock className="h-5 w-5 text-amber-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Compromissos Futuros (Mês)</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-heading text-xl font-bold text-amber-600">{formatCurrency(compromissosFuturos)}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-                  <PiggyBank className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">Taxa de Poupança</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-heading text-xl font-bold">{taxaPoupanca.toFixed(1)}%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {orphanedCount > 0 && accounts.length > 0 && (
-              <Card className="border-amber-500/20 bg-amber-500/5">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 shrink-0">
-                    <Info className="h-5 w-5 text-amber-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-amber-700">Ação Necessária</p>
-                    <p className="text-[10px] text-amber-600">Você tem {orphanedCount} transações sem conta bancária vinculada.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {hasCnpj && empresa && (
-              <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/configuracoes")}>
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-                    <Building2 className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-heading font-semibold text-sm truncate">{empresa.razao_social || empresa.nome_fantasia || "Empresa"}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          <HealthAlerts alerts={alerts} onDismiss={dismissAlert} />
         </div>
-      )}
+
+        {/* Coluna Lateral: Cards de Status Próximo */}
+        <div className="lg:col-span-4 flex flex-col gap-4">
+          {/* Fatura Atual → /cartoes */}
+          <Card
+            className="relative overflow-hidden border-none bg-emerald-500/5 cursor-pointer hover:shadow-xl hover:bg-emerald-500/10 transition-all duration-300 group rounded-2xl p-0.5"
+            onClick={() => navigate("/cartoes")}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-50" />
+            <CardContent className="p-5 relative z-10 flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/20 text-emerald-600 transition-transform group-hover:scale-110">
+                <CreditCard className="h-6 w-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] text-emerald-600/70 uppercase tracking-widest font-bold">Fatura Atual</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-heading text-xl font-bold text-foreground">{formatCurrency(faturasResumo.atualVal)}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground/80 font-medium">Próxima: {formatCurrency(faturasResumo.proxVal)}</p>
+              </div>
+              <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <ChevronRight className="h-4 w-4 text-emerald-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="relative overflow-hidden border-none bg-indigo-500/5 cursor-pointer hover:shadow-xl hover:bg-indigo-500/10 transition-all duration-300 group rounded-2xl p-0.5"
+            onClick={() => navigate("/assinaturas")}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent opacity-50" />
+            <CardContent className="p-5 relative z-10 flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/20 border border-indigo-500/20 text-indigo-600">
+                  <Layers className="h-4 w-4" />
+                </div>
+                <span className="text-[10px] text-indigo-600/70 uppercase tracking-widest font-bold flex-1">Assinaturas do Mês</span>
+                <ChevronRight className="h-3 w-3 text-indigo-600 opacity-40 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="flex items-center justify-between">
+                 <div className="flex flex-col">
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Previsão</span>
+                    <span className="font-heading text-lg font-bold text-foreground">{formatCurrency(assinaturasResumo.total)}</span>
+                 </div>
+                 <div className="flex flex-col text-right">
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Pago</span>
+                    <span className="font-heading text-lg font-bold text-primary">{formatCurrency(assinaturasResumo.pago)}</span>
+                 </div>
+              </div>
+              <div className="w-full bg-black/10 dark:bg-white/5 rounded-full h-1.5 overflow-hidden">
+                 <div className="bg-primary h-1.5 rounded-full transition-all duration-1000" style={{ width: `${assinaturasResumo.total > 0 ? (assinaturasResumo.pago / assinaturasResumo.total) * 100 : 0}%` }} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Card
+              className="relative overflow-hidden border-none bg-amber-500/5 cursor-pointer hover:shadow-xl hover:bg-amber-500/10 transition-all duration-300 group rounded-2xl p-0.5"
+              onClick={() => navigate("/despesas")}
+            >
+              <CardContent className="p-4 relative z-10 flex flex-col gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20 text-amber-600">
+                  <Clock className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[9px] text-amber-600/70 uppercase tracking-widest font-bold">Pendentes</span>
+                  <p className="font-heading text-base font-bold text-foreground truncate">{formatCurrency(compromissosFuturos)}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="relative overflow-hidden border-none bg-primary/5 cursor-pointer hover:shadow-xl hover:bg-primary/10 transition-all duration-300 group rounded-2xl p-0.5"
+              onClick={() => navigate("/relatorios")}
+            >
+              <CardContent className="p-4 relative z-10 flex flex-col gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
+                  <PiggyBank className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[9px] text-primary/70 uppercase tracking-widest font-bold">Poupança</span>
+                  <p className="font-heading text-base font-bold text-foreground">{taxaPoupanca.toFixed(0)}%</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {orphanedCount > 0 && accounts.length > 0 && (
+            <Card
+              className="border-none bg-destructive/10 cursor-pointer hover:bg-destructive/15 transition-all rounded-2xl"
+              onClick={() => navigate("/contas")}
+            >
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/20 text-destructive">
+                  <Info className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0 text-destructive/90">
+                  <p className="text-[10px] font-bold uppercase tracking-tight line-clamp-1">{orphanedCount} Transações sem conta</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
 
       <Separator />
 

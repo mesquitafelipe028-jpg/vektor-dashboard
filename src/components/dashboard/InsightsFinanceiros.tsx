@@ -165,19 +165,39 @@ export function InsightsFinanceiros({
       </div>
 
       <div className="animate-fade-in transition-all duration-500 ease-in-out">
-        <Card className={`border-l-4 shadow-sm hover:shadow-md transition-shadow ${insightColors[currentInsight.type]}`}>
-          <CardContent className="p-5 flex items-start gap-4">
-            <div className={cn("p-2 rounded-lg shrink-0", insightColors[currentInsight.type].replace('border-l-4', ''))}>
-              <currentInsight.icon className={`h-5 w-5 ${insightIconColors[currentInsight.type]}`} />
+        <Card className={cn(
+          "relative overflow-hidden border-none transition-all duration-500 hover:shadow-xl rounded-2xl",
+          insightColors[currentInsight.type]
+        )}>
+          {/* Decorative Gradient Blob */}
+          <div className={cn(
+            "absolute -right-8 -top-8 h-32 w-32 rounded-full blur-3xl opacity-20",
+            currentInsight.type === 'danger' ? 'bg-destructive' : 
+            currentInsight.type === 'warning' ? 'bg-warning' : 
+            'bg-primary'
+          )} />
+          
+          <CardContent className="p-6 relative z-10 flex flex-col md:flex-row items-start gap-5">
+            <div className={cn(
+              "p-3 rounded-2xl shrink-0 shadow-sm border border-white/10",
+              insightIconColors[currentInsight.type].replace('text-', 'bg-').replace('primary', 'primary/20').replace('warning', 'warning/20').replace('destructive', 'destructive/20')
+            )}>
+              <currentInsight.icon className={cn("h-6 w-6", insightIconColors[currentInsight.type])} />
             </div>
+            
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <p className="text-sm font-bold tracking-tight">{currentInsight.title}</p>
-                <Badge variant="outline" className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 ${insightBadgeConfig[currentInsight.type].badgeClass}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                <h3 className="text-lg font-bold tracking-tight text-foreground">{currentInsight.title}</h3>
+                <Badge variant="outline" className={cn(
+                  "text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 border-none shadow-sm",
+                  insightBadgeConfig[currentInsight.type].badgeClass
+                )}>
                   {insightBadgeConfig[currentInsight.type].label}
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{currentInsight.description}</p>
+              <p className="text-sm text-muted-foreground/90 leading-relaxed font-medium">
+                {currentInsight.description}
+              </p>
             </div>
           </CardContent>
         </Card>

@@ -24,7 +24,6 @@ const menuGroups = [
       { label: "Receitas", icon: TrendingUp, path: "/receitas", color: "bg-primary/10 text-primary" },
       { label: "Despesas", icon: TrendingDown, path: "/despesas", color: "bg-destructive/10 text-destructive" },
       { label: "Contas", icon: Wallet, path: "/contas", color: "bg-chart-1/10 text-chart-1" },
-      { label: "Cartões", icon: CreditCard, path: "/cartoes", color: "bg-chart-1/10 text-chart-1" },
       { label: "Clientes", icon: Users, path: "/clientes", color: "bg-chart-3/10 text-chart-3" },
       { label: "Cobranças", icon: ClipboardList, path: "/contas-a-receber", color: "bg-chart-4/10 text-chart-4" },
     ],
@@ -54,7 +53,6 @@ const menuGroups = [
   {
     label: "Sistema",
     items: [
-      { label: "Importar Extrato", icon: Upload, path: "/importar-extrato", color: "bg-muted text-muted-foreground" },
       { label: "Categorias", icon: Tag, path: "/categorias", color: "bg-chart-4/10 text-chart-4" },
       { label: "Configurações", icon: Settings, path: "/configuracoes", color: "bg-muted text-muted-foreground" },
       { label: "Guia Vektor", icon: HelpCircle, path: "/tutorial", color: "bg-primary/10 text-primary" },

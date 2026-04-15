@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,9 +15,14 @@ import { BankLogo, banks } from "@/lib/banks";
 import {
   Plus, Trash2, Pencil, Banknote, Smartphone, PiggyBank, CreditCard,
   TrendingUp, Wallet, Building2, CircleDollarSign, Landmark, ShieldCheck,
-  Gem, Star, Briefcase, Heart, Zap, LucideIcon, ArrowRightLeft,
+  Gem, Star, Briefcase, Heart, Zap, LucideIcon, ArrowRightLeft, ExternalLink,
 } from "lucide-react";
 import type { AccountType, AccountClassification, ContaFinanceiraInsert } from "@/types/accounts";
+import { useNavigate } from "react-router-dom";
+import { formatCurrency } from "@/lib/utils";
+import { AccountCard } from "@/components/accounts/AccountCard";
+import { CreditCardSheet } from "@/components/accounts/CreditCardSheet";
+import { AccountSheet } from "@/components/accounts/AccountSheet";
 
 const accountTypeOptions: { value: AccountType; label: string; icon: LucideIcon }[] = [
   { value: "banco", label: "Conta bancária", icon: Landmark },
@@ -55,14 +60,135 @@ function getIconComponent(iconName: string): LucideIcon {
   return iconOptions.find((i) => i.value === iconName)?.icon ?? Wallet;
 }
 
+// Helper: match por conjunto de tokens (bag-of-words) — tolera ordem diferente
+// Ex: "SANTADER FREE" e "FREE SANTANDER" fazem match pois compartilham tokens
+function nameTokens(name: string): Set<string> {
+  return new Set(
+    name.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, "")
+      .split(/\s+/)
+      .filter(t => t.length >= 2)
+  );
+}
+function namesMatch(a: string, b: string): boolean {
+  const ta = nameTokens(a);
+  const tb = nameTokens(b);
+  // Basta metade dos tokens coincidirem
+  let shared = 0;
+  for (const t of ta) if (tb.has(t)) shared++;
+  const minSize = Math.min(ta.size, tb.size);
+  return minSize > 0 && shared >= Math.ceil(minSize / 2);
+}
+
 export default function Accounts() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { accounts, isLoading, createAccount, updateAccount, deleteAccount } = useAccounts();
   const [open, setOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [shouldUpdateBalance, setShouldUpdateBalance] = useState(true);
+
+  // ── Dados de cartões de crédito para enriquecer contas do tipo "cartao" ──
+  const { data: cartoesCredito = [] } = useQuery({
+    queryKey: ["cartoes_credito", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("cartoes_credito").select("*").order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: comprasCartao = [] } = useQuery({
+    queryKey: ["compras_cartao", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("compras_cartao").select("*").order("data", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: faturasCartao = [] } = useQuery({
+    queryKey: ["faturas_cartao", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("faturas_cartao").select("*");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user,
+  });
+
+  // Helper: calcular período da fatura de uma compra
+  const getPurchaseInvoicePeriod = (purchaseDate: string, diaFechamento: number): string => {
+    const d = new Date(purchaseDate + "T12:00:00");
+    const day = d.getDate();
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    if (day >= diaFechamento) {
+      const next = new Date(y, m + 1, 1);
+      return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+    }
+    return `${y}-${String(m + 1).padStart(2, "0")}`;
+  };
+
+  // Map: conta_financeira.id → cartao_credito (por similaridade de nome)
+  const cartaoMap = useMemo(() => {
+    const map = new Map<string, (typeof cartoesCredito)[0]>();
+    for (const conta of accounts) {
+      if (conta.tipo !== "cartao") continue;
+      const found = cartoesCredito.find(c => namesMatch(conta.nome, c.nome));
+      if (found) map.set(conta.id, found);
+    }
+    return map;
+  }, [accounts, cartoesCredito]);
+
+  // Dados calculados por cartao_credito.id
+  const dadosCartao = useMemo(() => {
+    const result = new Map<string, { limiteUsado: number; limiteDisponivel: number; faturaMesAtual: string; faturaAtualValor: number }>();
+    for (const cartao of cartoesCredito) {
+      const now = new Date();
+      const d = now.getDate();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      let currentPeriod: string;
+      if (d >= (cartao.dia_fechamento || 1)) {
+        const next = new Date(y, m + 1, 1);
+        currentPeriod = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+      } else {
+        currentPeriod = `${y}-${String(m + 1).padStart(2, "0")}`;
+      }
+
+      const faturasPagas = new Set(
+        faturasCartao
+          .filter(f => f.cartao_id === cartao.id && f.status === "paga")
+          .map(f => f.mes_referencia)
+      );
+
+      // limiteUsado: TODOS os meses não pagos (para calcular disponibilidade real do limite)
+      let totalUsado = 0;
+      // faturaAtualValor: apenas o período corrente (para exibição no card)
+      let faturaAtualValor = 0;
+
+      for (const c of comprasCartao) {
+        if (c.cartao_id !== cartao.id) continue;
+        const mesRef = getPurchaseInvoicePeriod(c.data, cartao.dia_fechamento || 1);
+        if (!faturasPagas.has(mesRef)) totalUsado += c.valor;
+        if (mesRef === currentPeriod) faturaAtualValor += c.valor;
+      }
+
+      const disponivel = Math.max(0, (cartao.limite_total || 0) - totalUsado);
+      result.set(cartao.id, {
+        limiteUsado: totalUsado,
+        limiteDisponivel: disponivel,
+        faturaMesAtual: currentPeriod,
+        faturaAtualValor,
+      });
+    }
+    return result;
+  }, [cartoesCredito, comprasCartao, faturasCartao]);
 
   // Transfer state
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
@@ -181,8 +307,18 @@ export default function Accounts() {
   const [cor, setCor] = useState(colorOptions[0]);
   const [icone, setIcone] = useState("wallet");
   const [classificacao, setClassificacao] = useState<AccountClassification>("pessoal");
+  // Campos extras para cartão
+  const [limiteTotal, setLimiteTotal] = useState("");
+  const [diaFechamento, setDiaFechamento] = useState("1");
+  const [diaVencimento, setDiaVencimento] = useState("10");
+  // Sheet de fatura (cartão)
+  const [selectedCartaoId, setSelectedCartaoId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Sheet de extrato (conta corrente/digital/etc)
+  const [selectedAccountData, setSelectedAccountData] = useState<any | null>(null);
+  const [accountSheetOpen, setAccountSheetOpen] = useState(false);
 
-  const showBankSelector = tipo === "banco" || tipo === "digital";
+  const showBankSelector = tipo === "banco" || tipo === "digital" || tipo === "cartao";
 
   const resetForm = () => {
     setNome("");
@@ -192,6 +328,9 @@ export default function Accounts() {
     setCor(colorOptions[0]);
     setIcone("wallet");
     setClassificacao("pessoal");
+    setLimiteTotal("");
+    setDiaFechamento("1");
+    setDiaVencimento("10");
     setEditingAccount(null);
   };
 
@@ -226,7 +365,21 @@ export default function Accounts() {
         toast.success("Conta atualizada!");
       } else {
         const newAccount = await createAccount.mutateAsync(payload as ContaFinanceiraInsert);
-        
+
+        // Se tipo cartão → também criar em cartoes_credito
+        if (tipo === "cartao" && limiteTotal) {
+          await supabase.from("cartoes_credito").insert({
+            nome: nome.trim(),
+            limite_total: parseFloat(limiteTotal) || 0,
+            dia_fechamento: parseInt(diaFechamento) || 1,
+            dia_vencimento: parseInt(diaVencimento) || 10,
+            tipo_conta: classificacao,
+            banco: bancoId || null,
+            user_id: user.id,
+          } as any);
+          queryClient.invalidateQueries({ queryKey: ["cartoes_credito"] });
+        }
+
         // Se houver saldo inicial, criar uma transação de ajuste
         const initialBalance = parseFloat(saldo) || 0;
         if (initialBalance !== 0) {
@@ -241,8 +394,8 @@ export default function Accounts() {
             date: new Date().toISOString().split('T')[0],
           } as any);
         }
-        
-        toast.success("Conta criada com sucesso!");
+
+        toast.success(tipo === "cartao" ? "Cartão criado! Clique no card para gerenciar faturas." : "Conta criada com sucesso!");
       }
       resetForm();
       setOpen(false);
@@ -345,6 +498,44 @@ export default function Accounts() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {/* Campos extras para Cartão de Crédito */}
+              {tipo === "cartao" && (
+                <div className="space-y-3 p-3 rounded-lg border border-purple-500/30 bg-purple-500/5">
+                  <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Configurações do Cartão</p>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Limite total (R$)</Label>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      placeholder="Ex: 5000,00"
+                      value={limiteTotal}
+                      onChange={(e) => setLimiteTotal(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Dia fechamento</Label>
+                      <Input
+                        type="number"
+                        min="1" max="28"
+                        value={diaFechamento}
+                        onChange={(e) => setDiaFechamento(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Dia vencimento</Label>
+                      <Input
+                        type="number"
+                        min="1" max="28"
+                        value={diaVencimento}
+                        onChange={(e) => setDiaVencimento(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -495,60 +686,59 @@ export default function Accounts() {
             </Card>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((account) => {
-            const Icon = getIconComponent(account.icone);
-            const typeLabel = accountTypeOptions.find((t) => t.value === account.tipo)?.label ?? account.tipo;
-            return (
-              <Card key={account.id} className="group relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: account.cor }} />
-                <CardHeader className="pb-2 flex-row items-center gap-3 space-y-0">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: account.cor + "20", color: account.cor }}
-                  >
-                    {account.banco_id ? (
-                      <BankLogo bankId={account.banco_id} size={28} />
-                    ) : (
-                      <Icon className="h-5 w-5" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base truncate">{account.nome}</CardTitle>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      {typeLabel}
-                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted">
-                        {account.classificacao === "mei" ? "MEI" : "Pessoal"}
-                      </span>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleEditOpen(account)}
-                      className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary"
-                      title="Editar conta"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(account.id)}
-                      className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                      title="Excluir conta"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold text-foreground">
-                    {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(account.saldo)}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {accounts.map((account) => {
+              const cartaoVinculado = cartaoMap.get(account.id);
+              const isCreditCard = account.tipo === "cartao" && !!cartaoVinculado;
+              const dados = isCreditCard ? dadosCartao.get(cartaoVinculado!.id) : undefined;
+
+              return (
+                <AccountCard
+                  key={account.id}
+                  id={account.id}
+                  nome={account.nome}
+                  tipo={account.tipo}
+                  bankId={account.banco_id}
+                  classificacao={account.classificacao}
+                  isCredit={isCreditCard}
+                  saldo={account.saldo}
+                  limiteUsado={dados?.limiteUsado ?? 0}
+                  limiteDisponivel={dados?.limiteDisponivel ?? 0}
+                  limiteTotal={cartaoVinculado?.limite_total ?? 0}
+                  faturaAtual={dados?.faturaAtualValor ?? 0}
+                  onEdit={() => handleEditOpen(account)}
+                  onDelete={() => handleDelete(account.id)}
+                  onViewFatura={isCreditCard ? () => {
+                    setSelectedCartaoId(cartaoVinculado!.id);
+                    setSheetOpen(true);
+                  } : undefined}
+                  onClick={isCreditCard ? () => {
+                    setSelectedCartaoId(cartaoVinculado!.id);
+                    setSheetOpen(true);
+                  } : () => {
+                    setSelectedAccountData(account);
+                    setAccountSheetOpen(true);
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          {/* Sheet de Fatura do Cartão */}
+          <CreditCardSheet
+            cartao={cartoesCredito.find(c => c.id === selectedCartaoId) ?? null}
+            contaId={accounts.find(a => cartaoMap.get(a.id)?.id === selectedCartaoId)?.id}
+            open={sheetOpen}
+            onOpenChange={(v) => { setSheetOpen(v); if (!v) setSelectedCartaoId(null); }}
+          />
+
+          {/* Sheet de Extrato (conta corrente/digital/etc) */}
+          <AccountSheet
+            account={selectedAccountData}
+            open={accountSheetOpen}
+            onOpenChange={(v) => { setAccountSheetOpen(v); if (!v) setSelectedAccountData(null); }}
+          />
         </div>
-      </div>
     )}
 
     <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>

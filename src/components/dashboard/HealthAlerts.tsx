@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, Info, Target, AlertTriangle, ShieldCheck, ShieldAlert, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 export type AlertType = "info" | "success" | "warning" | "danger";
 
@@ -30,24 +31,38 @@ export function HealthAlerts({ alerts, onDismiss }: HealthAlertsProps) {
   if (alerts.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {alerts.map((alert) => {
         const style = alertStyles[alert.type];
         const Icon = alert.icon;
         return (
           <div
             key={alert.id}
-            className={`flex items-start gap-3 p-3.5 rounded-xl border ${style.bg} ${style.border} ${style.text} transition-all duration-200 animate-in fade-in slide-in-from-top-2 ${alert.actionRoute ? "cursor-pointer hover:shadow-md" : ""}`}
+            className={cn(
+              "flex items-start gap-3 p-4 rounded-2xl border transition-all duration-300 animate-in fade-in slide-in-from-top-2",
+              style.bg,
+              style.border,
+              style.text,
+              alert.actionRoute ? "cursor-pointer hover:shadow-lg hover:scale-[1.01] active:scale-95 group" : ""
+            )}
             onClick={() => { if (alert.actionRoute) navigate(alert.actionRoute); }}
           >
-            <Icon className={`h-5 w-5 mt-0.5 shrink-0 ${style.iconColor}`} />
-            <p className="text-sm font-medium leading-tight flex-1">{alert.message}</p>
-            {alert.actionRoute && <ChevronRight className="h-4 w-4 mt-1 opacity-50 shrink-0" />}
+            <div className={cn("p-2 rounded-xl shrink-0 mt-0.5", style.bg.replace('500/10', '500/20'))}>
+              <Icon className={cn("h-4 w-4", style.iconColor)} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold leading-relaxed line-clamp-2">{alert.message}</p>
+              {alert.actionRoute && (
+                <span className="text-[10px] font-bold uppercase tracking-wider opacity-70 mt-1 flex items-center gap-1 group-hover:opacity-100 transition-opacity">
+                  Ver detalhes <ChevronRight className="h-3 w-3" />
+                </span>
+              )}
+            </div>
             <button
               onClick={(e) => { e.stopPropagation(); onDismiss(alert.id); }}
-              className="mt-0.5 ml-2 text-current opacity-50 hover:opacity-100 transition-opacity"
+              className="mt-0.5 ml-2 p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors opacity-40 hover:opacity-100"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
         );
