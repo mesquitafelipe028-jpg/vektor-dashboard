@@ -343,6 +343,17 @@ export default function Accounts() {
     setCor(account.cor);
     setIcone(account.icone);
     setClassificacao(account.classificacao);
+    
+    // Load existing credit card configurations
+    if (account.tipo === "cartao") {
+      const cartao = cartoesCredito.find(c => namesMatch(account.nome, c.nome));
+      if (cartao) {
+        setLimiteTotal(String(cartao.limite_total || ""));
+        setDiaFechamento(String(cartao.dia_fechamento || "1"));
+        setDiaVencimento(String(cartao.dia_vencimento || "10"));
+      }
+    }
+    
     setOpen(true);
   };
 
@@ -359,29 +370,57 @@ export default function Accounts() {
       classificacao,
     };
 
+    const parseCurrency = (val: string) => {
+      if (!val) return 0;
+      return parseFloat(val.toString().replace(/\./g, "").replace(",", ".")) || 0;
+    };
+
     try {
       if (editingAccount) {
         await updateAccount.mutateAsync({ id: editingAccount.id, ...payload });
+        
+        if (tipo === "cartao") {
+           const existing = cartoesCredito.find(c => namesMatch(editingAccount.nome, c.nome));
+           if (existing) {
+             await supabase.from("cartoes_credito").update({
+                nome: nome.trim(),
+                limite_total: parseCurrency(limiteTotal),
+                dia_fechamento: parseInt(diaFechamento) || 1,
+                dia_vencimento: parseInt(diaVencimento) || 10,
+                banco: bancoId || null,
+             }).eq("id", existing.id);
+           }
+        }
         toast.success("Conta atualizada!");
       } else {
         const newAccount = await createAccount.mutateAsync(payload as ContaFinanceiraInsert);
 
-        // Se tipo cartão → também criar em cartoes_credito
-        if (tipo === "cartao" && limiteTotal) {
-          await supabase.from("cartoes_credito").insert({
-            nome: nome.trim(),
-            limite_total: parseFloat(limiteTotal) || 0,
-            dia_fechamento: parseInt(diaFechamento) || 1,
-            dia_vencimento: parseInt(diaVencimento) || 10,
-            tipo_conta: classificacao,
-            banco: bancoId || null,
-            user_id: user.id,
-          } as any);
-          queryClient.invalidateQueries({ queryKey: ["cartoes_credito"] });
+        if (tipo === "cartao") {
+          const existingMatch = cartoesCredito.find(c => namesMatch(nome.trim(), c.nome));
+          if (existingMatch) {
+             // Atualiza cartão oculto que ficou salvo
+             await supabase.from("cartoes_credito").update({
+                limite_total: parseCurrency(limiteTotal),
+                dia_fechamento: parseInt(diaFechamento) || 1,
+                dia_vencimento: parseInt(diaVencimento) || 10,
+                banco: bancoId || null,
+             }).eq("id", existingMatch.id);
+          } else {
+             // Cria novo
+             await supabase.from("cartoes_credito").insert({
+                nome: nome.trim(),
+                limite_total: parseCurrency(limiteTotal),
+                dia_fechamento: parseInt(diaFechamento) || 1,
+                dia_vencimento: parseInt(diaVencimento) || 10,
+                tipo_conta: classificacao,
+                banco: bancoId || null,
+                user_id: user.id,
+             } as any);
+          }
         }
 
         // Se houver saldo inicial, criar uma transação de ajuste
-        const initialBalance = parseFloat(saldo) || 0;
+        const initialBalance = parseCurrency(saldo);
         if (initialBalance !== 0) {
           await supabase.from("transactions").insert({
             user_id: user.id,
@@ -397,6 +436,7 @@ export default function Accounts() {
 
         toast.success(tipo === "cartao" ? "Cartão criado! Clique no card para gerenciar faturas." : "Conta criada com sucesso!");
       }
+      queryClient.invalidateQueries({ queryKey: ["cartoes_credito"] });
       resetForm();
       setOpen(false);
     } catch {
@@ -508,9 +548,8 @@ export default function Accounts() {
                   <div className="space-y-1">
                     <Label className="text-xs">Limite total (R$)</Label>
                     <Input
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      step="0.01"
                       placeholder="Ex: 5000,00"
                       value={limiteTotal}
                       onChange={(e) => setLimiteTotal(e.target.value)}
@@ -543,11 +582,11 @@ export default function Accounts() {
               <div className="space-y-2">
                 <Label>Saldo inicial</Label>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="0,00"
                   value={saldo}
                   onChange={(e) => setSaldo(e.target.value)}
-                  step="0.01"
                 />
               </div>
 
